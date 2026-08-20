@@ -1,0 +1,12 @@
+names:
+- Road
+nc: 1
+roboflow:
+  license: CC BY 4.0
+  project: road-atwrz
+  url: https://universe.roboflow.com/gabriel-zisua/road-atwrz/dataset/3
+  version: 3
+  workspace: gabriel-zisua
+test: ../test/images
+train: ../train/images
+val: ../valid/images
