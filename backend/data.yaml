@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 4
+names: ['Alligator Crack', 'Longitudinal Crack', 'Pothole', 'Transverse Crack']
+
+roboflow:
+  workspace: gab-pkfzz
+  project: my-first-project-oy4hj-hpy62
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/gab-pkfzz/my-first-project-oy4hj-hpy62/dataset/1
