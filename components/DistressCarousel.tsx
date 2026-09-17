@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { SeverityBadge } from './Severity';
 import type { Distress } from './UploadResultUi';
 
@@ -19,15 +19,15 @@ import type { Distress } from './UploadResultUi';
  * number of detections, a disabled arrow tells you where you are in the set.
  */
 export default function DistressCarousel({ distresses }: { distresses: Distress[] }) {
-  const [index, setIndex] = useState(0);
+  const [rawIndex, setIndex] = useState(0);
   const viewportRef = useRef<HTMLDivElement>(null);
 
   const total = distresses.length;
 
-  // Guard against the index dangling past the end if the data changes.
-  useEffect(() => {
-    setIndex((current) => (current >= total ? Math.max(0, total - 1) : current));
-  }, [total]);
+  // Clamped during render rather than corrected in an effect: if the detection
+  // list shrinks, a stale index is simply never read, with no extra render pass
+  // and no frame showing the wrong slide.
+  const index = Math.min(rawIndex, Math.max(0, total - 1));
 
   if (total === 0) {
     return (

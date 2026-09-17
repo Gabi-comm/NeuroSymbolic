@@ -101,6 +101,8 @@ export default function Navigation() {
       pathname === href ? 'text-oasys-blue' : 'text-white hover:text-oasys-blue'
     }`;
 
+  const isActive = (href: string) => (pathname === href ? 'true' : 'false');
+
   return (
     <>
       <nav
@@ -125,7 +127,13 @@ export default function Navigation() {
           {/* Desktop */}
           <div className="hidden md:flex items-center gap-7">
             {links.map((link) => (
-              <Link key={link.href} href={link.href} className={linkClass(link.href)}>
+              <Link
+                key={link.href}
+                href={link.href}
+                data-active={isActive(link.href)}
+                aria-current={pathname === link.href ? 'page' : undefined}
+                className={`nav-link ${linkClass(link.href)}`}
+              >
                 {link.label}
               </Link>
             ))}
@@ -200,7 +208,10 @@ export default function Navigation() {
                 // Closed on click rather than in an effect on pathname: the effect
                 // fired a synchronous setState on every navigation.
                 onClick={() => setMenuOpen(false)}
-                className={`${linkClass(link.href)} py-3 px-2 rounded-lg hover:bg-white/5`}
+                aria-current={pathname === link.href ? 'page' : undefined}
+                className={`${linkClass(link.href)} py-3 px-2 rounded-lg hover:bg-white/5 transition-colors ${
+                  pathname === link.href ? 'bg-white/5' : ''
+                }`}
               >
                 {link.label}
               </Link>

@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import Navigation from '@/components/Navigation';
+import PageTransition from '@/components/PageTransition';
 
 // This file was "use client", which opted the entire app out of Server
 // Components and made a `metadata` export impossible -- the site had no title,
@@ -37,7 +38,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to content
         </a>
         <Navigation />
-        <div id="content">{children}</div>
+        <div id="content">
+          <PageTransition>{children}</PageTransition>
+        </div>
       </body>
     </html>
   );

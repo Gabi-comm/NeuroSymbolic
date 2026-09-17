@@ -113,6 +113,48 @@ nav {
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
 }
 
+/* Page cross-fade. Remounted per route by PageTransition's key, which is what
+   restarts the animation. `will-change` is deliberately omitted: the animation
+   runs once on mount and pinning a layer for it costs more than it saves. */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.page-enter {
+  animation: page-enter 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Sliding underline on the active nav item. */
+.nav-link {
+  position: relative;
+}
+.nav-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-oasys-blue);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nav-link:hover::after {
+  transform: scaleX(0.4);
+}
+.nav-link[data-active='true']::after {
+  transform: scaleX(1);
+}
+
 .bg-dark-card {
   background-color: var(--color-card-bg);
   border-radius: var(--radius-oasys);

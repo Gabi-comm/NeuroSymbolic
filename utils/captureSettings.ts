@@ -118,6 +118,19 @@ export function useHasAcknowledged(): boolean {
   return useSyncExternalStore(subscribe, hasAcknowledged, getServerSnapshot);
 }
 
+const getServerGsd = () => DEFAULT_GSD_MM_PX;
+
+/**
+ * The acknowledged scale, read through the store.
+ *
+ * Calling getAcknowledgedGsd() directly during render would read sessionStorage
+ * on the client and the default on the server, producing a hydration mismatch
+ * whenever the inspector had entered a non-default road width.
+ */
+export function useAcknowledgedGsd(): number {
+  return useSyncExternalStore(subscribe, getAcknowledgedGsd, getServerGsd);
+}
+
 export function getAcknowledgedGsd(): number {
   try {
     const stored = sessionStorage.getItem(GSD_KEY);

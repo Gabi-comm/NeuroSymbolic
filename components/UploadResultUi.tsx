@@ -6,7 +6,7 @@ import { supabase } from '@/utils/supabase';
 import LoginModal from './LoginModal';
 import { readPendingScan, clearPendingScan } from '@/utils/pendingScan';
 import { getAcknowledgedGsd } from '@/utils/captureSettings';
-import { SeverityBadge, SeverityMeter, SEVERITY_RANK, type Severity } from './Severity';
+import { SEVERITY, SEVERITY_RANK, toSeverity, type Severity } from './Severity';
 import DistressCarousel from './DistressCarousel';
 
 export interface Distress {
@@ -49,8 +49,6 @@ interface UploadResultUiProps {
   backLinkHref: string;
   analysisData?: AnalysisData;
 }
-
-const panel = 'bg-surface-light rounded-2xl p-5 sm:p-6 text-black flex flex-col';
 
 export default function UploadResultUi({ backLinkHref, analysisData }: UploadResultUiProps) {
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -286,147 +284,190 @@ export default function UploadResultUi({ backLinkHref, analysisData }: UploadRes
     );
   }
 
+  const primary = primaryDistress(data.distresses);
+  const severityKey = toSeverity(data.overall_severity);
+  const accent = severityKey ? SEVERITY[severityKey] : null;
+
   return (
-    <div className="pt-28 sm:pt-32 px-4 sm:px-10 pb-16 min-h-screen bg-panel-bg text-white">
+    <div className="pt-28 sm:pt-32 px-4 sm:px-10 pb-16 min-h-screen bg-dark-bg text-white">
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
 
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-start gap-4 mb-6">
+      <div className="max-w-6xl mx-auto flex flex-col gap-5">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-oasys-blue font-bold text-sm uppercase tracking-wider mb-1">
-              Analysis results
+              Analysis complete
             </p>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black leading-tight">
               Road damage report
             </h1>
           </div>
           <Link
             href={backLinkHref}
-            className="text-white hover:text-gray-300 transition shrink-0 p-2"
             aria-label="Back"
+            className="p-2 rounded-full hover:bg-white/10 transition-all group shrink-0"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-7 w-7"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={3}
-              aria-hidden="true"
-            >
+            <svg className="h-6 w-6 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Image, location, detections */}
-          <div className={panel}>
-            <div className="flex items-center gap-2 mb-2">
-              <span aria-hidden="true" className="text-sm">
-                📄
+        {/* Verdict strip — the first thing an inspector needs: how bad is it. */}
+        <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-7">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-8">
+            <div className="flex items-center gap-4 min-w-0">
+              <span
+                aria-hidden="true"
+                className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${
+                  accent ? accent.solid : 'bg-white/10'
+                }`}
+              >
+                <span className="scale-[1.9]">{accent?.icon}</span>
               </span>
-              <p className="text-sm font-bold text-zinc-600 truncate" title={data.filename}>
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-0.5">
+                  Overall severity
+                </p>
+                <p className="text-3xl sm:text-4xl font-black leading-none">
+                  {data.overall_severity}
+                </p>
+              </div>
+            </div>
+
+            <div className="hidden lg:block w-px self-stretch bg-white/10" />
+
+            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3 grow text-sm">
+              <div>
+                <dt className="text-xs text-gray-500 font-bold uppercase tracking-wide">Detections</dt>
+                <dd className="font-black tabular-nums">{data.distresses.length}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500 font-bold uppercase tracking-wide">Main defect</dt>
+                <dd className="font-bold truncate" title={primary?.label}>
+                  {primary?.label ?? '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500 font-bold uppercase tracking-wide">Crack extent</dt>
+                <dd className="font-black tabular-nums">
+                  {data.crack_density_pct?.toFixed(2) ?? '—'}%
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500 font-bold uppercase tracking-wide">Scale</dt>
+                <dd className="font-black tabular-nums">
+                  {data.gsd_mm_px?.toFixed(3) ?? '—'} mm/px
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+
+        {/* Evidence + detections */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* Annotated image gets two thirds: it is the evidence. */}
+          <section className="lg:col-span-2 bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-6 flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-black">Detected damage</h2>
+              <p className="text-xs text-gray-500 font-bold truncate max-w-[14rem]" title={data.filename}>
                 {data.filename}
               </p>
             </div>
 
-            <div className="bg-zinc-800 rounded-xl w-full aspect-video mb-4 overflow-hidden border border-gray-400">
-              {/* eslint-disable-next-line @next/next/no-img-element -- base64 data URL from the API */}
+            <div className="rounded-2xl overflow-hidden bg-black border border-white/10">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={data.fileUrl}
                 alt="Road image with detected damage outlined and crack centrelines traced"
-                className="w-full h-full object-contain"
+                className="w-full h-auto max-h-[30rem] object-contain"
               />
             </div>
 
-            <h2 className="text-base font-black uppercase mb-2">Location</h2>
-            <p className="text-sm font-bold leading-snug text-zinc-800 bg-white/60 p-3 rounded-xl border border-white/40 mb-4 break-words">
-              <span aria-hidden="true">📍 </span>
-              {address}
-            </p>
+            <ul className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-gray-500">
+              <li><span className="inline-block w-3 h-0.5 bg-[#22c55e] align-middle mr-1.5" />Detection box</li>
+              <li><span className="inline-block w-3 h-0.5 bg-[#ef4444] align-middle mr-1.5" />Traced centreline</li>
+              <li>Perspective corrected: {data.ipm_applied ? 'yes' : 'no'}</li>
+              <li>Privacy blur: {data.privacy_blur_applied ? 'applied' : 'off'}</li>
+            </ul>
+          </section>
 
-            <h2 className="text-base font-black uppercase mb-2 flex items-center gap-2">
-              Detected damage
-              <span className="text-xs bg-zinc-800 text-white px-2 py-0.5 rounded-full">
-                {data.distresses.length}
-              </span>
-            </h2>
-
-            <DistressCarousel distresses={data.distresses} />
-          </div>
-
-          {/* Bulletin */}
-          <div className={panel}>
-            <h2 className="text-xl font-black mb-3">Maintenance bulletin</h2>
-            <div className="bg-white/50 p-4 sm:p-5 rounded-xl grow overflow-y-auto custom-scrollbar whitespace-pre-wrap text-sm font-medium border border-white/20 max-h-[32rem] leading-relaxed">
-              {data.gemini_bulletin}
-            </div>
-          </div>
-
-          {/* Severity and submission */}
           <div className="flex flex-col gap-5">
-            <div className={panel}>
-              <h2 className="text-xl font-black mb-4">Overall severity</h2>
+            <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-6">
+              <h2 className="font-black mb-3">
+                Findings{' '}
+                <span className="text-xs font-bold text-gray-500">
+                  ({data.distresses.length})
+                </span>
+              </h2>
+              <DistressCarousel distresses={data.distresses} />
+            </section>
 
-              <div className="flex flex-col items-center gap-4">
-                <SeverityMeter severity={data.overall_severity} />
-
-                <dl className="w-full text-xs font-bold text-zinc-700 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-zinc-300 pt-4">
-                  <dt>Crack density</dt>
-                  <dd className="text-right">
-                    {data.crack_density_pct?.toFixed(2) ?? '—'}%
-                  </dd>
-                  <dt>Scale</dt>
-                  <dd className="text-right">{data.gsd_mm_px?.toFixed(3) ?? '—'} mm/px</dd>
-                  <dt>Perspective corrected</dt>
-                  <dd className="text-right">{data.ipm_applied ? 'Yes' : 'No'}</dd>
-                  <dt>Privacy blur</dt>
-                  <dd className="text-right">
-                    {data.privacy_blur_applied ? 'Applied' : 'Off'}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-
-            <div className={panel}>
-              {isLoading ? (
-                <p className="w-full bg-zinc-800 text-zinc-400 font-black rounded-full px-6 py-4 uppercase tracking-widest text-center text-sm animate-pulse">
-                  Checking sign-in…
-                </p>
-              ) : isSignedIn ? (
-                <>
-                  <button
-                    onClick={handleSubmitReport}
-                    disabled={isSubmitting || submitState === 'done'}
-                    className="btn-blue w-full px-6 py-4 uppercase tracking-widest text-sm"
-                  >
-                    {submitState === 'done'
-                      ? 'Report submitted ✓'
-                      : isSubmitting
-                        ? 'Submitting…'
-                        : 'Submit report'}
-                  </button>
-                  <p aria-live="polite" className="mt-2 text-center text-xs font-bold">
-                    {submitState === 'error' && (
-                      <span className="text-red-700">{submitMessage}</span>
-                    )}
-                    {submitState === 'done' && (
-                      <span className="text-green-800">Sent to the admin review queue.</span>
-                    )}
-                  </p>
-                </>
-              ) : (
-                <button
-                  onClick={() => setShowLogin(true)}
-                  className="w-full bg-zinc-800 text-white font-black rounded-full px-6 py-4 uppercase tracking-widest text-sm hover:bg-black transition-all border border-white/10"
-                >
-                  Sign in to submit
-                </button>
-              )}
-            </div>
+            <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-6">
+              <h2 className="font-black mb-2">Location</h2>
+              <p className="text-sm text-gray-300 leading-snug break-words">
+                <span aria-hidden="true">📍 </span>
+                {address}
+              </p>
+            </section>
           </div>
         </div>
+
+        {/* Bulletin */}
+        <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-7">
+          <h2 className="font-black mb-1">Maintenance bulletin</h2>
+          <p className="text-xs text-gray-500 mb-4">
+            Interventions and priority are resolved from engineering rules; the summary
+            is written locally on this machine.
+          </p>
+          <div className="bg-black/30 border border-white/10 rounded-2xl p-5 whitespace-pre-wrap text-sm text-gray-200 leading-relaxed max-h-[26rem] overflow-y-auto custom-scrollbar">
+            {data.gemini_bulletin}
+          </div>
+        </section>
+
+        {/* Submit */}
+        <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="font-black mb-0.5">Submit this report</h2>
+            <p className="text-sm text-gray-400">
+              {isSignedIn
+                ? 'Sends the assessment to the admin review queue.'
+                : 'Sign in to send this to the review queue.'}
+            </p>
+            <p aria-live="polite" className="text-xs font-bold mt-1.5">
+              {submitState === 'error' && <span className="text-red-400">{submitMessage}</span>}
+              {submitState === 'done' && (
+                <span className="text-[#4ade80]">Sent to the admin review queue.</span>
+              )}
+            </p>
+          </div>
+
+          {isLoading ? (
+            <p className="px-8 py-3.5 rounded-full bg-white/5 text-gray-500 font-bold text-sm animate-pulse text-center">
+              Checking sign-in…
+            </p>
+          ) : isSignedIn ? (
+            <button
+              onClick={handleSubmitReport}
+              disabled={isSubmitting || submitState === 'done'}
+              className="btn-blue px-10 py-3.5 w-full sm:w-auto"
+            >
+              {submitState === 'done'
+                ? 'Submitted ✓'
+                : isSubmitting
+                  ? 'Submitting…'
+                  : 'Submit report'}
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowLogin(true)}
+              className="px-10 py-3.5 rounded-full font-bold bg-white/10 hover:bg-white/20 border border-white/15 transition-colors w-full sm:w-auto"
+            >
+              Sign in to submit
+            </button>
+          )}
+        </section>
       </div>
     </div>
   );
