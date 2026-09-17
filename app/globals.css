@@ -1,29 +1,53 @@
 @import "tailwindcss";
 
-@layer components {
-  .nav-hidden {
-    transform: translateY(-100%);
-    opacity: 0;
-    pointer-events: none;
-  }
+/* ===========================================================================
+   OASYS design tokens
 
-  .nav-visible {
-    transform: translateY(0);
-    opacity: 1;
-    pointer-events: auto;
-  }
-}
-
-nav {
-  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
-}
+   Single source of truth. Tailwind v4 is CSS-first: it reads @theme here and
+   does NOT auto-load tailwind.config.ts, which is why that file (and the
+   duplicate postcss config) were deleted rather than maintained.
+   =========================================================================== */
 
 @theme {
+  /* Surfaces */
   --color-oasys-blue: #3b82f6;
-  --color-dark-bg: #1a1a1a;   
-  --color-card-bg: #262626;   
-  --radius-oasys: 40px;        
-  --spacing-150: 600px;
+  --color-oasys-blue-hover: #2563eb;
+  --color-dark-bg: #1a1a1a;
+  --color-card-bg: #262626;
+  --color-panel-bg: #1e1e1e;
+  --color-surface-light: #d9d9d9;
+  --color-admin-bg: #525252;
+
+  /* Severity. One definition for the whole app. Medium was previously yellow on
+     the dashboard and orange on the reports page; for a tool whose entire output
+     is a severity grade, that is the one colour that cannot drift.
+
+     Values chosen with scripts/validate_palette.js rather than by eye.
+
+     Dark surfaces  green #16a34a, amber #fbbf24, red #dc2626
+       CVD separation 15.2 (protan), normal-vision 27.6, contrast >= 3:1 - all pass.
+       The amber sits above the categorical lightness band on purpose: that band
+       exists to keep series co-equal, and severity is deliberately NOT co-equal.
+
+     Light surfaces  green #15803d, amber #854d0e, red #dc2626
+       Normal-vision 17.5 and contrast pass. Deuteranope separation of the
+       red/amber pair is poor (2.8) and cannot be fixed on a light surface while
+       keeping traffic-light semantics - both are dark warms. That pair is
+       therefore carried by shape and by the word itself, never by hue alone;
+       see components/Severity.tsx. */
+  --color-severity-low: #16a34a;
+  --color-severity-low-light: #15803d;
+  --color-severity-medium: #fbbf24;
+  --color-severity-medium-light: #854d0e;
+  --color-severity-high: #dc2626;
+  --color-severity-high-light: #dc2626;
+
+  /* Chart marks. Single-series throughout, so no categorical palette is needed
+     and no CVD adjacency applies. */
+  --color-chart-mark: #3b82f6;
+
+  --radius-oasys: 40px;
+  --radius-panel: 30px;
 }
 
 :root {
@@ -34,9 +58,34 @@ nav {
 body {
   min-height: 100vh;
   margin: 0;
+  /* Nothing should ever scroll sideways on a phone. */
+  overflow-x: hidden;
 }
 
-/* Custom classes using the variables we defined above */
+/* Respect the OS reduced-motion setting. Several screens animate-pulse. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Visible keyboard focus. The file inputs are hidden inside <label>, so without
+   this there was no way to tell where focus was when tabbing. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--color-oasys-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+nav {
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+}
+
 .bg-dark-card {
   background-color: var(--color-card-bg);
   border-radius: var(--radius-oasys);
@@ -56,5 +105,53 @@ body {
 }
 
 .btn-blue:hover {
-  filter: brightness(1.1);
+  background-color: var(--color-oasys-blue-hover);
+}
+
+.btn-blue:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Scrollable panels inside the light cards. */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.3) transparent;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+}
+
+/* Keyboard users land on the nav on every page otherwise. */
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  z-index: 200;
+  background: var(--color-oasys-blue);
+  color: white;
+  font-weight: 700;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0 0 0.75rem 0.75rem;
+  transition: top 0.2s ease;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+/* Screen-reader-only text, for the non-colour severity cue. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }

@@ -7,6 +7,9 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
   const [isLogin, setIsLogin] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  // Replaces alert(): a blocking native dialog is the wrong feedback for a form
+  // that already has a place to show messages.
+  const [successMsg, setSuccessMsg] = useState("");
 
   // Form Data State
   const [email, setEmail] = useState("");
@@ -54,11 +57,11 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
         await new Promise(resolve => setTimeout(resolve, 500));
         await supabase.auth.signOut();
         
-        alert("Account created! Please log in.");
         toggleMode(true); // Switch to the login panel
+        setSuccessMsg("Account created. You can sign in now.");
         
-      } catch (error: any) {
-        setErrorMsg(error.message || "Failed to create account.");
+      } catch (error) {
+        setErrorMsg(error instanceof Error ? error.message : "Failed to create account.");
       } finally {
         setIsLoading(false);
       }
@@ -70,7 +73,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
         setErrorMsg("");
 
         try {
-                const { data, error } = await supabase.auth.signInWithPassword({
+                const { error } = await supabase.auth.signInWithPassword({
                   email,
                   password,
                 });
@@ -78,7 +81,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
                 if (error) throw error;
                 onClose();
           
-        } catch (error: any) {
+        } catch {
           setErrorMsg("Invalid email or password.");
         } finally {
           setIsLoading(false);
@@ -98,10 +101,10 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
       const { error } = await supabase.auth.resetPasswordForEmail(email);
       if (error) throw error;
       
-      alert(`Password reset link sent to ${email}!`);
+      setSuccessMsg(`Password reset link sent to ${email}.`);
       
-    } catch (error: any) {
-      setErrorMsg(error.message || "Failed to send reset link.");
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : "Failed to send reset link.");
     } finally {
       setIsLoading(false);
     }
@@ -111,6 +114,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
   const toggleMode = (toLogin: boolean) => {
     setIsLogin(toLogin);
     setErrorMsg("");
+    setSuccessMsg("");
     setEmail("");
     setUsername("");
     setPassword("");
@@ -132,7 +136,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
           {/* CHANGED TEXT COLOR TO #262626 HERE */}
           <h2 className="text-4xl font-black mb-6 text-center text-[#262626]">Sign Up</h2>
           
-          {errorMsg && !isLogin && <p className="text-red-500 text-xs font-bold text-center mb-2">{errorMsg}</p>}
+          {errorMsg && !isLogin && <p role="alert" className="text-red-600 text-xs font-bold text-center mb-2">{errorMsg}</p>}
 
           <form onSubmit={handleSignUp} className="space-y-4">
             <div>
@@ -187,7 +191,8 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
           {/* CHANGED TEXT COLOR TO #262626 HERE */}
           <h2 className="text-4xl font-black mb-6 text-center text-[#262626]">Log In</h2>
           
-          {errorMsg && isLogin && <p className="text-red-500 text-xs font-bold text-center mb-2">{errorMsg}</p>}
+          {errorMsg && isLogin && <p role="alert" className="text-red-600 text-xs font-bold text-center mb-2">{errorMsg}</p>}
+          {successMsg && isLogin && <p role="status" className="text-green-700 text-xs font-bold text-center mb-2">{successMsg}</p>}
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>

@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.local.example
+!backend/.env.example
 
 # vercel
 .vercel
@@ -39,3 +41,21 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ---- Python / ML (added Phase 0) ----
+deps/
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Model weights: distribute via GitHub Release assets or Git LFS, not the repo.
+*.pt
+*.pth
+
+# Training artifacts and datasets
+runs/
+road-3/
+My-First-Project-1/
+*.cache

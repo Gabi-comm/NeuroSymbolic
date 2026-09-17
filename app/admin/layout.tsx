@@ -1,31 +1,39 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/utils/supabase';
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  // Use a ref to track if we've already passed the check once in this session
-  const hasVerified = useRef(false);
-  
-  // Initialize state based on whether we've already verified
-  const [isAuthorized, setIsAuthorized] = useState(hasVerified.current);
-  const [authMessage, setAuthMessage] = useState("Verifying Admin Access...");
+type AuthState = 'checking' | 'authorized' | 'denied';
+
+/**
+ * Client-side admin gate.
+ *
+ * This is a UX guard, not a security boundary. It stops a non-admin from seeing
+ * the console shell, but anyone can bypass it in a debugger. The real boundaries
+ * are `proxy.ts` (signed-in check) and, decisively, Supabase RLS -- the anon key
+ * ships to every browser, so only a database policy actually protects the rows.
+ *
+ * The previous version read `useRef().current` during render to seed state and
+ * looped the effect on its own output. A plain state machine does the same job
+ * without either problem.
+ */
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const [authState, setAuthState] = useState<AuthState>('checking');
   const router = useRouter();
 
   useEffect(() => {
-    // IF we are already authorized, don't run the fetch again
-    if (isAuthorized) return;
+    let isMounted = true;
 
     const checkAdminStatus = async () => {
       try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
 
         if (authError || !user) {
+          if (isMounted) setAuthState('denied');
           router.replace('/');
           return;
         }
@@ -36,34 +44,37 @@ export default function AdminLayout({
           .eq('userloginuuid', user.id)
           .maybeSingle();
 
-        if (dbError || !profile || profile.role?.toLowerCase() !== 'admin') {
-          setAuthMessage("Access Denied.");
+        if (dbError || profile?.role?.toLowerCase() !== 'admin') {
+          if (isMounted) setAuthState('denied');
           router.replace('/');
           return;
         }
 
-        // SUCCESS: Set both the Ref and the State
-        hasVerified.current = true;
-        setIsAuthorized(true);
-
-      } catch (err) {
-        console.error("Auth Error:", err);
+        if (isMounted) setAuthState('authorized');
+      } catch {
+        if (isMounted) setAuthState('denied');
         router.replace('/');
       }
     };
 
     checkAdminStatus();
-  }, [isAuthorized, router]);
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
-  // Only show the loading screen if we haven't authorized yet
-  if (!isAuthorized) {
+  if (authState !== 'authorized') {
     return (
-      <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center text-white">
-        <p className="animate-pulse font-bold tracking-widest uppercase text-sm">{authMessage}</p>
+      <div
+        className="min-h-screen bg-dark-bg flex items-center justify-center text-white px-4"
+        aria-live="polite"
+      >
+        <p className="font-bold tracking-widest uppercase text-sm text-center">
+          {authState === 'checking' ? 'Verifying admin access…' : 'Access denied. Redirecting…'}
+        </p>
       </div>
     );
   }
 
-  // Once authorized, this stays rendered even when switching sub-pages!
   return <>{children}</>;
 }

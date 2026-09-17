@@ -1,24 +1,38 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+// Next.js 16 renamed middleware.ts to proxy.ts; the exported function must be `proxy`.
+//
+// This is a first gate only. It can cheaply tell whether someone is signed in,
+// but it cannot tell whether they are an admin without a database round trip on
+// every request. The real boundaries are:
+//
+//   1. app/admin/layout.tsx  — checks UserDetail.role before rendering
+//   2. Supabase RLS          — the only one that actually protects the data,
+//                              since the anon key ships to every browser
+//
+// The previous version looked for a cookie named 'auth_token' that Supabase
+// never sets, and had its redirect commented out, so it did nothing at all.
 export function proxy(request: NextRequest) {
-  // 1. Check if the user is trying to access any /admin route
-  if (request.nextUrl.pathname.startsWith('/admin')) {
-    
-    // 2. Check for your auth token/cookie (Replace this with your actual auth logic)
-    const isAuthenticated = request.cookies.get('auth_token'); 
-
-    // 3. If they aren't logged in, kick them back to the login page
-    if (!isAuthenticated) {
-      //return NextResponse.redirect(new URL('/login', request.url));
-    }
+  if (!request.nextUrl.pathname.startsWith('/admin')) {
+    return NextResponse.next();
   }
 
-  // Otherwise, let them through!
+  // Supabase stores its session as sb-<project-ref>-auth-token, sometimes split
+  // across .0/.1 chunks when the JWT is large. Match the family, not one name.
+  const hasSession = request.cookies
+    .getAll()
+    .some(({ name, value }) => /^sb-.*-auth-token(\.\d+)?$/.test(name) && value);
+
+  if (!hasSession) {
+    const redirectUrl = new URL('/', request.url);
+    redirectUrl.searchParams.set('signIn', 'required');
+    return NextResponse.redirect(redirectUrl);
+  }
+
   return NextResponse.next();
 }
 
-// 4. The Matcher: Tells the proxy to ONLY run on admin pages to save performance
 export const config = {
   matcher: ['/admin/:path*'],
 };

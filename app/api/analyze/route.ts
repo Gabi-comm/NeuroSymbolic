@@ -1,40 +1,42 @@
 import { NextResponse } from 'next/server';
 
+// Single server-side entry point to the Python backend.
+//
+// The browser must never call the FastAPI host directly: a hardcoded
+// http://localhost:8000 works only on the developer's machine and breaks the
+// moment the app is deployed. Everything goes through this route, which reads
+// the backend location from the environment.
+const API_BASE_URL = process.env.API_BASE_URL ?? 'http://127.0.0.1:8000';
+
 export async function POST(request: Request) {
   try {
-    // 1. Get the image data sent from your frontend page
     const body = await request.json();
 
-    // 2. Forward that exact data to your Python FastAPI server
-    const pythonResponse = await fetch('http://127.0.0.1:8000/analyze-road', {
+    const pythonResponse = await fetch(`${API_BASE_URL}/analyze-road`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
 
-    // 3. Check if Python crashed or returned an error
     if (!pythonResponse.ok) {
       const errorText = await pythonResponse.text();
-      console.error("Python Backend Error:", errorText);
+      console.error('Python backend error:', errorText);
       return NextResponse.json(
-        { error: `Python backend failed: ${pythonResponse.status}` }, 
+        { error: `Analysis backend returned ${pythonResponse.status}.` },
         { status: pythonResponse.status }
       );
     }
 
-    // 4. Get the successful AI data back from Python
-    const data = await pythonResponse.json();
-    
-    // 5. Send it back to your frontend UI to display!
-    return NextResponse.json(data);
-
+    return NextResponse.json(await pythonResponse.json());
   } catch (error) {
-    console.error("Next.js API Route Error:", error);
+    console.error('Analyze route error:', error);
     return NextResponse.json(
-      { error: 'Failed to communicate with the Python backend.' }, 
-      { status: 500 }
+      {
+        error:
+          'Could not reach the analysis backend. Make sure the Python server is running ' +
+          `(uvicorn api:app) and that API_BASE_URL points at it (currently ${API_BASE_URL}).`,
+      },
+      { status: 502 }
     );
   }
 }
