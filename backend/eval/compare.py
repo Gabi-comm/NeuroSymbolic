@@ -44,6 +44,10 @@ METHODS = {
     "severity_legacy_crisp": "Legacy 3/6 mm thresholds (pre-alignment)",
 }
 
+# The DPWH two-band verdict is deliberately NOT in METHODS: Narrow/Wide is not on
+# the same Low/Medium/High scale as the inspector grades, so kappa against it
+# would be meaningless. It is exported for reference and manual cross-checking.
+
 SEVERITIES = ["Low", "Medium", "High"]
 
 

@@ -201,6 +201,7 @@ export default function UploadResultUi({ backLinkHref, analysisData }: UploadRes
           severity_fuzzy: primary?.severity_fuzzy ?? null,
           severity_crisp: primary?.severity_crisp ?? null,
           severity_confidence: primary?.severity_confidence ?? null,
+          severity_dpwh_nw: primary?.severity_dpwh_nw ?? null,
           membership_trace: primary?.membership_trace ?? null,
         },
       ]);

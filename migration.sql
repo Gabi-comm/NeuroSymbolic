@@ -63,6 +63,8 @@ alter table "FileUpload" add column if not exists observation_details jsonb;
 alter table "FileUpload" add column if not exists severity_fuzzy      text;
 alter table "FileUpload" add column if not exists severity_crisp      text;
 alter table "FileUpload" add column if not exists severity_confidence text;
+-- The literal DPWH two-band verdict (Narrow / Wide), D.O. 120 s.2019.
+alter table "FileUpload" add column if not exists severity_dpwh_nw    text;
 alter table "FileUpload" add column if not exists membership_trace    jsonb;
 alter table "FileUpload" add column if not exists crack_density_pct   double precision;
 alter table "FileUpload" add column if not exists gsd_mm_px           double precision;
