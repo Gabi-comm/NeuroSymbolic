@@ -50,6 +50,33 @@
   --radius-panel: 30px;
 }
 
+/* ---------------------------------------------------------------------------
+   Black gradient brand theme.
+
+   Blue is kept as the *interactive* accent -- buttons, links, focus rings --
+   because removing it would leave nothing to signal what is clickable, and the
+   focus ring has to stay high-contrast for keyboard users. What changed is the
+   brand surfaces: panels that were flat #3b82f6 are now black gradients, with
+   the logo's silver reading against them.
+   --------------------------------------------------------------------------- */
+
+.bg-brand-gradient {
+  background-image:
+    radial-gradient(120% 120% at 15% 0%, rgba(59, 130, 246, 0.14) 0%, transparent 55%),
+    linear-gradient(155deg, #000000 0%, #0d0d0d 38%, #1c1c1c 72%, #101010 100%);
+}
+
+.bg-panel-gradient {
+  background-image: linear-gradient(160deg, #202020 0%, #171717 50%, #0e0e0e 100%);
+}
+
+/* Header bands on the admin console and page heroes. */
+.bg-header-gradient {
+  background-image:
+    radial-gradient(90% 140% at 85% 0%, rgba(59, 130, 246, 0.12) 0%, transparent 60%),
+    linear-gradient(180deg, #000000 0%, #0a0a0a 60%, #151515 100%);
+}
+
 :root {
   background-color: var(--color-dark-bg);
   color: white;

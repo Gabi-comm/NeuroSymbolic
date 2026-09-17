@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 
 export default function HomePage() {
@@ -42,9 +43,17 @@ export default function HomePage() {
         />
       </div>
 
-      <div aria-hidden="true" className="absolute inset-0 z-0 bg-black/60 pointer-events-none" />
+      <div aria-hidden="true" className="absolute inset-0 z-0 bg-gradient-to-b from-black/90 via-black/70 to-black/90 pointer-events-none" />
 
       <div className="z-10 text-white flex flex-col items-center w-full max-w-4xl py-24">
+        <Image
+          src="/oasys-logo.png"
+          alt=""
+          width={281}
+          height={281}
+          priority
+          className="w-28 h-28 sm:w-36 sm:h-36 object-contain mb-4 drop-shadow-[0_10px_30px_rgba(0,0,0,0.8)]"
+        />
         <h1 className="text-6xl sm:text-8xl lg:text-9xl font-black mb-4 text-center tracking-tight">
           OASYS
         </h1>

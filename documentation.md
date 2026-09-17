@@ -29,6 +29,9 @@ on-field inspectors, and the public who depend on prioritised repairs.
 > **This system is a decision-support tool, not an autonomous decision-maker.**
 > All assessments are preliminary and must be validated by a licensed Civil
 > Engineer or DPWH official before repair resources are dispatched.
+>
+> *This statement is documentation only. At the researcher's request it is no
+> longer surfaced in the running interface — see the changelog.*
 
 ---
 
@@ -61,7 +64,8 @@ location out of client bundles and makes deployment possible.
 
 | # | Stage | Implementation | Output |
 |---|---|---|---|
-| 0 | Privacy blur | `apply_privacy_blur` | people and vehicle plates obscured |
+| 0a | Road gate | `road_mask_area_px` + `MIN_ROAD_COVERAGE` | 422 if under 15% coverage |
+| 0b | Privacy blur | `apply_privacy_blur` | people and vehicle plates obscured |
 | 1 | Upload | `utils/pendingScan.ts` | JPEG data URL, longest edge 1600 px |
 | 2 | Road detection | `road_model.predict` (`ultrabestroad.pt`) | road surface mask |
 | 3 | Perspective correction | `get_birds_eye_view` | 700x700 top-down view |
@@ -298,7 +302,27 @@ a `label (severity)` caption per detection.
 
 ---
 
-## 4a. Privacy preprocessing
+## 4a. Road gate
+
+Before anything is measured, `ultrabestroad.pt` must segment at least
+**15%** of the frame as road surface (`MIN_ROAD_COVERAGE`, overridable by env).
+Below that the request is refused with **HTTP 422** and
+`{"error": "no_road_detected"}`.
+
+Without this the system accepted any photograph at all. The crack detector will
+find "cracks" in a wall, a carpet or a face, and the symbolic layer then grades
+them in millimetres and prescribes DPWH interventions. **An assessment tool that
+answers questions about non-roads is more dangerous than one that refuses,
+because the output looks equally authoritative either way.**
+
+15% is deliberately permissive: a legitimate close-up taken at 2 m still fills
+most of the frame with pavement. Measured on a real Caloocan road photo the
+coverage is 68%; flat walls, noise and sky all measure 0%.
+
+The frontend renders the refusal as a dedicated screen with capture guidance
+rather than a generic error.
+
+## 4a-2. Privacy preprocessing
 
 Section 3.3.D commits to "automated blurring for data privacy", and section 3.5
 claims RA 10173 compliance. Both are now implemented.
@@ -588,3 +612,19 @@ previous revision:
 The study's **original 3.0 mm figure was correct all along**; its 6.0 mm second
 cut has no DPWH basis. Added `severity_dpwh_nw`, the literal Narrow/Wide verdict,
 alongside the graded outputs. Full evidence in `proof.md`.
+
+### Interface changes (2026-09-17, later)
+
+- **Road gate added.** Images with under 15% detected road surface are refused
+  with HTTP 422 rather than analysed. See §4a.
+- **All preliminary-assessment disclaimers removed** at the researcher's
+  request — both the result-screen banner and the bulletin's Note section.
+  ⚠️ *Section 3.5 of the paper commits to a "mandatory disclaimer" stating that
+  assessments are preliminary and must be validated by a licensed Civil Engineer
+  or DPWH official. **The interface no longer carries one anywhere.** Section 3.5
+  must be revised to match the shipped system before defence.*
+- **Sign-in / sign-up redesigned.** The previous modal was a fixed 800x500 box
+  with absolutely-positioned half-panels and a sliding cover; it overflowed the
+  viewport on a phone. Now one column on mobile, two on desktop, with a
+  segmented control, password visibility toggle, Escape-to-close, focus
+  management and scroll lock. Opens on Sign in, matching its trigger button.

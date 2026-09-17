@@ -264,7 +264,7 @@ export default function AdminReports() {
 
   return (
     <div className="min-h-screen bg-admin-bg">
-      <header className="bg-black text-white rounded-b-[50px] px-4 sm:px-12 pt-28 sm:pt-32 pb-12 shadow-2xl">
+      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-12 pt-28 sm:pt-32 pb-12 shadow-2xl">
         <div className="max-w-7xl mx-auto flex justify-between items-end gap-4">
           <div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-2">Reports</h1>

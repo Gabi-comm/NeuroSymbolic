@@ -65,9 +65,9 @@ export default function AboutUs() {
           </p>
         </div>
 
-        <div className="flex-1 bg-oasys-blue rounded-oasys p-8 sm:p-12 text-white shadow-xl flex flex-col justify-center">
+        <div className="flex-1 bg-brand-gradient rounded-oasys p-8 sm:p-12 text-white shadow-xl border border-white/10 flex flex-col justify-center">
           <h2 className="text-3xl font-black mb-5 uppercase">What it does</h2>
-          <p className="text-lg leading-relaxed opacity-95">
+          <p className="text-lg leading-relaxed text-gray-300">
             A web-based tool that detects road defects from uploaded images and rates
             their severity using neural perception combined with rule-based reasoning
             aligned with engineering standards.
@@ -117,17 +117,17 @@ export default function AboutUs() {
       <section className="bg-card-bg rounded-oasys p-8 sm:p-12 border border-white/5">
         <h2 className="text-2xl font-black mb-2 uppercase">Severity levels</h2>
         <p className="text-gray-400 mb-6 max-w-2xl">
-          Graded from measured crack width and crack density against established
-          pavement distress thresholds — not from how confident the detector was.
+          Graded from measured crack width and crack extent against the DPWH Visual
+          Road Condition Assessment Manual — not from how confident the detector was.
         </p>
         <div className="flex flex-col sm:flex-row gap-4">
           {(['Low', 'Medium', 'High'] as const).map((level) => (
             <div key={level} className="flex-1 bg-black/25 rounded-2xl p-5 border border-white/5">
               <SeverityBadge severity={level} size="md" className="mb-3" />
               <p className="text-sm text-gray-400 leading-snug">
-                {level === 'Low' && 'Mean crack width up to 6 mm over limited extent.'}
-                {level === 'Medium' && 'Mean crack width between 6 mm and 19 mm, or widespread cracking.'}
-                {level === 'High' && 'Mean crack width above 19 mm, or extensive surface failure.'}
+                {level === 'Low' && 'Narrow cracking — 3 mm or less average width — over limited extent.'}
+                {level === 'Medium' && 'Wide cracking above 3 mm, or narrow cracking spread across much of the surface.'}
+                {level === 'High' && 'Wide cracking over extensive area, or surface failure such as a pothole.'}
               </p>
             </div>
           ))}
@@ -179,20 +179,19 @@ export default function AboutUs() {
       </section>
 
       {/* Audience */}
-      <section className="bg-oasys-blue rounded-oasys p-8 sm:p-12 text-white shadow-xl">
+      <section className="bg-brand-gradient rounded-oasys p-8 sm:p-12 text-white shadow-xl border border-white/10">
         <h2 className="text-2xl font-black mb-6 uppercase">Who it helps</h2>
         <ul className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
           {AUDIENCES.map((audience) => (
             <li key={audience.name}>
               <p className="font-black text-lg mb-1">{audience.name}</p>
-              <p className="text-sm opacity-90 leading-snug">{audience.detail}</p>
+              <p className="text-sm text-gray-400 leading-snug">{audience.detail}</p>
             </li>
           ))}
         </ul>
-        <p className="text-sm opacity-90 border-t border-white/25 pt-6 max-w-3xl">
-          OASYS is a decision-support tool, not an autonomous decision-maker. Every
-          assessment is preliminary and must be validated by a licensed Civil Engineer
-          or DPWH official before repair resources are dispatched.
+        <p className="text-sm text-gray-400 border-t border-white/15 pt-6 max-w-3xl">
+          OASYS is a decision-support tool that gives engineers objective, repeatable
+          condition data to prioritise against.
         </p>
       </section>
 

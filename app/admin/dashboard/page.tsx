@@ -156,7 +156,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-admin-bg">
-      <header className="bg-black text-white rounded-b-[50px] px-4 sm:px-10 pt-28 sm:pt-32 pb-20 shadow-2xl">
+      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-10 pt-28 sm:pt-32 pb-20 shadow-2xl">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-5">
           <div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-2 tracking-tight">
@@ -197,8 +197,8 @@ export default function AdminDashboard() {
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-5">
-          <div className={`${statCard} bg-oasys-blue text-white`}>
-            <span className="font-bold text-sm text-blue-100">Total reports</span>
+          <div className={`${statCard} bg-brand-gradient text-white border border-white/10`}>
+            <span className="font-bold text-sm text-gray-400">Total reports</span>
             <span className="mt-auto text-5xl font-black tabular-nums">
               {isLoading ? '—' : stats.total}
             </span>

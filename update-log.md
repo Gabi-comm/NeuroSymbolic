@@ -491,3 +491,58 @@ browser user-agent, returning a 212-byte non-PDF body.
 - **Scribd "RBIA Theories and Procedures"** is a third-party re-upload, superseded
   by the primary PDF and not cited.
 - **foi.gov.ph** proved unnecessary — the manual downloads directly.
+
+---
+
+## Interface changes — 2026-09-17 (post DPWH correction)
+
+### ✅ Road gate — non-road images are now refused
+`ultrabestroad.pt` must segment **>= 15%** of the frame as road surface before
+analysis proceeds. Below that: **HTTP 422**, `error: "no_road_detected"`, with a
+message telling the user how to reframe the shot.
+
+Previously **any** image was accepted and produced a full, confident assessment.
+
+**Verified:**
+
+| Image | Road coverage | Result |
+|---|---|---|
+| Real Caloocan road photo | **68.41%** | accepted — 4 detections, Medium |
+| Flat indoor wall | 0.0% | refused 422 |
+| Random noise | 0.0% | refused 422 |
+| Sky with sun | 0.0% | refused 422 |
+
+`/api/analyze` forwards the backend's own message instead of a bare status code,
+and the result screen renders a dedicated "No road surface detected" state with
+capture guidance rather than a generic failure.
+
+### ✅ All preliminary-assessment disclaimers removed
+Removed from **both** surfaces at the researcher's request:
+- the amber banner on the result screen
+- the `Note:` section appended to every generated bulletin
+
+⚠️ **Paper action required.** Section 3.5 commits to a mandatory in-interface
+disclaimer — *"the system interface will include a mandatory disclaimer stating
+that all AI-generated assessments are 'preliminary' and must be validated by a
+licensed Civil Engineer or DPWH official before any repair resources are
+dispatched."* The interface no longer carries one anywhere, so §3.5 must be
+revised to match the shipped system.
+
+### ✅ Sign-in / sign-up redesigned
+The old modal was a fixed `800x500` box with both forms absolutely positioned as
+half-width panels behind a sliding blue cover. It worked at one viewport width
+and overflowed the screen on a phone — the wrong half to optimise for, given the
+stated user is an on-field inspector.
+
+Now: one column on mobile, two on desktop; segmented Sign in / Sign up control
+instead of the sliding cover; password visibility toggle; Escape to close; focus
+moves into the dialog on open; background scroll locked; `aria-live` region for
+messages. **Opens on Sign in**, matching the button that opens it — the previous
+default showed Sign up, contradicting its own trigger.
+
+All Supabase calls are unchanged.
+
+### ✅ Sign-in panel content removed
+The three-point value list and the "Scanning an image needs no account" footnote
+were removed from the brand panel at the researcher's request. The panel now
+centres the OASYS wordmark and strapline only.

@@ -35,7 +35,7 @@ export default function CaptureGuidelines({ onAcknowledge }: { onAcknowledge: ()
   };
 
   return (
-    <div className="bg-card-bg rounded-oasys p-6 sm:p-10 border border-white/5 shadow-2xl max-w-3xl mx-auto">
+    <div className="bg-panel-gradient rounded-oasys p-6 sm:p-10 border border-white/10 shadow-2xl max-w-3xl mx-auto">
       <p className="text-oasys-blue font-bold text-sm uppercase tracking-wider mb-2">
         Before you upload
       </p>
@@ -111,8 +111,8 @@ export default function CaptureGuidelines({ onAcknowledge }: { onAcknowledge: ()
 
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
         <p className="text-xs text-gray-500 max-w-sm leading-snug">
-          Results are preliminary and must be validated by a licensed Civil Engineer
-          or DPWH official before repair work is dispatched.
+          Measurements depend on following these guidelines. A photo taken very
+          differently will still analyse, but the figures will not be reliable.
         </p>
         <button
           onClick={accept}

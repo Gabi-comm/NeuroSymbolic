@@ -7,6 +7,7 @@ import LoginModal from './LoginModal';
 import { readPendingScan, clearPendingScan } from '@/utils/pendingScan';
 import { getAcknowledgedGsd } from '@/utils/captureSettings';
 import { SeverityBadge, SeverityMeter, SEVERITY_RANK, type Severity } from './Severity';
+import DistressCarousel from './DistressCarousel';
 
 export interface Distress {
   label: string;
@@ -65,6 +66,7 @@ export default function UploadResultUi({ backLinkHref, analysisData }: UploadRes
 
   const [data, setData] = useState<AnalysisData | null>(analysisData || null);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetchReason, setFetchReason] = useState<string | null>(null);
   const [submitState, setSubmitState] = useState<'idle' | 'done' | 'error'>('idle');
   const [submitMessage, setSubmitMessage] = useState<string>('');
 
@@ -121,6 +123,7 @@ export default function UploadResultUi({ backLinkHref, analysisData }: UploadRes
 
         if (!response.ok) {
           const detail = await response.json().catch(() => ({}));
+          setFetchReason(detail.reason ?? null);
           throw new Error(detail.error || 'Failed to process image.');
         }
 
@@ -217,13 +220,49 @@ export default function UploadResultUi({ backLinkHref, analysisData }: UploadRes
   };
 
   if (fetchError) {
+    const noRoad = fetchReason === 'no_road_detected';
+
     return (
-      <div className="pt-28 sm:pt-32 px-4 min-h-screen bg-panel-bg flex flex-col items-center justify-center text-center gap-6">
-        <div>
-          <h1 className="text-2xl font-bold text-white mb-2">Analysis failed</h1>
-          <p className="text-gray-400 max-w-md">{fetchError}</p>
+      <div className="pt-28 sm:pt-32 px-4 min-h-screen bg-panel-bg flex flex-col items-center justify-center text-center gap-7">
+        <div
+          aria-hidden="true"
+          className={`w-16 h-16 rounded-full flex items-center justify-center ${
+            noRoad ? 'bg-amber-500/15 text-amber-400' : 'bg-red-500/15 text-red-400'
+          }`}
+        >
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            {noRoad ? (
+              <>
+                <path d="M12 9v4" />
+                <path d="M12 17h.01" />
+                <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+              </>
+            ) : (
+              <>
+                <circle cx="12" cy="12" r="9" />
+                <path d="M15 9l-6 6M9 9l6 6" />
+              </>
+            )}
+          </svg>
         </div>
-        <Link href={backLinkHref} className="btn-blue px-8 py-3">
+
+        <div className="max-w-md">
+          <h1 className="text-2xl font-bold text-white mb-3">
+            {noRoad ? 'No road surface detected' : 'Analysis failed'}
+          </h1>
+          <p className="text-gray-400 leading-relaxed">{fetchError}</p>
+        </div>
+
+        {noRoad && (
+          <ul className="text-sm text-gray-400 text-left bg-black/25 border border-white/5 rounded-2xl p-5 max-w-md flex flex-col gap-2">
+            <li>• Point the camera down at the pavement, not along the street</li>
+            <li>• Stand about 2 m back, at chest height</li>
+            <li>• Keep vehicles, people and deep shadow out of the frame</li>
+            <li>• Shoot in daylight, on a clear, unobstructed surface</li>
+          </ul>
+        )}
+
+        <Link href={backLinkHref} className="btn-blue px-8 py-3.5">
           Try another image
         </Link>
       </div>
@@ -280,22 +319,6 @@ export default function UploadResultUi({ backLinkHref, analysisData }: UploadRes
           </Link>
         </div>
 
-        {/* Ethics commitment, section 3.5: the assessment is advisory only. */}
-        <div
-          role="note"
-          className="flex gap-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 mb-6"
-        >
-          <span aria-hidden="true" className="text-amber-400 font-black text-lg leading-none">
-            !
-          </span>
-          <p className="text-sm text-amber-100/90 leading-snug">
-            <strong className="font-bold">Preliminary assessment.</strong> This result is
-            produced automatically from a single 2D image and must be validated by a
-            licensed Civil Engineer or DPWH official before repair resources are
-            dispatched.
-          </p>
-        </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Image, location, detections */}
           <div className={panel}>
@@ -330,36 +353,7 @@ export default function UploadResultUi({ backLinkHref, analysisData }: UploadRes
               </span>
             </h2>
 
-            <div className="grow overflow-y-auto custom-scrollbar max-h-72 lg:max-h-none">
-              <ul className="flex flex-col gap-2">
-                {data.distresses.map((distress, index) => (
-                  <li
-                    key={index}
-                    className="flex justify-between items-center gap-3 bg-white/60 p-3 rounded-xl border border-white/40"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-bold text-sm text-zinc-900 truncate">
-                        {distress.label}
-                      </p>
-                      <p className="text-xs text-zinc-600">
-                        {distress.measurement_type}: {distress.metric_value?.toFixed(3)}{' '}
-                        {distress.unit} · {distress.width_mm?.toFixed(1)} mm wide
-                      </p>
-                      <SeverityBadge severity={distress.severity} tone="light" className="mt-1.5" />
-                    </div>
-                    <span className="bg-zinc-800 text-white text-xs font-black px-2.5 py-1.5 rounded-lg shrink-0">
-                      {(distress.confidence * 100).toFixed(0)}%
-                    </span>
-                  </li>
-                ))}
-
-                {data.distresses.length === 0 && (
-                  <li className="text-center p-4 text-zinc-500 font-bold italic">
-                    No damage detected.
-                  </li>
-                )}
-              </ul>
-            </div>
+            <DistressCarousel distresses={data.distresses} />
           </div>
 
           {/* Bulletin */}

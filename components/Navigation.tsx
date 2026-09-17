@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import LoginModal from './LoginModal';
@@ -109,8 +110,16 @@ export default function Navigation() {
         } ${menuOpen ? 'bg-dark-bg' : 'bg-dark-bg/90 backdrop-blur-sm'}`}
       >
         <div className="flex justify-between items-center gap-4 px-4 sm:px-8 py-4 sm:py-6">
-          <Link href="/" className="font-black text-lg tracking-tight shrink-0">
-            OASYS
+          <Link href="/" className="flex items-center gap-2.5 shrink-0" aria-label="OASYS home">
+            <Image
+              src="/oasys-logo-small.png"
+              alt=""
+              width={96}
+              height={96}
+              priority
+              className="w-8 h-8 object-contain"
+            />
+            <span className="font-black text-lg tracking-tight">OASYS</span>
           </Link>
 
           {/* Desktop */}

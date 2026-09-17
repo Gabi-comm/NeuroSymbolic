@@ -45,6 +45,21 @@ OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2")
 # by a factor of ~2.9 (and every area by ~8.4).
 DEFAULT_GSD_MM_PX = float(os.environ.get("DEFAULT_GSD_MM_PX", "4.357"))
 
+# --- Road gate ----------------------------------------------------------------
+# Minimum share of the frame that ultrabestroad.pt must segment as road surface
+# before the image is accepted for analysis.
+#
+# Without this, any photograph at all produced a confident-looking assessment:
+# the crack detector will happily find "cracks" in a wall, a carpet or a face,
+# and the symbolic layer then grades them in millimetres and recommends DPWH
+# interventions. An assessment tool that answers questions about non-roads is
+# worse than one that refuses, because the output looks authoritative either way.
+#
+# 15% is deliberately permissive -- a legitimate close-up of a defect taken at
+# 2 m still fills most of the frame with pavement, while a photo of something
+# else rarely reaches it.
+MIN_ROAD_COVERAGE = float(os.environ.get("MIN_ROAD_COVERAGE", "0.15"))
+
 print("Loading AI models into memory. This may take a moment...")
 
 
@@ -554,17 +569,10 @@ def generate_maintenance_bulletin(distresses, density_pct, ipm_applied):
         f"at {density_pct:.2f} percent crack density."
     )
 
-    disclaimer = (
-        "This is a preliminary automated assessment. It must be validated by a "
-        "licensed Civil Engineer or DPWH official before repair resources are "
-        "dispatched."
-    )
-
     return (
         f"{header}\n{summary}\n\n"
         f"Recommended Interventions:\n{interventions}\n\n"
-        f"Priority Level:\n{justification}\n\n"
-        f"Note:\n  {disclaimer}"
+        f"Priority Level:\n{justification}"
     )
 
 
@@ -581,8 +589,32 @@ async def analyze_road(request: ImageRequest):
         # 2. Privacy pass before anything is detected, measured or returned.
         img = apply_privacy_blur(img)
 
-        # 3. Road detection
+        # 3. Road detection, and the gate that depends on it
         road_results = road_model.predict(img, conf=0.25)
+
+        frame_px = img.shape[0] * img.shape[1]
+        road_px = road_mask_area_px(road_results, img.shape)
+        road_coverage = (road_px / frame_px) if frame_px else 0.0
+
+        if road_coverage < MIN_ROAD_COVERAGE:
+            # Refuse rather than return a confident-looking assessment of
+            # something that is not a road.
+            print(f"Rejected: road coverage {road_coverage:.1%} < {MIN_ROAD_COVERAGE:.0%}")
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "error": "no_road_detected",
+                    "message": (
+                        "No road surface was detected in this image. Upload a photo "
+                        "of a road taken from chest height, about 2 m from the "
+                        "defect, with the pavement filling most of the frame."
+                    ),
+                    "road_coverage_pct": round(road_coverage * 100, 2),
+                    "required_coverage_pct": round(MIN_ROAD_COVERAGE * 100, 2),
+                },
+            )
+
+        print(f"Road detected: {road_coverage:.1%} of frame.")
 
         # 4. Inverse Perspective Mapping
         print("Calculating bird's eye view...")
@@ -595,7 +627,7 @@ async def analyze_road(request: ImageRequest):
         if ipm_applied:
             road_area_px = bev_img.shape[0] * bev_img.shape[1]
         else:
-            road_area_px = road_mask_area_px(road_results, img.shape)
+            road_area_px = road_px
             print("IPM not applied; measurements are perspective-distorted.")
 
         # 5. Crack detection on the BEV
@@ -627,6 +659,7 @@ async def analyze_road(request: ImageRequest):
             "gsd_mm_px": gsd,
             "crack_density_pct": round(density_pct, 2),
             "ipm_applied": ipm_applied,
+            "road_coverage_pct": round(road_coverage * 100, 2),
             "privacy_blur_applied": PRIVACY_BLUR_ENABLED,
         }
 

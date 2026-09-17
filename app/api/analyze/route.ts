@@ -19,8 +19,18 @@ export async function POST(request: Request) {
     });
 
     if (!pythonResponse.ok) {
-      const errorText = await pythonResponse.text();
-      console.error('Python backend error:', errorText);
+      // Forward the backend's own message rather than a bare status code. A 422
+      // is a deliberate, explainable refusal (e.g. no road surface detected) and
+      // the user needs to read why, not "the backend returned 422".
+      const detail = await pythonResponse.json().catch(() => null);
+      if (detail?.message) {
+        return NextResponse.json(
+          { error: detail.message, reason: detail.error ?? null, detail },
+          { status: pythonResponse.status }
+        );
+      }
+
+      console.error('Python backend error:', await pythonResponse.text());
       return NextResponse.json(
         { error: `Analysis backend returned ${pythonResponse.status}.` },
         { status: pythonResponse.status }
