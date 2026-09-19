@@ -1,0 +1,9 @@
+Terminal 1 — the website:
+cd C:\Users\Gab\Documents\GitHub\NeuroSymbolic
+npx next start -p 3000
+
+Terminal 2 — the analysis backend:
+cd C:\Users\Gab\Documents\GitHub\NeuroSymbolic\backend
+..\deps\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8000
+
+open http://localhost:3000
