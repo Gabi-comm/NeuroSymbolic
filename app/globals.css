@@ -9,14 +9,23 @@
    =========================================================================== */
 
 @theme {
-  /* Surfaces */
+  /* Surfaces.
+
+     One canvas colour for every tab. There used to be three: a flat #525252 on
+     the admin tabs, a flat #1a1a1a on /report-damage, and nothing at all on the
+     rest, which fell through to the :root colour. The grey was the worst of the
+     three -- black gradient panels sat on a mid-grey sheet, so the panels read
+     as holes punched through the page instead of as cards raised off it.
+
+     Dark UI reads elevation as lightness: the further from the page, the
+     lighter the surface. The scale below is ordered that way, and the admin
+     console no longer inverts it. */
   --color-oasys-blue: #3b82f6;
   --color-oasys-blue-hover: #2563eb;
-  --color-dark-bg: #1a1a1a;
+  --color-app-bg: #08090c;
   --color-card-bg: #262626;
   --color-panel-bg: #1e1e1e;
   --color-surface-light: #d9d9d9;
-  --color-admin-bg: #525252;
 
   /* Severity. One definition for the whole app. Medium was previously yellow on
      the dashboard and orange on the reports page; for a tool whose entire output
@@ -60,25 +69,30 @@
    the logo's silver reading against them.
    --------------------------------------------------------------------------- */
 
+/* Most elevated: feature cards that need to sit above a panel. */
 .bg-brand-gradient {
   background-image:
-    radial-gradient(120% 120% at 15% 0%, rgba(59, 130, 246, 0.14) 0%, transparent 55%),
-    linear-gradient(155deg, #000000 0%, #0d0d0d 38%, #1c1c1c 72%, #101010 100%);
+    radial-gradient(120% 120% at 15% 0%, rgba(59, 130, 246, 0.16) 0%, transparent 55%),
+    linear-gradient(155deg, #262c38 0%, #1b1f29 38%, #14171f 72%, #101319 100%);
 }
 
+/* The workhorse: every card, panel and modal body. */
 .bg-panel-gradient {
-  background-image: linear-gradient(160deg, #202020 0%, #171717 50%, #0e0e0e 100%);
+  background-image: linear-gradient(160deg, #1f232b 0%, #171a21 55%, #12141a 100%);
 }
 
-/* Header bands on the admin console and page heroes. */
+/* Header bands on the admin console and page heroes. These used to run to
+   near-black, which worked when the page behind them was mid-grey. Against the
+   new canvas a black band would vanish, so the band is now the lighter of the
+   two and its rounded bottom edge is what reads. */
 .bg-header-gradient {
   background-image:
-    radial-gradient(90% 140% at 85% 0%, rgba(59, 130, 246, 0.12) 0%, transparent 60%),
-    linear-gradient(180deg, #000000 0%, #0a0a0a 60%, #151515 100%);
+    radial-gradient(90% 140% at 85% 0%, rgba(59, 130, 246, 0.14) 0%, transparent 62%),
+    linear-gradient(180deg, #191d27 0%, #13161e 58%, #0d0f15 100%);
 }
 
 :root {
-  background-color: var(--color-dark-bg);
+  background-color: var(--color-app-bg);
   color: white;
 }
 
@@ -87,6 +101,39 @@ body {
   margin: 0;
   /* Nothing should ever scroll sideways on a phone. */
   overflow-x: hidden;
+}
+
+/* ---------------------------------------------------------------------------
+   The app canvas, shared by every tab.
+
+   Painted on a fixed pseudo-element rather than with `background-attachment:
+   fixed`, which iOS Safari renders at the wrong size and which forces a
+   full-layer repaint on every scroll frame elsewhere. A fixed element is
+   composited once and then left alone.
+
+   body must therefore carry no background of its own: a block-level background
+   paints *after* negative-z-index descendants, so an opaque body would hide
+   this entirely.
+
+   The grid is a survey motif -- apt for a pavement-assessment tool -- held at
+   an alpha you register as texture rather than see as lines. Because the layer
+   never scrolls, the 1px rules cannot shimmer against fractional device pixels.
+   --------------------------------------------------------------------------- */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--color-app-bg);
+  /* First layer listed paints on top. */
+  background-image:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 48px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 48px),
+    radial-gradient(70% 55% at 6% -10%, rgba(59, 130, 246, 0.13) 0%, transparent 68%),
+    radial-gradient(60% 50% at 97% 2%, rgba(59, 130, 246, 0.07) 0%, transparent 70%),
+    radial-gradient(95% 65% at 50% 112%, rgba(59, 130, 246, 0.06) 0%, transparent 72%),
+    linear-gradient(170deg, #0c0e13 0%, #08090c 55%, #050609 100%);
 }
 
 /* Respect the OS reduced-motion setting. Several screens animate-pulse. */

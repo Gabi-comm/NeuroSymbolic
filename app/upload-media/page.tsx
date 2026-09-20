@@ -41,6 +41,9 @@ export default function UploadMediaPage() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) acceptFile(file);
+    // Reset so picking the SAME file again still fires onChange -- otherwise
+    // "Replace" silently does nothing when the choice is unchanged.
+    e.target.value = '';
   };
 
   // The dropzone previously said "Drag or Upload Image Here" but had no drop

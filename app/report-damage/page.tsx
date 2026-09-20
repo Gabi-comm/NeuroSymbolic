@@ -6,12 +6,13 @@ import dynamic from 'next/dynamic';
 import { Position } from './Map';
 import { savePendingScan } from '@/utils/pendingScan';
 import { useHasAcknowledged, useAcknowledgedGsd } from '@/utils/captureSettings';
+import { useHasCarriedAnalysis, readPendingAnalysis, clearPendingAnalysis } from '@/utils/pendingAnalysis';
 import CaptureGuidelines from '@/components/CaptureGuidelines';
 
 const MapComponent = dynamic(() => import('./Map'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-zinc-800 text-gray-400 font-bold">
+    <div className="w-full h-full flex items-center justify-center bg-black/40 text-gray-400 font-bold">
       Loading map…
     </div>
   ),
@@ -30,6 +31,10 @@ export default function ReportDamagePage() {
 
   const acknowledged = useHasAcknowledged();
   const gsd = useAcknowledgedGsd();
+  // A scan can hand its finished analysis over so the user only drops a pin.
+  // The photo requirement is already met in that case.
+  const carriedAnalysis = useHasCarriedAnalysis();
+  const carriedImage = carriedAnalysis ? readPendingAnalysis()?.fileUrl ?? null : null;
   const inputRef = useRef<HTMLInputElement>(null);
 
   const fetchAddress = async (lat: number, lng: number) => {
@@ -60,6 +65,8 @@ export default function ReportDamagePage() {
     try {
       setMediaPreview(await savePendingScan(file));
       setFileName(file.name);
+      // A different photo means the carried analysis no longer describes it.
+      clearPendingAnalysis();
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Could not read that image.');
     } finally {
@@ -83,7 +90,8 @@ export default function ReportDamagePage() {
     if (file) acceptFile(file);
   };
 
-  const isReadyToSubmit = hasPinned && mediaPreview !== null;
+  const hasPhoto = mediaPreview !== null || carriedAnalysis;
+  const isReadyToSubmit = hasPinned && hasPhoto;
 
   if (!acknowledged) {
     return (
@@ -94,7 +102,7 @@ export default function ReportDamagePage() {
   }
 
   return (
-    <div className="pt-28 sm:pt-32 px-4 sm:px-10 pb-16 min-h-screen bg-dark-bg">
+    <div className="pt-28 sm:pt-32 px-4 sm:px-10 pb-16 min-h-screen">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-start justify-between gap-4 mb-6">
           <div>
@@ -159,7 +167,7 @@ export default function ReportDamagePage() {
                 className={`rounded-2xl border-2 border-dashed transition-all overflow-hidden ${
                   isDragging
                     ? 'border-oasys-blue bg-oasys-blue/10'
-                    : mediaPreview
+                    : hasPhoto
                       ? 'border-white/15 bg-black/40'
                       : 'border-white/20 bg-black/30 hover:border-oasys-blue/60'
                 }`}
@@ -173,22 +181,24 @@ export default function ReportDamagePage() {
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (f) acceptFile(f);
+                    // Reset so picking the SAME file again still fires onChange.
+                    e.target.value = '';
                   }}
                 />
 
-                {mediaPreview ? (
+                {mediaPreview || carriedImage ? (
                   <div className="p-3">
                     <div className="aspect-video rounded-xl overflow-hidden bg-black">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={mediaPreview}
-                        alt="The damage photo you selected"
+                        src={mediaPreview ?? carriedImage ?? ''}
+                        alt={carriedImage && !mediaPreview ? "Analysed image carried over from your scan" : "The damage photo you selected"}
                         className="w-full h-full object-contain"
                       />
                     </div>
                     <div className="flex items-center justify-between gap-2 mt-3">
                       <p className="text-xs text-gray-400 truncate min-w-0" title={fileName ?? ''}>
-                        {fileName}
+                        {fileName ?? (carriedImage ? 'Carried over from your scan — already analysed' : '')}
                       </p>
                       <button
                         onClick={() => inputRef.current?.click()}
@@ -249,7 +259,7 @@ export default function ReportDamagePage() {
                 <dt className="text-gray-500 font-bold uppercase tracking-wide mb-0.5">Pin</dt>
                 <dd
                   className={`font-bold tabular-nums flex items-center gap-1.5 ${
-                    hasPinned ? 'text-white' : 'text-gray-600'
+                    hasPinned ? 'text-white' : 'text-gray-500'
                   }`}
                 >
                   {hasPinned && (
@@ -267,16 +277,20 @@ export default function ReportDamagePage() {
                 <dt className="text-gray-500 font-bold uppercase tracking-wide mb-0.5">Photo</dt>
                 <dd
                   className={`font-bold flex items-center gap-1.5 ${
-                    mediaPreview ? 'text-white' : 'text-gray-600'
+                    hasPhoto ? 'text-white' : 'text-gray-500'
                   }`}
                 >
-                  {mediaPreview && (
+                  {hasPhoto && (
                     <span aria-hidden="true" className="text-[#4ade80]">
                       ✓
                     </span>
                   )}
                   <span className="truncate max-w-[12rem]" title={fileName ?? undefined}>
-                    {mediaPreview ? (fileName ?? 'Added') : 'Not added'}
+                    {mediaPreview
+                      ? (fileName ?? 'Added')
+                      : carriedImage
+                        ? 'From scan'
+                        : 'Not added'}
                   </span>
                 </dd>
               </div>

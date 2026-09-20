@@ -66,7 +66,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (authState !== 'authorized') {
     return (
       <div
-        className="min-h-screen bg-dark-bg flex items-center justify-center text-white px-4"
+        className="min-h-screen flex items-center justify-center text-white px-4"
         aria-live="polite"
       >
         <p className="font-bold tracking-widest uppercase text-sm text-center">

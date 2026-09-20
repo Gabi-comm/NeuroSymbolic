@@ -1,8 +1,8 @@
 import UploadResultUi from '@/components/UploadResultUi';
 
-// Thin wrapper. UploadResultUi owns fetching for both entry points so there is
-// exactly one path from a stored image to an analysis, instead of this page and
-// the component each having their own.
+// Scan results are informational. Figure 7.5 of the paper requires an address
+// before a report can proceed, so this screen offers a route into the report
+// flow rather than a submit button.
 export default function ScanMediaResult() {
-  return <UploadResultUi backLinkHref="/upload-media" />;
+  return <UploadResultUi backLinkHref="/upload-media" mode="scan" />;
 }

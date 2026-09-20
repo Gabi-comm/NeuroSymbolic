@@ -18,6 +18,12 @@ export default function Navigation() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const [authUser, setAuthUser] = useState<{ id: string } | null>(null);
+  // The session is read asynchronously, so authUser is null on the first paint
+  // whether or not someone is signed in. Rendering the auth control before this
+  // resolves showed "Sign in" to signed-in users for a frame, then swapped it
+  // for "Log out" -- a visible flicker on every navigation. Nothing is rendered
+  // in that slot until we actually know.
+  const [authChecked, setAuthChecked] = useState(false);
   const [dbProfile, setDbProfile] = useState<DbProfile | null>(null);
 
   const router = useRouter();
@@ -54,29 +60,41 @@ export default function Navigation() {
   }, []);
 
   useEffect(() => {
-    const checkUser = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setAuthUser(session?.user ?? null);
-      if (session?.user) await fetchUserProfile(session.user.id);
-    };
-    checkUser();
+    // As in UploadResultUi: no awaited getSession(). onAuthStateChange fires
+    // INITIAL_SESSION on subscribe, which is all this needs, and awaiting an
+    // auth call here risks hanging on the shared auth lock.
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setAuthUser(session?.user ?? null);
+      setAuthChecked(true);
 
-      if (session?.user) {
-        const profile = await fetchUserProfile(session.user.id);
-        if (event === 'SIGNED_IN' && profile?.role?.toLowerCase() === 'admin') {
-          router.push('/admin/dashboard');
-        }
-      } else {
+      if (!session?.user) {
         setDbProfile(null);
+        return;
       }
+
+      // Deferred out of the callback on purpose. Supabase documents that
+      // calling its own methods inside an onAuthStateChange handler can
+      // deadlock, because the handler runs while the auth lock is held. A
+      // zero-delay timeout runs the query on the next tick, after the lock is
+      // released.
+      const userId = session.user.id;
+      setTimeout(async () => {
+        const profile = await fetchUserProfile(userId);
+        if (event === 'SIGNED_IN' && profile?.role?.toLowerCase() === 'admin') {
+          router.push('/admin');
+        }
+      }, 0);
     });
 
-    return () => authListener.subscription.unsubscribe();
+    // If the subscription never reports, show the signed-out control rather
+    // than leaving a placeholder in the header indefinitely.
+    const authTimeout = setTimeout(() => setAuthChecked(true), 5000);
+
+    return () => {
+      clearTimeout(authTimeout);
+      authListener.subscription.unsubscribe();
+    };
   }, [router, fetchUserProfile]);
 
   const handleLogout = async () => {
@@ -89,12 +107,22 @@ export default function Navigation() {
 
   const isAdmin = dbProfile?.role?.toLowerCase() === 'admin';
 
-  const links = [
-    { href: isAdmin ? '/admin/dashboard' : '/', label: isAdmin ? 'Dashboard' : 'Home' },
-    { href: '/upload-media', label: 'Scan' },
-    { href: '/report-damage', label: 'Report' },
-    { href: '/about', label: 'About' },
-  ];
+  // Admins get the console's sections; everyone else gets the public site.
+  // Showing Scan / Report / About to an administrator mixed two different jobs
+  // in one header and buried the pages they actually work in.
+  const links = isAdmin
+    ? [
+        { href: '/admin', label: 'Console' },
+        { href: '/admin/dashboard', label: 'Dashboard' },
+        { href: '/admin/reports', label: 'Reports' },
+        { href: '/admin/users', label: 'Users' },
+      ]
+    : [
+        { href: '/', label: 'Home' },
+        { href: '/upload-media', label: 'Scan' },
+        { href: '/report-damage', label: 'Report' },
+        { href: '/about', label: 'About' },
+      ];
 
   const linkClass = (href: string) =>
     `font-bold transition-colors ${
@@ -107,12 +135,23 @@ export default function Navigation() {
     <>
       <nav
         aria-label="Main"
-        className={`fixed top-0 w-full z-50 transition-transform ${
+        className={`fixed top-0 w-full z-50 transition-transform border-b ${
           isVisible ? 'translate-y-0' : '-translate-y-full'
-        } ${menuOpen ? 'bg-dark-bg' : 'bg-dark-bg/90 backdrop-blur-sm'}`}
+        } ${
+          // Opaque while the mobile drawer is open, so the links behind it do
+          // not show through. Otherwise a hairline and heavy blur are all that
+          // separate the bar from the canvas -- the page reads as one surface.
+          menuOpen
+            ? 'bg-app-bg border-white/10'
+            : 'bg-app-bg/75 backdrop-blur-xl border-white/5'
+        }`}
       >
         <div className="flex justify-between items-center gap-4 px-4 sm:px-8 py-4 sm:py-6">
-          <Link href="/" className="flex items-center gap-2.5 shrink-0" aria-label="OASYS home">
+          <Link
+            href={isAdmin ? '/admin' : '/'}
+            className="flex items-center gap-2.5 shrink-0"
+            aria-label={isAdmin ? 'OASYS admin console' : 'OASYS home'}
+          >
             <Image
               src="/oasys-logo-small.png"
               alt=""
@@ -138,7 +177,11 @@ export default function Navigation() {
               </Link>
             ))}
 
-            {authUser ? (
+            {!authChecked ? (
+              /* Reserve the space so the header does not shift when the real
+                 control appears. */
+              <div aria-hidden="true" className="w-28 h-10 rounded-full bg-white/5 animate-pulse" />
+            ) : authUser ? (
               <div className="flex items-center gap-4 border-l border-white/20 pl-6">
                 {dbProfile?.username && (
                   <span className="text-sm text-gray-300">
@@ -218,7 +261,9 @@ export default function Navigation() {
             ))}
 
             <div className="pt-3 mt-2 border-t border-white/10">
-              {authUser ? (
+              {!authChecked ? (
+                <div aria-hidden="true" className="w-full h-11 rounded-full bg-white/5 animate-pulse" />
+              ) : authUser ? (
                 <>
                   {dbProfile?.username && (
                     <p className="text-sm text-gray-400 px-2 pb-3">

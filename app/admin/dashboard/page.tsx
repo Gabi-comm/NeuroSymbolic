@@ -155,8 +155,8 @@ export default function AdminDashboard() {
   const statCard = 'rounded-panel p-5 sm:p-6 shadow-xl flex flex-col min-h-[9rem]';
 
   return (
-    <div className="min-h-screen bg-admin-bg">
-      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-10 pt-28 sm:pt-32 pb-20 shadow-2xl">
+    <div className="min-h-screen">
+      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-10 pt-28 sm:pt-32 pb-20 shadow-[0_24px_70px_-24px_rgba(59,130,246,0.30)]">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-5">
           <div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-2 tracking-tight">
@@ -175,12 +175,6 @@ export default function AdminDashboard() {
             >
               Export CSV
             </button>
-            <Link
-              href="/admin/users"
-              className="bg-oasys-blue text-white px-5 py-2.5 rounded-full font-bold text-xs hover:bg-blue-500 transition-all shadow-lg flex items-center"
-            >
-              Manage users
-            </Link>
           </div>
         </div>
       </header>
@@ -204,14 +198,14 @@ export default function AdminDashboard() {
             </span>
           </div>
 
-          <div className={`${statCard} bg-zinc-900 text-white border border-white/10`}>
+          <div className={`${statCard} bg-panel-gradient text-white border border-white/10`}>
             <span className="font-bold text-sm text-gray-400">Pending review</span>
             <span className="mt-auto text-5xl font-black tabular-nums">
               {isLoading ? '—' : stats.pending}
             </span>
           </div>
 
-          <div className={`${statCard} bg-zinc-900 text-white border border-white/10`}>
+          <div className={`${statCard} bg-panel-gradient text-white border border-white/10`}>
             <span className="font-bold text-sm text-gray-400">High severity</span>
             <span className="mt-auto text-5xl font-black tabular-nums text-[#f87171]">
               {isLoading ? '—' : stats.severe}
@@ -220,7 +214,7 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-          <section className="bg-zinc-900 rounded-panel p-6 sm:p-8 shadow-xl text-white border border-white/10">
+          <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-white border border-white/10">
             <h2 className="font-bold text-sm text-gray-400 mb-6">Resolution status</h2>
             <div className="mt-auto">
               <div className="flex justify-between text-xs font-bold mb-2">
@@ -228,7 +222,7 @@ export default function AdminDashboard() {
                 <span className="text-[#fbbf24]">Unresolved ({stats.pending})</span>
               </div>
               <div
-                className="w-full h-4 bg-zinc-800 rounded-full overflow-hidden flex gap-[2px]"
+                className="w-full h-4 bg-black/40 rounded-full overflow-hidden flex gap-[2px] ring-1 ring-inset ring-white/5"
                 role="img"
                 aria-label={`${stats.resolved} resolved, ${stats.pending} unresolved of ${stats.total}`}
               >
@@ -244,7 +238,7 @@ export default function AdminDashboard() {
             </div>
           </section>
 
-          <section className="bg-zinc-900 rounded-panel p-6 sm:p-8 shadow-xl text-white border border-white/10">
+          <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-white border border-white/10">
             <div className="flex justify-between items-center gap-4 mb-4">
               <h2 className="font-bold text-sm text-gray-400">Submissions over time</h2>
               <label className="sr-only" htmlFor="range">
@@ -271,7 +265,7 @@ export default function AdminDashboard() {
           </section>
         </div>
 
-        <section className="bg-zinc-900 rounded-panel p-6 sm:p-8 shadow-xl text-white border border-white/10 mb-5">
+        <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-white border border-white/10 mb-5">
           <h2 className="font-bold text-sm text-gray-400 mb-6">Damage type breakdown</h2>
           {isLoading ? (
             <p className="text-sm text-gray-500 font-bold py-8 text-center">Loading…</p>
@@ -280,7 +274,7 @@ export default function AdminDashboard() {
           )}
         </section>
 
-        <section className="bg-zinc-900 rounded-panel p-6 sm:p-8 shadow-xl text-white border border-white/10">
+        <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-white border border-white/10">
           <div className="flex justify-between items-center gap-4 mb-5">
             <h2 className="text-lg font-black tracking-wide">Recent submissions</h2>
             <Link

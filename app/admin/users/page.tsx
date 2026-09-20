@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { supabase } from '@/utils/supabase';
 
 interface UserProfile {
@@ -21,6 +20,8 @@ export default function UserManagementPage() {
   // dismissed with a click outside, and reads poorly to screen readers.
   const [pending, setPending] = useState<{ user: UserProfile; newRole: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const adminCount = users.filter((u) => (u.role || '').toLowerCase() === 'admin').length;
 
   useEffect(() => {
     let isMounted = true;
@@ -86,83 +87,108 @@ export default function UserManagementPage() {
   };
 
   return (
-    <div className="min-h-screen bg-admin-bg px-4 sm:px-10 pt-28 sm:pt-32 pb-20">
-      <div className="max-w-4xl mx-auto bg-zinc-900 rounded-panel p-6 sm:p-8 shadow-xl text-white border border-white/10">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-black">User management</h1>
-            <p className="text-gray-400 text-sm mt-1">View and manage system access levels.</p>
-          </div>
-          <Link
-            href="/admin/dashboard"
-            className="bg-oasys-blue hover:bg-blue-500 text-white px-5 py-2.5 rounded-full font-bold text-sm transition-colors text-center shrink-0"
-          >
-            &larr; Dashboard
-          </Link>
+    <div className="min-h-screen">
+      {/* Console, Dashboard and Reports all open with this band; Users was the
+          one tab that did not, and it used a flat zinc card while the others
+          used the panel gradient. Two of the four admin tabs looking like a
+          different product is a background problem, so it is fixed here.
+
+          The "← Dashboard" button that lived in this header is gone: Dashboard
+          is a nav tab now, which is where a reader looks for it. */}
+      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-10 pt-28 sm:pt-32 pb-20 shadow-[0_24px_70px_-24px_rgba(59,130,246,0.30)]">
+        <div className="max-w-4xl mx-auto">
+          <p className="text-oasys-blue text-sm font-bold uppercase tracking-widest mb-2">
+            Access control
+          </p>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight mb-3">
+            Users
+          </h1>
+          <p className="text-lg text-gray-300 max-w-2xl">
+            {isLoading ? (
+              <span className="text-gray-500">Loading accounts…</span>
+            ) : (
+              <>
+                <strong className="text-white">
+                  {users.length} account{users.length === 1 ? '' : 's'}
+                </strong>
+                {adminCount > 0 && (
+                  <>
+                    , <strong className="text-white">{adminCount}</strong> with
+                    administrator access
+                  </>
+                )}
+                .
+              </>
+            )}
+          </p>
         </div>
+      </header>
 
-        {loadError && (
-          <div
-            role="alert"
-            className="bg-red-950/80 border border-red-500/40 text-red-200 rounded-xl p-4 mb-6"
-          >
-            <p className="font-bold mb-1">Could not load users</p>
-            <p className="text-sm">{loadError}</p>
-          </div>
-        )}
+      <div className="max-w-4xl mx-auto px-4 sm:px-10 -mt-12 relative z-10 pb-20">
+        <div className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-white border border-white/10">
+          {loadError && (
+            <div
+              role="alert"
+              className="bg-red-950/80 border border-red-500/40 text-red-200 rounded-xl p-4 mb-6"
+            >
+              <p className="font-bold mb-1">Could not load users</p>
+              <p className="text-sm">{loadError}</p>
+            </div>
+          )}
 
-        {isLoading ? (
-          <p className="text-center text-gray-500 font-bold py-10">Loading users…</p>
-        ) : users.length === 0 ? (
-          <p className="text-center text-gray-400 font-bold py-10">No users found.</p>
-        ) : (
-          <ul className="flex flex-col divide-y divide-white/5">
-            {users.map((user) => {
-              const role = (user.role || 'user').toLowerCase();
-              const isSelf = user.userloginuuid === currentAdminId;
+          {isLoading ? (
+            <p className="text-center text-gray-500 font-bold py-10">Loading users…</p>
+          ) : users.length === 0 ? (
+            <p className="text-center text-gray-400 font-bold py-10">No users found.</p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-white/5">
+              {users.map((user) => {
+                const role = (user.role || 'user').toLowerCase();
+                const isSelf = user.userloginuuid === currentAdminId;
 
-              return (
-                <li
-                  key={user.userloginuuid}
-                  className="flex flex-col sm:flex-row sm:items-center gap-3 py-4"
-                >
-                  <div className="grow min-w-0">
-                    <p className="font-bold truncate">
-                      {user.username || 'Unnamed user'}
-                      {isSelf && <span className="text-oasys-blue ml-2 text-sm">(you)</span>}
-                    </p>
-                    <p className="text-gray-400 text-sm truncate">{user.email || 'No email'}</p>
-                  </div>
-
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-bold uppercase shrink-0 w-max ${
-                      role === 'admin'
-                        ? 'bg-oasys-blue/20 text-blue-300 border border-oasys-blue/40'
-                        : 'bg-white/5 text-gray-400 border border-white/10'
-                    }`}
+                return (
+                  <li
+                    key={user.userloginuuid}
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 py-4"
                   >
-                    {role}
-                  </span>
+                    <div className="grow min-w-0">
+                      <p className="font-bold truncate">
+                        {user.username || 'Unnamed user'}
+                        {isSelf && <span className="text-oasys-blue ml-2 text-sm">(you)</span>}
+                      </p>
+                      <p className="text-gray-400 text-sm truncate">{user.email || 'No email'}</p>
+                    </div>
 
-                  {isSelf ? (
-                    <span className="text-xs text-gray-600 italic shrink-0 sm:w-32 sm:text-right">
-                      Protected
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() =>
-                        setPending({ user, newRole: role === 'admin' ? 'user' : 'admin' })
-                      }
-                      className="text-xs font-bold text-white bg-zinc-700 hover:bg-zinc-600 px-4 py-2 rounded-lg transition-colors shrink-0 sm:w-32"
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-bold uppercase shrink-0 w-max ${
+                        role === 'admin'
+                          ? 'bg-oasys-blue/20 text-blue-300 border border-oasys-blue/40'
+                          : 'bg-white/5 text-gray-400 border border-white/10'
+                      }`}
                     >
-                      Make {role === 'admin' ? 'user' : 'admin'}
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                      {role}
+                    </span>
+
+                    {isSelf ? (
+                      <span className="text-xs text-gray-500 italic shrink-0 sm:w-32 sm:text-right">
+                        Protected
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() =>
+                          setPending({ user, newRole: role === 'admin' ? 'user' : 'admin' })
+                        }
+                        className="text-xs font-bold text-white bg-zinc-700 hover:bg-zinc-600 px-4 py-2 rounded-lg transition-colors shrink-0 sm:w-32"
+                      >
+                        Make {role === 'admin' ? 'user' : 'admin'}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </div>
 
       {pending && (

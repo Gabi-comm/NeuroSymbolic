@@ -6,11 +6,12 @@ import dynamic from 'next/dynamic';
 import { supabase } from '@/utils/supabase';
 import { SeverityBadge } from '@/components/Severity';
 import type { MapReport } from '@/components/ReportsMap';
+import FixReportModal, { type FixableReport } from '@/components/FixReportModal';
 
 const ReportsMap = dynamic(() => import('@/components/ReportsMap'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-[22rem] sm:h-[30rem] rounded-2xl bg-zinc-800 flex items-center justify-center font-bold text-gray-400">
+    <div className="w-full h-[22rem] sm:h-[30rem] rounded-2xl bg-black/40 flex items-center justify-center font-bold text-gray-400">
       Loading map…
     </div>
   ),
@@ -24,6 +25,10 @@ interface Report extends MapReport {
   detection_details: string | null;
   observation_details: unknown;
   crack_density_pct: number | null;
+  corrected_damage_type: string | null;
+  corrected_severity: string | null;
+  correction_note: string | null;
+  corrected_at: string | null;
 }
 
 export default function AdminReports() {
@@ -40,6 +45,7 @@ export default function AdminReports() {
     to: 'Resolved' | 'Needs Action';
   } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [fixing, setFixing] = useState<Report | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -162,10 +168,26 @@ export default function AdminReports() {
               <h3 className="font-black text-lg truncate">
                 RPT-{String(report.id).slice(0, 8).toUpperCase()}
               </h3>
-              <SeverityBadge severity={report.severity} tone="light" />
+              {/* The admin's verdict leads where one exists; the system's
+                  original is shown struck through beside it, never replaced. */}
+              <SeverityBadge
+                severity={report.corrected_severity ?? report.severity}
+                tone="light"
+              />
+              {report.corrected_severity && (
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide">
+                  corrected · was {report.severity}
+                </span>
+              )}
             </div>
             <p className="font-bold text-sm text-zinc-700">
-              {report.damage_type || 'Unclassified'}
+              {report.corrected_damage_type ?? report.damage_type ?? 'Unclassified'}
+              {report.corrected_damage_type && (
+                <span className="font-normal text-zinc-500">
+                  {' '}
+                  (system: {report.damage_type})
+                </span>
+              )}
             </p>
             <p className="text-zinc-500 font-bold text-xs mt-0.5 break-words">
               {report.address || 'Location unknown'}
@@ -256,21 +278,34 @@ export default function AdminReports() {
                   </span>
                 </div>
 
-                <button
-                  onClick={() =>
-                    setPendingAction({
-                      id: String(report.id),
-                      to: isResolvedColumn ? 'Needs Action' : 'Resolved',
-                    })
-                  }
-                  className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow ${
-                    isResolvedColumn
-                      ? 'bg-zinc-900 text-white hover:bg-black'
-                      : 'bg-[#16a34a] text-white hover:bg-green-700'
-                  }`}
-                >
-                  {isResolvedColumn ? 'Reopen report' : 'Mark resolved'}
-                </button>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* Resolving says the report was right and the work is done.
+                      Fixing says something in it is wrong. They are different
+                      judgements, so they are different buttons -- and the fix
+                      is the quieter of the two, because most reports need it. */}
+                  <button
+                    onClick={() => setFixing(report)}
+                    className="px-5 py-2.5 rounded-xl font-bold text-xs transition-colors border border-zinc-300 text-zinc-700 hover:bg-zinc-100 hover:border-zinc-400"
+                  >
+                    Fix report
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      setPendingAction({
+                        id: String(report.id),
+                        to: isResolvedColumn ? 'Needs Action' : 'Resolved',
+                      })
+                    }
+                    className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow ${
+                      isResolvedColumn
+                        ? 'bg-zinc-900 text-white hover:bg-black'
+                        : 'bg-[#16a34a] text-white hover:bg-green-700'
+                    }`}
+                  >
+                    {isResolvedColumn ? 'Reopen report' : 'Mark resolved'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -280,8 +315,8 @@ export default function AdminReports() {
   };
 
   return (
-    <div className="min-h-screen bg-admin-bg">
-      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-12 pt-28 sm:pt-32 pb-12 shadow-2xl">
+    <div className="min-h-screen">
+      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-12 pt-28 sm:pt-32 pb-12 shadow-[0_24px_70px_-24px_rgba(59,130,246,0.30)]">
         <div className="max-w-7xl mx-auto flex justify-between items-end gap-4">
           <div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-2">Reports</h1>
@@ -324,17 +359,17 @@ export default function AdminReports() {
           <button
             onClick={() => setShowMap((open) => !open)}
             aria-expanded={showMap}
-            className="bg-zinc-900 text-white border border-white/15 px-6 py-3.5 rounded-full font-bold text-sm hover:bg-black transition-colors shrink-0"
+            className="bg-white/5 hover:bg-white/10 text-white border border-white/15 px-6 py-3.5 rounded-full font-bold text-sm transition-colors shrink-0"
           >
             {showMap ? 'Hide map' : 'Show map'}
           </button>
         </div>
 
         {showMap && (
-          <section className="bg-zinc-900 rounded-panel p-4 sm:p-6 border border-white/10 mb-6">
+          <section className="bg-panel-gradient rounded-panel p-4 sm:p-6 border border-white/10 mb-6">
             <h2 className="font-bold text-sm text-gray-400 mb-4">
               Defect locations{' '}
-              <span className="text-gray-600">
+              <span className="text-gray-500">
                 ({filtered.filter((r) => r.lat != null).length} mapped)
               </span>
             </h2>
@@ -426,6 +461,18 @@ export default function AdminReports() {
             </div>
           </div>
         </div>
+      )}
+
+      {fixing && (
+        <FixReportModal
+          report={fixing as FixableReport}
+          onClose={() => setFixing(null)}
+          onSaved={(patch) =>
+            setReports((prev) =>
+              prev.map((r) => (String(r.id) === String(fixing.id) ? { ...r, ...patch } : r))
+            )
+          }
+        />
       )}
 
       {actionError && (

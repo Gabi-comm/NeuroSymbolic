@@ -348,6 +348,92 @@ nothing is worse than none at all.
 
 ---
 
+## 4b. Accounts and authentication
+
+Authentication is delegated entirely to **Supabase Auth**. The application stores
+no credential of any kind.
+
+```
+UserDetail                         auth.users
+  id            bigint PK            id  uuid PK
+  username      text                 encrypted_password  (bcrypt)
+  email         text unique          email_confirmed_at
+  role          user | admin         last_sign_in_at
+  userloginuuid uuid  ------------>  id
+```
+
+`UserDetail` holds the application's view of a person — display name, role — and
+links to the auth record by `userloginuuid`. **There is deliberately no password
+column**: `auth.users.encrypted_password` already holds a bcrypt hash, and a
+second copy would be a credential store to defend, kept in sync, and protected by
+policy. The ERD can show the relationship without storing the secret.
+
+### Sign-up
+
+A database trigger (`on_auth_user_created`) creates the `UserDetail` row in the
+same transaction as the auth user. The application previously did this in two
+steps; when the second failed it left a half-created account, and nine such
+orphans had accumulated — profiles with a null `userloginuuid` that could never
+sign in.
+
+Sign-up always assigns `role = 'user'`, enforced by both the trigger and a CHECK
+constraint. Nobody can self-promote.
+
+### Email verification
+
+Sign-up sends a confirmation link to `/auth/callback`, which exchanges the code
+for a session. Until it is clicked there is no session, so the account cannot be
+used. **This requires "Confirm email" to be enabled in the Supabase dashboard**
+(Authentication → Sign In / Providers → Email); with it off, Supabase
+auto-confirms and anyone can register an address they do not own.
+
+### Password reset
+
+"Forgot password" sends a recovery link through `/auth/callback?next=/reset-password`.
+`/reset-password` waits for the recovery session, takes a new password, calls
+`updateUser`, then signs the user out so the new password is used on the next
+sign-in. Expired and already-used links are reported explicitly.
+
+### Sessions
+
+Sessions are stored in **cookies** via `@supabase/ssr`, not `localStorage`. This
+matters: `proxy.ts` gates `/admin/*` server-side and can only read cookies. With
+localStorage the middleware saw no session and redirected everyone away from the
+console, administrators included.
+
+Three layers guard the admin side:
+
+| Layer | Checks |
+|---|---|
+| `proxy.ts` | A valid session exists (`getUser()`, which revalidates — `getSession()` only decodes a cookie a client could forge) |
+| `app/admin/layout.tsx` | `UserDetail.role === 'admin'` |
+| Supabase RLS | What rows the request may actually touch |
+
+Only the third is a real security boundary: the publishable key ships to every
+browser, so the database must assume the client is hostile.
+
+### Roles
+
+Promotion happens at `/admin/users`. Three protections:
+
+- **Self-demotion blocked** in the UI.
+- **Last-admin guard**: a `BEFORE UPDATE OR DELETE` trigger refuses any change
+  leaving zero administrators. Without it the final admin could be demoted,
+  leaving no administrator and no interface able to create one.
+- **Audit trail**: `role_change_log` records actor, target, old role, new role
+  and timestamp. Written only by a `SECURITY DEFINER` trigger and readable only
+  by admins; it has no write policies, because an audit log a user can rewrite
+  is not an audit log.
+
+The first administrator must be promoted with SQL, since the only promotion UI is
+itself admin-only:
+
+```sql
+update "UserDetail" set role = 'admin' where email = 'you@example.com';
+```
+
+---
+
 ## 5. Database
 
 Supabase Postgres. Run `migration.sql` in the SQL editor; it is idempotent.

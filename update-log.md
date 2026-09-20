@@ -546,3 +546,172 @@ All Supabase calls are unchanged.
 The three-point value list and the "Scanning an image needs no account" footnote
 were removed from the brand panel at the researcher's request. The panel now
 centres the OASYS wordmark and strapline only.
+
+---
+
+## Phase 4 — Auth, RLS and data hygiene (2026-09-20)
+
+Supabase connected. The project is **OASYS** (`vybijjvazuopatbewras`), which sits in a
+different organization from the account's three other projects, which is why it never
+appeared in a project listing.
+
+### ✅ Fixed a bug from Phase 1: the admin console was unreachable
+`utils/supabase.ts` created the client with `storage: window.localStorage`, so the
+session lived only in the browser. `proxy.ts` gates `/admin/*` by reading a **cookie** —
+which was therefore never present. **The middleware redirected everyone away from the
+admin console, signed-in administrators included.**
+
+Migrated both to `@supabase/ssr` (already a dependency): `createBrowserClient` writes
+cookies, `createServerClient` reads them in the middleware and route handlers, and the
+middleware now refreshes the session on every request. The gate uses `getUser()` rather
+than `getSession()`, because the latter only decodes a cookie a client could forge.
+
+### ✅ Email verification
+`mailer_autoconfirm` was `true` — anyone could sign up with an address they did not own
+and the account confirmed instantly. Sign-up now passes `emailRedirectTo`, and the new
+**`app/auth/callback/route.ts`** exchanges the emailed code for a session. The modal
+shows a "check your email" state instead of silently doing nothing.
+
+⚠️ **Enabling confirmation is a dashboard toggle only you can flip** — see below.
+
+### ✅ Forgot password, end to end
+`resetPasswordForEmail` was called with no `redirectTo`, there was no reset page, and
+nothing handled `PASSWORD_RECOVERY` or called `updateUser`. The flow sent an email and
+stopped. Added **`app/reset-password/page.tsx`** with explicit expired-link handling,
+and routed the recovery link through the callback.
+
+### ✅ RLS: user enumeration closed
+`Allow everyone to read users` was `USING (true)` — any signed-in user could read all
+14 emails, usernames and roles. Replaced with own-row access plus an admin policy
+backed by a `SECURITY DEFINER` `is_admin()`. Self-delete dropped: it orphaned the auth
+account and locked the user out with no way back.
+
+### ✅ Sign-up made atomic
+An `on_auth_user_created` trigger creates the profile in the same transaction as the
+auth user. The old two-step approach had produced **nine orphan profiles** with a null
+`userloginuuid` that could never sign in.
+
+### ✅ Legacy data cleared
+All 5 test accounts, 14 profiles and 2 test reports deleted. One of those reports
+stored `"Error connecting to Gemini API: 403…"` as if it were a bulletin; the other was
+pinned at lat 12, lng 13 — Central Africa — with `file_name: "FILE_NAME"`.
+
+### ✅ Role assignment hardened
+- **Last-admin guard**: a `BEFORE UPDATE OR DELETE` trigger refuses any change that
+  would leave zero administrators. Previously the final admin could be demoted, leaving
+  **no administrator and no interface able to create one**.
+- **Audit trail**: `role_change_log` records who changed whose role, from what, when.
+  Written only by a `SECURITY DEFINER` trigger, readable only by admins, with no write
+  policies — an audit log a user can rewrite is not an audit log.
+
+### ✅ `/admin` landing page
+New front door for the console: who you are signed in as, four counts, and cards to
+Dashboard, Reports and Users. Nav now points at `/admin`; the label is "Console".
+
+### ✅ Auth redirects are no longer silent
+`?signIn=required` and `?authError=` were being set but never displayed, so an expired
+confirmation link looked like the app had ignored the click. **`AuthNotice`** renders
+them and clears the parameter so a refresh cannot resurrect a stale message.
+
+### ❌ Not done, deliberately
+**No `password` column** (decision D6). Supabase Auth already stores a bcrypt hash in
+`auth.users.encrypted_password`; a second copy would be a credential store to defend at
+defence, would drift out of sync, and under the *old* RLS every signed-in user could
+have read it. The ERD can show `userloginuuid → auth.users.id` without storing secrets.
+
+**Verified:** `tsc` clean, eslint clean, build green across 17 routes. `/admin` returns
+307 with `?signIn=required` for anonymous visitors. `/auth/callback` with no code
+redirects with a legible message. Publishable key authenticates; anonymous reads of
+`UserDetail` return `[]`.
+
+---
+
+## Scan / Report separation — 2026-09-20
+
+### ✅ Fixed: submit hung forever
+`handleSubmitReport` called `supabase.auth.getUser()` — a network round-trip —
+before inserting. supabase-js serialises auth operations through the Web Locks
+API, and the component also holds an `onAuthStateChange` subscription; the await
+never settled, so the `finally` never ran and the button sat on "Submitting…".
+
+The session is already read on mount and kept current by that subscription, so
+the user id was available without asking the server. Removed the call and wrapped
+the insert in a 30-second timeout, so a stall now reports itself instead of
+spinning silently.
+
+### ✅ Fixed: nav flickered "Sign in" → "Log out"
+`authUser` starts null and the session check is async, so the first paint always
+rendered "Sign in" before swapping. The auth slot now waits for the check and
+shows a same-size placeholder, so there is no flicker and no layout shift.
+
+### ✅ Submit is now a full confirmation panel
+"Submitted ✓" on a button was too quiet for the end of the task. The panel turns
+green: **"Report has been submitted"**, stating it is queued as *Needs Action*.
+
+### ✅ Scan results are informational; only reports reach the queue
+Driven by the paper. Figure 7.5: a report *"would not proceed without an attached
+image or an address"*. Figure 7.6 lists **Location** among the result fields. The
+use case list promises *"Provide Accurate Map View… Displays defect locations"*.
+
+A scan has no address, so submitting one produced a report the admin could not
+dispatch against and that the map — which filters on coordinates — could never
+show.
+
+- Scan results now offer **"Add location and report"** instead of Submit.
+- The finished analysis is carried across in `utils/pendingAnalysis.ts`, so the
+  report flow only needs a pin. Without it the hop would re-run road detection,
+  SAM segmentation and the bulletin — about 25 seconds to reproduce a result
+  already in hand.
+- `/report-damage` treats a carried analysis as satisfying the photo step and
+  shows the annotated image; choosing a different photo discards it, since it no
+  longer describes that image.
+- `UploadResultUi` takes a `mode` prop: `'scan'` bridges, `'report'` submits.
+
+Types moved to `utils/pendingAnalysis.ts` so a util no longer has to import from
+a component.
+
+---
+
+## Admin console refinements — 2026-09-20
+
+### ✅ Admin navigation shows the console's sections
+Signing in as an admin still showed Scan / Report / About — the public site's
+pages. Admins now get **Dashboard · Reports · Users**, and the wordmark links to
+`/admin` rather than the public home page. Non-admins are unchanged.
+
+### ✅ `/admin` rebuilt around what needs doing
+It led with totals, which is not what an administrator opens the console to
+learn. It now opens with the state of the queue in a sentence — *"3 reports need
+review, 1 high severity"* — then the three sections, then a live list of what is
+waiting, with totals last as context.
+
+### ✅ "Manage users" removed from the dashboard
+Redundant once Users has its own nav item and its own card on `/admin`.
+
+### ✅ Reports can be corrected, not just resolved
+"Mark resolved" was the only action, which assumed every report was right. A
+report can be right about the defect and wrong about where it is.
+
+**Fix report** opens a modal for damage type, severity, address, a map pin and an
+optional note.
+
+**The important part is how it stores them.** Two kinds of field, handled
+differently:
+
+| Field | Treatment | Why |
+|---|---|---|
+| `address`, `lat`, `lng` | corrected **in place** | user-supplied, not model output — a wrong pin is simply wrong |
+| `severity`, `damage_type` | original kept, correction stored **beside** it | this is the model's output, and overwriting it would destroy the evidence RQ3 and RQ4 rest on |
+
+New columns: `corrected_severity`, `corrected_damage_type`, `corrected_at`,
+`corrected_by`, `correction_note`.
+
+**This is worth a paragraph in the paper.** Every correction is a licensed
+engineer disagreeing with the model on a specific detection — precisely the
+paired data Cohen's Kappa needs for RQ4. The system now collects its own
+evaluation set as a by-product of being used, rather than requiring a separate
+double-blind exercise. `corrected_severity` against `severity_fuzzy` is the
+comparison; `backend/eval/compare.py` already computes it.
+
+The UI shows the admin's verdict first and the system's original beside it
+(*"corrected · was Medium"*), so nothing is hidden.

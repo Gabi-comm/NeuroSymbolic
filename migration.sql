@@ -3,9 +3,12 @@
 --
 -- Project: OASYS  (ref vybijjvazuopatbewras, ap-northeast-1)
 --
--- Already applied to the live project on 2026-09-20 as two migrations:
+-- Already applied to the live project on 2026-09-20 as five migrations:
 --   oasys_add_symbolic_columns_and_fix_role_default
 --   oasys_allow_null_location_and_confidence
+--   oasys_fix_rls_and_atomic_signup
+--   oasys_clear_legacy_test_data
+--   oasys_role_guard_and_audit_log
 --
 -- Kept here so the repository records what the database looks like and why.
 -- Idempotent: safe to re-run.
@@ -100,9 +103,7 @@ create index if not exists fileupload_state_idx      on "FileUpload" (state);
 
 
 -- ---------------------------------------------------------------------------
--- Row Level Security — ALREADY CONFIGURED, deliberately not touched
---
--- Both tables have RLS enabled with a working policy set:
+-- Row Level Security — as it stood BEFORE Phase 4 (historical record)
 --
 --   FileUpload   INSERT for users            (INSERT, authenticated)
 --                edit or delete own upload   (ALL,    authenticated)
@@ -110,28 +111,160 @@ create index if not exists fileupload_state_idx      on "FileUpload" (state);
 --
 --   UserDetail   INSERT users based on user_id  (INSERT, authenticated)
 --                SELECT users based on user_id  (SELECT, authenticated)
---                Allow everyone to read users   (SELECT, authenticated)
+--                Allow everyone to read users   (SELECT, authenticated)  <-- LEAK
 --                users update own profile       (UPDATE, authenticated)
---                users delete own profile       (DELETE, authenticated)
+--                users delete own profile       (DELETE, authenticated)  <-- removed
 --                Admins can update users        (UPDATE, authenticated)
 --
--- Do not replace these with the policies from the old version of this file —
--- they were written against a different table structure.
--- ---------------------------------------------------------------------------
-
-
--- ---------------------------------------------------------------------------
--- Promoting an administrator
+-- Section A below replaces the two marked policies. FileUpload's policies were
+-- already correct and are unchanged.
 --
--- Sign-up always creates role = 'user'. The only screen that can promote
--- someone is /admin/users, which is itself admin-only, so the first admin must
--- be made here.
+-- Promoting an administrator: see the note at the end of this file.
+-- ---------------------------------------------------------------------------
+
+
+-- ============================================================================
+-- PHASE 4 (2026-09-20) — applied as three further migrations
+--   oasys_fix_rls_and_atomic_signup
+--   oasys_clear_legacy_test_data
+--   oasys_role_guard_and_audit_log
+-- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A. Close the user-enumeration hole
+--
+-- "Allow everyone to read users" was USING (true): every signed-in user could
+-- read all 14 emails, usernames and roles. Own-row reads were already covered
+-- by "SELECT users based on user_id", so that policy carries the normal case.
+--
+-- is_admin() is SECURITY DEFINER so the role lookup bypasses RLS and cannot
+-- recurse into UserDetail's own policies. Create it BEFORE dropping the
+-- permissive policy, or admin updates break mid-migration.
+-- ---------------------------------------------------------------------------
+create or replace function public.is_admin() returns boolean
+  language sql security definer stable set search_path = public
+as $$ select exists (select 1 from "UserDetail"
+                     where userloginuuid = auth.uid() and role = 'admin'); $$;
+
+drop policy if exists "Allow everyone to read users" on "UserDetail";
+create policy "admins read all users" on "UserDetail"
+  for select to authenticated using (public.is_admin());
+
+drop policy if exists "Admins can update users" on "UserDetail";
+create policy "admins update users" on "UserDetail"
+  for update to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- Self-delete removed: deleting your own UserDetail row leaves a live auth
+-- account with no profile, so every gate reads null for your role and you are
+-- locked out of the console and your own reports, with no UI path back.
+drop policy if exists "users delete own profile" on "UserDetail";
+
+
+-- ---------------------------------------------------------------------------
+-- B. Atomic sign-up
+--
+-- The app called auth.signUp() then separately inserted into UserDetail. When
+-- the second step failed the account was half-created. Nine orphans with a null
+-- userloginuuid had accumulated; none of them could ever sign in.
+-- ---------------------------------------------------------------------------
+create or replace function public.handle_new_user() returns trigger
+  language plpgsql security definer set search_path = public
+as $$
+begin
+  insert into "UserDetail" (username, email, userloginuuid, role)
+  values (coalesce(nullif(trim(new.raw_user_meta_data ->> 'username'), ''),
+                   split_part(new.email, '@', 1)),
+          new.email, new.id, 'user');
+  return new;
+end $$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+
+-- ---------------------------------------------------------------------------
+-- C. Legacy data cleared (decision D7)
+--
+--   delete from "FileUpload";   -- 2 test rows
+--   delete from "UserDetail";   -- 14 rows, 9 of them orphans
+--   delete from auth.users;     -- 5 test accounts
+--
+-- Not repeated here: re-running it would wipe real data.
+-- ---------------------------------------------------------------------------
+
+
+-- ---------------------------------------------------------------------------
+-- D. Role assignment: guard and audit trail
+-- ---------------------------------------------------------------------------
+create table if not exists public.role_change_log (
+  id bigint generated always as identity primary key,
+  changed_at timestamptz not null default now(),
+  actor_uuid uuid, actor_email text,
+  target_uuid uuid, target_email text not null,
+  old_role text, new_role text not null
+);
+alter table public.role_change_log enable row level security;
+create policy "admins read role log" on public.role_change_log
+  for select to authenticated using (public.is_admin());
+-- No write policies: only the SECURITY DEFINER trigger inserts. An audit log a
+-- user can rewrite is not an audit log.
+
+-- Refuse to remove the last administrator, in the database rather than the UI,
+-- so it holds however the update arrives.
+create or replace function public.guard_last_admin() returns trigger
+  language plpgsql security definer set search_path = public
+as $$
+declare admin_count integer;
+begin
+  if tg_op = 'DELETE' then
+    if old.role = 'admin' then
+      select count(*) into admin_count from "UserDetail" where role = 'admin';
+      if admin_count <= 1 then
+        raise exception 'Cannot delete the last administrator. Promote another account first.'
+          using errcode = 'check_violation';
+      end if;
+    end if;
+    return old;
+  end if;
+  if old.role = 'admin' and new.role is distinct from 'admin' then
+    select count(*) into admin_count from "UserDetail" where role = 'admin';
+    if admin_count <= 1 then
+      raise exception 'Cannot remove the last administrator. Promote another account first.'
+        using errcode = 'check_violation';
+    end if;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists guard_last_admin_trigger on "UserDetail";
+create trigger guard_last_admin_trigger before update or delete on "UserDetail"
+  for each row execute function public.guard_last_admin();
+
+create or replace function public.log_role_change() returns trigger
+  language plpgsql security definer set search_path = public
+as $$
+begin
+  if old.role is distinct from new.role then
+    insert into public.role_change_log
+      (actor_uuid, actor_email, target_uuid, target_email, old_role, new_role)
+    values (auth.uid(),
+            (select email from "UserDetail" where userloginuuid = auth.uid()),
+            new.userloginuuid, new.email, old.role, new.role);
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists log_role_change_trigger on "UserDetail";
+create trigger log_role_change_trigger after update on "UserDetail"
+  for each row execute function public.log_role_change();
+
+
+-- ---------------------------------------------------------------------------
+-- Promoting the first administrator
+--
+-- Sign-up always creates role = 'user' (CHECK + trigger). /admin/users is the
+-- only promotion UI and is itself admin-only, so the first admin is made here:
 --
 --   update "UserDetail" set role = 'admin' where email = 'you@example.com';
---
--- As of 2026-09-20 two admins exist: admin1@test.com and admin2@test.com.
---
--- NOTE: ten rows in UserDetail have a NULL userloginuuid, so they are not
--- linked to an auth.users account and cannot sign in. Promoting one of those
--- has no effect — the admin gate looks the profile up by userloginuuid.
 -- ---------------------------------------------------------------------------

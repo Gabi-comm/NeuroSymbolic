@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { SeverityBadge } from './Severity';
-import type { Distress } from './UploadResultUi';
+import type { Distress } from '@/utils/pendingAnalysis';
 
 /**
  * Detected damage, one at a time, navigated vertically.

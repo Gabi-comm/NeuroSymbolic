@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import Navigation from '@/components/Navigation';
 import PageTransition from '@/components/PageTransition';
+import AuthNotice from '@/components/AuthNotice';
 
 // This file was "use client", which opted the entire app out of Server
 // Components and made a `metadata` export impossible -- the site had no title,
@@ -27,17 +28,18 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#1a1a1a',
+  themeColor: '#08090c',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="bg-dark-bg text-white">
+      <body className="text-white">
         <a href="#content" className="skip-link">
           Skip to content
         </a>
         <Navigation />
+        <AuthNotice />
         <div id="content">
           <PageTransition>{children}</PageTransition>
         </div>

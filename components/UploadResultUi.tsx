@@ -2,56 +2,48 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/utils/supabase';
 import LoginModal from './LoginModal';
 import { readPendingScan, clearPendingScan } from '@/utils/pendingScan';
+import {
+  savePendingAnalysis,
+  readPendingAnalysis,
+  clearPendingAnalysis,
+  type AnalysisData,
+  type Distress,
+  type Severity,
+} from '@/utils/pendingAnalysis';
+
+export type { AnalysisData, Distress, Severity };
 import { getAcknowledgedGsd } from '@/utils/captureSettings';
-import { SEVERITY, SEVERITY_RANK, toSeverity, type Severity } from './Severity';
+import { SEVERITY, SEVERITY_RANK, toSeverity } from './Severity';
 import DistressCarousel from './DistressCarousel';
-
-export interface Distress {
-  label: string;
-  type?: string;
-  confidence: number;
-  measurement_type: string;
-  metric_value: number;
-  unit: string;
-  width_mm: number;
-  /** Headline grade shown in the UI; carries the fuzzy result. */
-  severity: Severity;
-  // Symbolic component outputs. The parallel severities are the RQ3 dataset.
-  severity_fuzzy?: Severity;
-  severity_crisp?: Severity;
-  severity_confidence?: Severity;
-  /** The study's original 3/6 mm thresholds, kept for reproducing prior results. */
-  severity_legacy_crisp?: Severity;
-  /** The literal DPWH two-band verdict: Narrow / Wide (D.O. 120 s.2019). */
-  severity_dpwh_nw?: 'Narrow' | 'Wide' | 'Not rated';
-  severity_score?: number | null;
-  rule_base?: 'linear' | 'area' | 'pothole-unstratified';
-  crack_density_pct?: number;
-  membership_trace?: Record<string, unknown>;
-}
-
-export interface AnalysisData {
-  filename: string;
-  fileUrl: string;
-  overall_severity: Severity;
-  gemini_bulletin: string;
-  distresses: Distress[];
-  gsd_mm_px?: number;
-  crack_density_pct?: number;
-  ipm_applied?: boolean;
-  privacy_blur_applied?: boolean;
-}
 
 interface UploadResultUiProps {
   backLinkHref: string;
   analysisData?: AnalysisData;
+  /**
+   * 'scan'   — informational only. Figure 7.5 of the paper states a report
+   *            "would not proceed without an attached image or an address",
+   *            and a scan has no address, so it offers a route into the report
+   *            flow instead of a submit button.
+   * 'report' — came from /report-damage, so a location exists and the result
+   *            can be submitted to the admin queue.
+   */
+  mode?: 'scan' | 'report';
 }
 
-export default function UploadResultUi({ backLinkHref, analysisData }: UploadResultUiProps) {
+export default function UploadResultUi({
+  backLinkHref,
+  analysisData,
+  mode = 'report',
+}: UploadResultUiProps) {
+  const router = useRouter();
   const [isSignedIn, setIsSignedIn] = useState(false);
+  // Captured from the session we already hold, so submitting never has to make
+  // another auth call -- see the note in handleSubmitReport.
+  const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -81,26 +73,31 @@ export default function UploadResultUi({ backLinkHref, analysisData }: UploadRes
       }
     }
 
-    const checkAuth = async () => {
-      try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
-        if (error) throw error;
-        setIsSignedIn(!!session);
-      } catch {
-        setIsSignedIn(false);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    checkAuth();
+    // No getSession() call here.
+    //
+    // supabase-js serialises auth operations through the Web Locks API, and
+    // awaiting one in an effect that also registers onAuthStateChange can leave
+    // the promise unsettled — which pinned this screen on "Checking sign-in…"
+    // forever, with no way to submit.
+    //
+    // onAuthStateChange fires INITIAL_SESSION as soon as it subscribes, so the
+    // subscription alone tells us everything, with no await to get stuck on.
 
     // Run the analysis via the Next.js route handler. Never call the Python host
     // directly from the browser: a hardcoded localhost only works in dev.
     const fetchAiData = async () => {
       if (analysisData) return;
+
+      // Arriving from a scan: the analysis is already done. Re-running it would
+      // cost another road pass, SAM segmentation and bulletin for a result we
+      // already have.
+      const carried = readPendingAnalysis();
+      if (carried) {
+        setData(carried);
+        clearPendingAnalysis();
+        clearPendingScan();
+        return;
+      }
 
       const pending = readPendingScan();
       if (!pending) {
@@ -150,9 +147,16 @@ export default function UploadResultUi({ backLinkHref, analysisData }: UploadRes
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsSignedIn(!!session);
+      setUserId(session?.user?.id ?? null);
+      setIsLoading(false);
     });
 
+    // Belt and braces: if the subscription never reports (a broken or blocked
+    // storage adapter), fall back to signed-out rather than spinning.
+    const authTimeout = setTimeout(() => setIsLoading(false), 5000);
+
     return () => {
+      clearTimeout(authTimeout);
       authListener.subscription.unsubscribe();
     };
   }, [analysisData]);
@@ -167,6 +171,30 @@ export default function UploadResultUi({ backLinkHref, analysisData }: UploadRes
     )[0];
   };
 
+  /**
+   * Discard this result and go back for a different image.
+   *
+   * The only way off this screen used to be the back arrow, which left the
+   * stored scan in place; the next analysis could then pick up the previous
+   * image. Clearing both stores makes "scan another" mean exactly that.
+   */
+  const handleScanAnother = () => {
+    clearPendingAnalysis();
+    clearPendingScan();
+    router.push('/upload-media');
+  };
+
+  /**
+   * Hand this analysis to the report flow so the user only has to drop a pin.
+   *
+   * If sessionStorage refuses the payload the report flow simply re-analyses,
+   * which is slower but still correct — so the hop is never blocked.
+   */
+  const handleAddLocation = () => {
+    if (data) savePendingAnalysis(data);
+    router.push('/report-damage');
+  };
+
   // Writes to "FileUpload" -- the table named in the ERD and the only one the
   // admin screens read. This previously inserted into "damage_reports", which
   // nothing reads, so submitted reports never reached an administrator.
@@ -175,16 +203,27 @@ export default function UploadResultUi({ backLinkHref, analysisData }: UploadRes
     setIsSubmitting(true);
 
     try {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError || !userData?.user) {
+      // Deliberately NOT calling supabase.auth.getUser() here.
+      //
+      // supabase-js serialises auth operations through the Web Locks API. This
+      // component also holds an onAuthStateChange subscription, and calling an
+      // auth method from a click handler while that subscription is active can
+      // deadlock: the await never settles, the finally never runs, and the
+      // button sits on "Submitting..." forever. That was the bug.
+      //
+      // The session was already read on mount and is kept current by the
+      // subscription, so the id is right here for the taking.
+      if (!userId) {
         throw new Error('You are not signed in. Please sign in again.');
       }
 
       const primary = primaryDistress(data.distresses);
 
-      const { error: insertError } = await supabase.from('FileUpload').insert([
+      // A network request with no upper bound can hang indefinitely; a report
+      // that fails loudly is far better than a button that spins forever.
+      const insertPromise = supabase.from('FileUpload').insert([
         {
-          userid: userData.user.id,
+          userid: userId,
           damage_type: primary?.label ?? 'No damage detected',
           severity: data.overall_severity,
           state: 'Needs Action',
@@ -208,6 +247,16 @@ export default function UploadResultUi({ backLinkHref, analysisData }: UploadRes
           severity_dpwh_nw: primary?.severity_dpwh_nw ?? null,
           membership_trace: primary?.membership_trace ?? null,
         },
+      ]);
+
+      const { error: insertError } = await Promise.race([
+        insertPromise,
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('The server did not respond. Please try again.')),
+            30_000
+          )
+        ),
       ]);
 
       if (insertError) throw new Error(insertError.message);
@@ -292,7 +341,7 @@ export default function UploadResultUi({ backLinkHref, analysisData }: UploadRes
   const accent = severityKey ? SEVERITY[severityKey] : null;
 
   return (
-    <div className="pt-28 sm:pt-32 px-4 sm:px-10 pb-16 min-h-screen bg-dark-bg text-white">
+    <div className="pt-28 sm:pt-32 px-4 sm:px-10 pb-16 min-h-screen text-white">
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
 
       <div className="max-w-6xl mx-auto flex flex-col gap-5">
@@ -429,48 +478,104 @@ export default function UploadResultUi({ backLinkHref, analysisData }: UploadRes
           </div>
         </section>
 
-        {/* Submit */}
-        <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="font-black mb-0.5">Submit this report</h2>
-            <p className="text-sm text-gray-400">
-              {isSignedIn
-                ? 'Sends the assessment to the admin review queue.'
-                : 'Sign in to send this to the review queue.'}
-            </p>
-            <p aria-live="polite" className="text-xs font-bold mt-1.5">
-              {submitState === 'error' && <span className="text-red-400">{submitMessage}</span>}
-              {submitState === 'done' && (
-                <span className="text-[#4ade80]">Sent to the admin review queue.</span>
-              )}
-            </p>
-          </div>
+        {/* Action: report it, or submit it */}
+        {mode === 'scan' ? (
+          /* A scan has no address, and Figure 7.5 of the paper states a report
+             "would not proceed without an attached image or an address". So
+             this offers the route into the report flow rather than a submit
+             button that would file an undispatchable report — one the admin
+             map could never show, because it filters on coordinates. */
+          <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+            <div>
+              <h2 className="font-black mb-0.5">Needs fixing?</h2>
+              <p className="text-sm text-gray-400 max-w-lg leading-snug">
+                Add the location to file this with road maintenance. Your
+                analysis is kept, so you only need to drop a pin — the image is
+                not re-processed.
+              </p>
+            </div>
 
-          {isLoading ? (
-            <p className="px-8 py-3.5 rounded-full bg-white/5 text-gray-500 font-bold text-sm animate-pulse text-center">
-              Checking sign-in…
-            </p>
-          ) : isSignedIn ? (
-            <button
-              onClick={handleSubmitReport}
-              disabled={isSubmitting || submitState === 'done'}
-              className="btn-blue px-10 py-3.5 w-full sm:w-auto"
+            <div className="flex flex-col sm:flex-row gap-3 shrink-0 w-full sm:w-auto">
+              <button
+                onClick={handleScanAnother}
+                className="px-6 py-3.5 rounded-full font-bold bg-white/10 hover:bg-white/20 border border-white/15 transition-colors w-full sm:w-auto"
+              >
+                Scan another image
+              </button>
+              <button
+                onClick={handleAddLocation}
+                className="btn-blue px-8 py-3.5 w-full sm:w-auto"
+              >
+                Add location and report
+              </button>
+            </div>
+          </section>
+        ) : submitState === 'done' ? (
+          /* A whole-panel confirmation, not a line of small green text. The
+             submission is the end of the task; it should be unmistakable that
+             it worked. */
+          <section
+            role="status"
+            className="bg-[#16a34a]/10 border border-[#16a34a]/40 rounded-oasys shadow-2xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center gap-5"
+          >
+            <span
+              aria-hidden="true"
+              className="w-14 h-14 rounded-full bg-[#16a34a] text-white flex items-center justify-center text-2xl font-black shrink-0"
             >
-              {submitState === 'done'
-                ? 'Submitted ✓'
-                : isSubmitting
-                  ? 'Submitting…'
-                  : 'Submit report'}
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowLogin(true)}
-              className="px-10 py-3.5 rounded-full font-bold bg-white/10 hover:bg-white/20 border border-white/15 transition-colors w-full sm:w-auto"
-            >
-              Sign in to submit
-            </button>
-          )}
-        </section>
+              ✓
+            </span>
+            <div className="grow">
+              <h2 className="text-xl font-black text-white mb-1">
+                Report has been submitted
+              </h2>
+              <p className="text-sm text-gray-300 leading-snug">
+                It is now in the admin review queue with a status of{' '}
+                <strong className="text-white">Needs Action</strong>. An
+                administrator will assess it and mark it resolved.
+              </p>
+            </div>
+            <Link href="/" className="btn-blue px-8 py-3.5 w-full sm:w-auto shrink-0">
+              Done
+            </Link>
+          </section>
+        ) : (
+          <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="font-black mb-0.5">Submit this report</h2>
+              <p className="text-sm text-gray-400">
+                {isSignedIn
+                  ? 'Sends the assessment to the admin review queue.'
+                  : 'Sign in to send this to the review queue.'}
+              </p>
+              <p aria-live="assertive" className="text-xs font-bold mt-1.5">
+                {submitState === 'error' && (
+                  <span className="text-red-400">{submitMessage}</span>
+                )}
+              </p>
+            </div>
+
+            {isLoading ? (
+              <p className="px-8 py-3.5 rounded-full bg-white/5 text-gray-500 font-bold text-sm animate-pulse text-center">
+                Checking sign-in…
+              </p>
+            ) : isSignedIn ? (
+              <button
+                onClick={handleSubmitReport}
+                disabled={isSubmitting}
+                className="btn-blue px-10 py-3.5 w-full sm:w-auto"
+              >
+                {isSubmitting ? 'Submitting…' : 'Submit report'}
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowLogin(true)}
+                className="px-10 py-3.5 rounded-full font-bold bg-white/10 hover:bg-white/20 border border-white/15 transition-colors w-full sm:w-auto"
+              >
+                Sign in to submit
+              </button>
+            )}
+          </section>
+        )}
       </div>
     </div>
   );
