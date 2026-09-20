@@ -7,8 +7,8 @@ import { toSeverity } from './Severity';
 
 export interface MapReport {
   id: number | string;
-  latitude: number | null;
-  longitude: number | null;
+  lat: number | null;
+  lng: number | null;
   damage_type: string | null;
   severity: string | null;
   state: string | null;
@@ -56,16 +56,16 @@ function pinFor(severity: string | null) {
 export default function ReportsMap({ reports }: { reports: MapReport[] }) {
   const located = reports.filter(
     (r) =>
-      typeof r.latitude === 'number' &&
-      typeof r.longitude === 'number' &&
-      Number.isFinite(r.latitude) &&
-      Number.isFinite(r.longitude)
+      typeof r.lat === 'number' &&
+      typeof r.lng === 'number' &&
+      Number.isFinite(r.lat) &&
+      Number.isFinite(r.lng)
   );
 
   const centre: [number, number] = located.length
     ? [
-        located.reduce((sum, r) => sum + (r.latitude as number), 0) / located.length,
-        located.reduce((sum, r) => sum + (r.longitude as number), 0) / located.length,
+        located.reduce((sum, r) => sum + (r.lat as number), 0) / located.length,
+        located.reduce((sum, r) => sum + (r.lng as number), 0) / located.length,
       ]
     : DEFAULT_CENTRE;
 
@@ -85,7 +85,7 @@ export default function ReportsMap({ reports }: { reports: MapReport[] }) {
         {located.map((report) => (
           <Marker
             key={report.id}
-            position={[report.latitude as number, report.longitude as number]}
+            position={[report.lat as number, report.lng as number]}
             icon={pinFor(report.severity)}
           >
             <Popup>

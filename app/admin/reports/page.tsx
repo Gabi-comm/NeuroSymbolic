@@ -20,7 +20,7 @@ interface Report extends MapReport {
   uploadtime: string | null;
   image_url: string | null;
   file_name: string | null;
-  confidence: string | null;
+  confidence: number | null;
   detection_details: string | null;
   observation_details: unknown;
   crack_density_pct: number | null;
@@ -89,6 +89,21 @@ export default function AdminReports() {
       );
     }
     setPendingAction(null);
+  };
+
+  /**
+   * Format a stored confidence, whichever scale it was written on.
+   *
+   * Legacy rows are inconsistent: one holds 0.751058 (a fraction), another
+   * holds 92.1 (already a percentage). Multiplying blindly renders the second
+   * as 9210%. Anything above 1 is therefore treated as already-scaled.
+   *
+   * New submissions always store the raw 0-1 detector score.
+   */
+  const formatConfidence = (value: number | null): string => {
+    if (value == null || !Number.isFinite(value)) return 'N/A';
+    const pct = value > 1 ? value : value * 100;
+    return `${Math.min(pct, 100).toFixed(0)}%`;
   };
 
   const parseObservations = (value: unknown): string[] => {
@@ -194,7 +209,9 @@ export default function AdminReports() {
                 </span>
                 <span className="whitespace-nowrap shrink-0">
                   <span className="font-bold text-zinc-500">Confidence </span>
-                  <span className="text-blue-700 font-black">{report.confidence || 'N/A'}</span>
+                  <span className="text-blue-700 font-black">
+                    {formatConfidence(report.confidence)}
+                  </span>
                 </span>
               </div>
               {report.crack_density_pct != null && (
@@ -318,7 +335,7 @@ export default function AdminReports() {
             <h2 className="font-bold text-sm text-gray-400 mb-4">
               Defect locations{' '}
               <span className="text-gray-600">
-                ({filtered.filter((r) => r.latitude != null).length} mapped)
+                ({filtered.filter((r) => r.lat != null).length} mapped)
               </span>
             </h2>
             {!isLoading && <ReportsMap reports={filtered} />}

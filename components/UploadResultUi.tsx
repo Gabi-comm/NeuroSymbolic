@@ -190,11 +190,14 @@ export default function UploadResultUi({ backLinkHref, analysisData }: UploadRes
           state: 'Needs Action',
           uploadtime: new Date().toISOString(),
           address: address.startsWith('Location not provided') ? null : address,
-          latitude: location.lat,
-          longitude: location.lng,
+          // The columns are lat/lng, not latitude/longitude.
+          lat: location.lat,
+          lng: location.lng,
           image_url: data.fileUrl,
           file_name: data.filename,
-          confidence: primary ? `${(primary.confidence * 100).toFixed(1)}%` : 'N/A',
+          // confidence is a real (float4), not text. Stored as the raw 0-1
+          // detector score so it can be aggregated; the UI formats it.
+          confidence: primary?.confidence ?? null,
           detection_details: data.gemini_bulletin,
           observation_details: data.distresses,
           gsd_mm_px: data.gsd_mm_px ?? null,
