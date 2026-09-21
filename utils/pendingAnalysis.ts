@@ -54,6 +54,60 @@ export interface AnalysisData {
 
 const KEY = 'oasys.pendingAnalysis';
 
+// ---------------------------------------------------------------------------
+// The last finished result, per result screen.
+//
+// A result screen analyses the pending scan and then clears it, so the scan
+// cannot be re-analysed and re-charged 25 seconds on every revisit. That made
+// the screen a dead end: leaving it and coming back -- via the browser's back
+// button, or the arrow on /process -- re-mounted the page with nothing to show
+// and reported "No image found to analyze."
+//
+// Keeping the finished result makes the screen returnable. It is keyed by path
+// because /upload-media/result and /report-damage/result are different
+// screens, and a scan's result must not surface on the report screen.
+// ---------------------------------------------------------------------------
+
+const LAST_KEY = 'oasys.lastResult';
+
+interface LastResult {
+  path: string;
+  data: AnalysisData;
+  /** Already filed. Restoring the screen must not offer to file it again. */
+  submitted: boolean;
+}
+
+export function saveLastResult(
+  path: string,
+  data: AnalysisData,
+  submitted = false
+): void {
+  try {
+    sessionStorage.setItem(
+      LAST_KEY,
+      JSON.stringify({ path, data, submitted } as LastResult)
+    );
+  } catch {
+    // Quota. Losing this only costs the back-navigation convenience.
+  }
+}
+
+/** The finished result for this screen, or null if the last one was elsewhere. */
+export function readLastResult(
+  path: string
+): { data: AnalysisData; submitted: boolean } | null {
+  try {
+    const raw = sessionStorage.getItem(LAST_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as LastResult;
+    if (parsed?.path !== path) return null;
+    if (!Array.isArray(parsed.data?.distresses)) return null;
+    return { data: parsed.data, submitted: parsed.submitted === true };
+  } catch {
+    return null;
+  }
+}
+
 export function savePendingAnalysis(data: AnalysisData): boolean {
   try {
     sessionStorage.setItem(KEY, JSON.stringify(data));

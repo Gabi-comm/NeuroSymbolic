@@ -10,12 +10,15 @@ import {
   savePendingAnalysis,
   readPendingAnalysis,
   clearPendingAnalysis,
+  saveLastResult,
+  readLastResult,
   type AnalysisData,
   type Distress,
   type Severity,
 } from '@/utils/pendingAnalysis';
 
 export type { AnalysisData, Distress, Severity };
+import { savePipelineStages, useHasPipelineStages } from '@/utils/pipelineStages';
 import { getAcknowledgedGsd } from '@/utils/captureSettings';
 import { SEVERITY, SEVERITY_RANK, toSeverity } from './Severity';
 import DistressCarousel from './DistressCarousel';
@@ -58,6 +61,7 @@ export default function UploadResultUi({
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [fetchReason, setFetchReason] = useState<string | null>(null);
   const [submitState, setSubmitState] = useState<'idle' | 'done' | 'error'>('idle');
+  const hasStages = useHasPipelineStages();
   const [submitMessage, setSubmitMessage] = useState<string>('');
 
   useEffect(() => {
@@ -94,6 +98,7 @@ export default function UploadResultUi({
       const carried = readPendingAnalysis();
       if (carried) {
         setData(carried);
+        saveLastResult(window.location.pathname, carried);
         clearPendingAnalysis();
         clearPendingScan();
         return;
@@ -101,6 +106,17 @@ export default function UploadResultUi({
 
       const pending = readPendingScan();
       if (!pending) {
+        // Nothing new to analyse. Before giving up, check whether this screen
+        // already produced a result -- that is what coming back from /process,
+        // or the browser's back button, looks like from here.
+        const previous = readLastResult(window.location.pathname);
+        if (previous) {
+          setData(previous.data);
+          // Without this, leaving and returning would show the submit
+          // button again and let the same report be filed twice.
+          if (previous.submitted) setSubmitState('done');
+          return;
+        }
         setFetchError('No image found to analyze. Please upload one again.');
         return;
       }
@@ -124,7 +140,7 @@ export default function UploadResultUi({
 
         const result = await response.json();
 
-        setData({
+        const analysis: AnalysisData = {
           filename: pending.filename,
           fileUrl: result.fileUrl,
           overall_severity: result.overall_severity,
@@ -134,7 +150,19 @@ export default function UploadResultUi({
           crack_density_pct: result.crack_density_pct,
           ipm_applied: result.ipm_applied,
           privacy_blur_applied: result.privacy_blur_applied,
-        });
+        };
+        setData(analysis);
+        // Kept so this screen can be returned to; the scan itself is cleared
+        // below, so without this a revisit has nothing to render.
+        saveLastResult(window.location.pathname, analysis);
+        // Stored separately, and never blocking: /process is an explanation of
+        // the result, not part of producing it. The current URL goes with it so
+        // the walkthrough can return here exactly -- for a report that means
+        // keeping the query string, which carries the pinned location.
+        savePipelineStages(
+          result.stages,
+          window.location.pathname + window.location.search
+        );
         clearPendingScan();
       } catch (error) {
         setFetchError(
@@ -261,6 +289,7 @@ export default function UploadResultUi({
 
       if (insertError) throw new Error(insertError.message);
       setSubmitState('done');
+      saveLastResult(window.location.pathname, data, true);
     } catch (error) {
       setSubmitState('error');
       setSubmitMessage(error instanceof Error ? error.message : 'Unknown error occurred.');
@@ -463,6 +492,33 @@ export default function UploadResultUi({
                 {address}
               </p>
             </section>
+
+            {/* Fills the gap this column left under Location, and answers the
+                question the annotated image provokes: a reader who is asked to
+                trust a severity grade should be able to see how it was reached.
+
+                Hidden when the frames are not in storage -- a quota failure, or
+                a reload that lost them -- rather than offering a button that
+                opens an empty page. */}
+            {hasStages && (
+              <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-6 flex flex-col grow">
+                <h2 className="font-black mb-2">How does the detection work?</h2>
+                <p className="text-sm text-gray-400 leading-snug mb-5">
+                  This image passed through six steps, from finding the road surface
+                  to tracing each crack. See what every stage did to your photo.
+                </p>
+                <Link
+                  href="/process"
+                  className="btn-blue mt-auto w-full px-6 py-3 gap-2"
+                >
+                  Show Process
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M5 12h14" />
+                    <path d="m12 5 7 7-7 7" />
+                  </svg>
+                </Link>
+              </section>
+            )}
           </div>
         </div>
 
@@ -490,8 +546,7 @@ export default function UploadResultUi({
               <h2 className="font-black mb-0.5">Needs fixing?</h2>
               <p className="text-sm text-gray-400 max-w-lg leading-snug">
                 Add the location to file this with road maintenance. Your
-                analysis is kept, so you only need to drop a pin — the image is
-                not re-processed.
+                analysis is kept, so you only need to drop a pin.
               </p>
             </div>
 

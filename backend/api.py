@@ -346,6 +346,126 @@ def skeletonize_opencv(img):
 
     return skel
 
+# ---------------------------------------------------------------------------
+# Pipeline stage visualisation.
+#
+# The six steps below already ran on every request; only the final composite
+# was ever returned. Emitting the intermediates costs one JPEG encode each and
+# turns the pipeline from a claim into something a reader can check.
+#
+# They are deliberately small. Six full-size frames would roughly triple the
+# response and would not fit in sessionStorage alongside the annotated image,
+# which is what carries a scan into the report flow.
+# ---------------------------------------------------------------------------
+
+STAGE_MAX_W = 560
+STAGE_JPEG_QUALITY = 72
+
+
+def _stage_jpeg(img):
+    """Encode a stage frame as a data URL, downscaled for transport."""
+    h, w = img.shape[:2]
+    if w > STAGE_MAX_W:
+        scale = STAGE_MAX_W / float(w)
+        img = cv2.resize(img, (STAGE_MAX_W, max(1, int(h * scale))), interpolation=cv2.INTER_AREA)
+    ok, buf = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), STAGE_JPEG_QUALITY])
+    if not ok:
+        return None
+    return "data:image/jpeg;base64," + base64.b64encode(buf).decode("utf-8")
+
+
+def render_road_overlay(img, road_results):
+    """Green wash over whatever the road model claimed is road surface."""
+    out = img.copy()
+    if road_results and road_results[0].masks is not None:
+        h, w = img.shape[:2]
+        masks = road_results[0].masks.data.cpu().numpy()
+        combined = np.zeros((masks.shape[1], masks.shape[2]), dtype=np.uint8)
+        for m in masks:
+            combined = np.maximum(combined, m)
+        mask = cv2.resize((combined * 255).astype(np.uint8), (w, h))
+        wash = np.zeros_like(out)
+        wash[mask > 0] = (0, 200, 0)
+        out = cv2.addWeighted(out, 1.0, wash, 0.35, 0)
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cv2.drawContours(out, contours, -1, (0, 255, 0), 2)
+    return out
+
+
+def render_boxes(img, boxes_xyxy, colour, thickness=2):
+    out = img.copy()
+    for x1, y1, x2, y2 in boxes_xyxy:
+        cv2.rectangle(out, (int(x1), int(y1)), (int(x2), int(y2)), colour, thickness)
+    return out
+
+
+def _dashed_line(img, pt1, pt2, colour, thickness=2, dash=12, gap=8):
+    x1, y1 = pt1
+    x2, y2 = pt2
+    dist = int(np.hypot(x2 - x1, y2 - y1))
+    if dist == 0:
+        return
+    for start in range(0, dist, dash + gap):
+        end = min(start + dash, dist)
+        sx = int(x1 + (x2 - x1) * start / dist)
+        sy = int(y1 + (y2 - y1) * start / dist)
+        ex = int(x1 + (x2 - x1) * end / dist)
+        ey = int(y1 + (y2 - y1) * end / dist)
+        cv2.line(img, (sx, sy), (ex, ey), colour, thickness)
+
+
+def _dashed_rectangle(img, pt1, pt2, colour, thickness=2):
+    x1, y1 = pt1
+    x2, y2 = pt2
+    _dashed_line(img, (x1, y1), (x2, y1), colour, thickness)
+    _dashed_line(img, (x2, y1), (x2, y2), colour, thickness)
+    _dashed_line(img, (x2, y2), (x1, y2), colour, thickness)
+    _dashed_line(img, (x1, y2), (x1, y1), colour, thickness)
+
+
+def render_kept_boxes(img, boxes_xyxy, keep_indices):
+    """Survivors solid green, suppressed duplicates dashed magenta.
+
+    Showing only the winners would make non-maximum suppression look like it
+    did nothing -- the discarded duplicates are the entire point of the step.
+    The first version drew them as 1px grey, which on grey asphalt was
+    invisible, so the stage still looked like a no-op.
+
+    Dashed versus solid is the primary cue and colour the secondary one, the
+    same belt-and-braces the severity badges use: a reader with red-green
+    colour deficiency reads the line style regardless of hue.
+    """
+    out = img.copy()
+    keep = set(int(i) for i in keep_indices)
+
+    # Discarded first, so a survivor overlapping one is drawn on top.
+    for i, (x1, y1, x2, y2) in enumerate(boxes_xyxy):
+        if i not in keep:
+            _dashed_rectangle(out, (int(x1), int(y1)), (int(x2), int(y2)),
+                              (255, 70, 255), 2)
+
+    for i, (x1, y1, x2, y2) in enumerate(boxes_xyxy):
+        if i in keep:
+            cv2.rectangle(out, (int(x1), int(y1)), (int(x2), int(y2)),
+                          (0, 255, 0), 3)
+    return out
+
+
+def render_mask_overlay(img, mask, colour=(0, 140, 255), alpha=0.55):
+    out = img.copy()
+    wash = np.zeros_like(out)
+    wash[mask > 0] = colour
+    return cv2.addWeighted(out, 1.0, wash, alpha, 0)
+
+
+def render_skeleton(img, skeleton):
+    """Centrelines on a darkened frame so the traces read at a glance."""
+    out = (img.astype(np.float32) * 0.35).astype(np.uint8)
+    thick = cv2.dilate(skeleton, np.ones((2, 2), np.uint8), iterations=1)
+    out[thick > 0] = (0, 0, 255)
+    return out
+
+
 def trace_cracks(image, crack_results, predictor, gsd, road_area_px):
     """Measure every surviving detection, then grade it.
 
@@ -354,9 +474,14 @@ def trace_cracks(image, crack_results, predictor, gsd, road_area_px):
     measured. The previous single-pass version graded each detection in isolation,
     which is why density -- a stated key feature -- was never computed at all.
 
-    Returns (traced, debug_img, pure_skeleton, density_pct).
+    Returns (traced, debug_img, pure_skeleton, density_pct, consensus_mask).
+
+    The consensus mask is the SAM-and-YOLO agreement, already computed per
+    detection for measurement; accumulating it costs one bitwise_or and is
+    what the SAM Masking stage shows.
     """
-    empty = ([], image.copy(), np.zeros(image.shape[:2], dtype=np.uint8), 0.0)
+    empty = ([], image.copy(), np.zeros(image.shape[:2], dtype=np.uint8), 0.0,
+             np.zeros(image.shape[:2], dtype=np.uint8))
 
     if not crack_results or crack_results[0].masks is None:
         return empty
@@ -368,6 +493,7 @@ def trace_cracks(image, crack_results, predictor, gsd, road_area_px):
     predictor.set_image(image)
     debug_img = image.copy()
     pure_skeleton = np.zeros(image.shape[:2], dtype=np.uint8)
+    consensus_all = np.zeros(image.shape[:2], dtype=np.uint8)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     yolo_masks = crack_results[0].masks.data
@@ -390,6 +516,7 @@ def trace_cracks(image, crack_results, predictor, gsd, road_area_px):
         y_mask_resized = cv2.resize(y_mask_raw, (image.shape[1], image.shape[0]))
         y_mask_binary = (y_mask_resized > 0.5).astype(np.uint8) * 255
         consensus_mask = cv2.bitwise_and(sam_mask, y_mask_binary)
+        consensus_all = cv2.bitwise_or(consensus_all, consensus_mask)
 
         roi_fence = consensus_mask[y1:y2, x1:x2]
         roi_gray = gray[y1:y2, x1:x2]
@@ -465,7 +592,7 @@ def trace_cracks(image, crack_results, predictor, gsd, road_area_px):
             (x1, max(15, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2,
         )
 
-    return traced, debug_img, pure_skeleton, density_pct
+    return traced, debug_img, pure_skeleton, density_pct, consensus_all
 
 
 def _summary_prose(context: str) -> str:
@@ -616,6 +743,9 @@ async def analyze_road(request: ImageRequest):
 
         print(f"Road detected: {road_coverage:.1%} of frame.")
 
+        # Stage 1 frame, captured before the warp replaces the viewpoint.
+        stage_road = render_road_overlay(img, road_results)
+
         # 4. Inverse Perspective Mapping
         print("Calculating bird's eye view...")
         bev_img, ipm_applied = get_birds_eye_view(img, road_results)
@@ -637,9 +767,82 @@ async def analyze_road(request: ImageRequest):
         # 6. SAM tracing, metrics, and symbolic reasoning
         gsd = request.gsd_mm_px or DEFAULT_GSD_MM_PX
         print("Tracing with SAM, measuring, and grading...")
-        traced_data, debug_img, skel, density_pct = trace_cracks(
+        traced_data, debug_img, skel, density_pct, consensus_mask = trace_cracks(
             bev_img, crack_results, predictor, gsd, road_area_px
         )
+
+        # 6b. Stage frames. Every one of these is a step that already ran; this
+        # only draws what it produced. Built defensively -- a visualisation
+        # failing must never cost the caller an assessment it already has.
+        stages = []
+        try:
+            raw_boxes = []
+            keep_idx = []
+            if crack_results and crack_results[0].boxes is not None:
+                raw_boxes = crack_results[0].boxes.xyxy.cpu().numpy().astype(int)
+                # Not gated on masks. Suppression needs only boxes, and gating
+                # it meant a maskless result reported every detection as a
+                # discarded duplicate -- blaming NMS for something it never ran.
+                keep_idx = filter_overlapping_boxes(crack_results[0].boxes)
+
+            suppressed = max(0, len(raw_boxes) - len(keep_idx))
+
+            stage_specs = [
+                ("road_detection", "Road Detection",
+                 "Isolates the road surface",
+                 f"{road_coverage * 100:.1f}% of the frame was identified as road. "
+                 f"Anything below {MIN_ROAD_COVERAGE * 100:.0f}% is rejected rather than assessed.",
+                 stage_road),
+                ("perspective_correction", "Perspective Correction",
+                 "Inverse Perspective Mapping for accurate measurement",
+                 ("The road trapezoid is warped to a 700x700 top-down view, so a "
+                  "millimetre near the camera and a millimetre far from it are the "
+                  "same number of pixels."
+                  if ipm_applied else
+                  "The road edges could not be fitted, so the original view is kept. "
+                  "Measurements on this image are perspective-distorted."),
+                 bev_img),
+                ("defect_detection", "Defect Detection",
+                 "Identifies and classifies road defects",
+                 f"{len(raw_boxes)} candidate detection(s) from the crack model, "
+                 f"before any are discarded.",
+                 render_boxes(bev_img, raw_boxes, (0, 200, 255))),
+                ("box_filtering", "Box Filtering",
+                 "Removes overlapping detections",
+                 (f"Non-maximum suppression kept {len(keep_idx)} detection(s), "
+                  f"solid green, and discarded {suppressed} overlapping "
+                  f"duplicate(s), dashed magenta."
+                  if suppressed else
+                  f"No detections overlapped by more than 40%, so all "
+                  f"{len(keep_idx)} were kept. Nothing needed discarding here."),
+                 render_kept_boxes(bev_img, raw_boxes, keep_idx)),
+                ("sam_masking", "SAM Masking",
+                 "Segments the exact defect shape",
+                 "Segment Anything outlines the defect, then that outline is "
+                 "intersected with the crack model's own mask. Only pixels both "
+                 "models agree on are measured.",
+                 render_mask_overlay(bev_img, consensus_mask)),
+                ("skeletonization", "Skeletonization",
+                 "Traces the crack structure",
+                 "The mask is thinned to a one-pixel centreline. Its length is the "
+                 "crack length; mask area divided by that length is the mean width "
+                 "the severity grade is built from.",
+                 render_skeleton(bev_img, skel)),
+            ]
+
+            for key, title, summary, detail, frame in stage_specs:
+                encoded = _stage_jpeg(frame)
+                if encoded:
+                    stages.append({
+                        "key": key,
+                        "title": title,
+                        "summary": summary,
+                        "detail": detail,
+                        "image": encoded,
+                    })
+        except Exception as stage_error:
+            print(f"Stage visualisation skipped: {stage_error}")
+            stages = []
 
         # 7. Encode the annotated image
         _, buffer = cv2.imencode(".jpg", debug_img)
@@ -661,6 +864,7 @@ async def analyze_road(request: ImageRequest):
             "ipm_applied": ipm_applied,
             "road_coverage_pct": round(road_coverage * 100, 2),
             "privacy_blur_applied": PRIVACY_BLUR_ENABLED,
+            "stages": stages,
         }
 
     except Exception as e:

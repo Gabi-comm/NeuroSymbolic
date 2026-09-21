@@ -715,3 +715,151 @@ comparison; `backend/eval/compare.py` already computes it.
 
 The UI shows the admin's verdict first and the system's original beside it
 (*"corrected · was Medium"*), so nothing is hidden.
+
+---
+
+## Console, canvas and the pipeline walkthrough — 2026-09-20 (evening)
+
+### ✅ Console tab restored to the admin nav
+
+Replacing Scan/Report/About with Dashboard/Reports/Users had removed every
+explicit link to `/admin` itself — only the wordmark reached it. The admin nav is
+now **Console · Dashboard · Reports · Users**.
+
+### ✅ "Fix report" button — the feature shipped without a way in
+
+`FixReportModal`, the `fixing` state and the save handler were all wired from the
+previous session. Nothing ever called `setFixing`. The button now sits beside
+Mark resolved in the expanded card.
+
+**Why the previous verification missed it.** I grepped the built bundle for
+`"Fix report"` and `"Save correction"` — but both strings live *inside* the modal
+component, so they were present because the component existed, not because
+anything rendered it. The check confirmed the code shipped, not that it was
+reachable. The re-check looked for the handler instead: `onClick:()=>k(e)` next to
+the Mark-resolved button in the same flex row.
+
+Every other `useState` setter in the app was then audited for the same defect.
+None found. The only handler-less `<button>` is a deliberately disabled
+placeholder on `/report-damage`.
+
+### ✅ One background for every tab
+
+There were three treatments:
+
+| Surface | Before |
+|---|---|
+| admin tabs | flat `#525252` |
+| `/report-damage` | flat `#1a1a1a` |
+| everything else | nothing — fell through to `:root` |
+
+The grey was the real problem: black gradient panels sat on a mid-grey sheet and
+read as **holes punched through the page** rather than cards raised off it. Dark
+UI reads elevation as lightness, and the admin console was inverting it.
+
+A single canvas is now painted on a fixed `body::before` — near-black `#08090c`,
+three low-alpha blue glows, and a 48 px survey grid at an alpha you register as
+texture rather than see as lines. A pseudo-element rather than
+`background-attachment: fixed`, which iOS renders at the wrong size and which
+forces a full-layer repaint on every scroll frame.
+
+`<body>` had to lose its own background for this: a block-level background paints
+*after* negative-z-index descendants, so an opaque body would have hidden the
+canvas entirely.
+
+The rest of the scale was re-ordered to match — panels lifted to `#1f232b →
+#12141a`, hero bands raised above the canvas so their rounded bottom edge still
+reads, their invisible black `shadow-2xl` swapped for a blue-tinted lit edge, and
+the nav reduced to 75% canvas with a heavy blur and a hairline.
+
+While unifying: six dashboard panels and the reports filter moved off flat
+`bg-zinc-900`; the resolution-status track and the map placeholders were
+`zinc-800` — *lighter* than the panel they sat on, so they read as raised instead
+of recessed.
+
+**Contrast re-run against the new surfaces**, because changing a page background
+changes every ratio on it. All pass. Two findings:
+
+- Raw `#dc2626` measures 3.7:1, but the High badge uses `#f87171` for text
+  (6.5:1) and `#dc2626` only as a 15% fill — non-text, so the 4.5 floor does not
+  apply. Palette sound as shipped.
+- `text-gray-600` measured **2.4:1** on the dark surfaces, below the 3:1 floor
+  even for meta text. Four dark-surface uses moved to `gray-500`; the three on
+  white were left alone.
+
+**Kept deliberately:** the white report cards on `/admin/reports`. They are a
+document metaphor, the validated `onLight` severity palette exists specifically
+for them, and against a darker canvas they read with stronger figure/ground.
+
+### ✅ `/admin/users` brought onto the pattern
+
+The one admin tab with no hero band, using a flat `bg-zinc-900` card while the
+others used the panel gradient. Two of four tabs looking like a different product
+is a background problem. Its redundant "← Dashboard" button is gone — Dashboard
+is a nav tab now.
+
+### ✅ Pipeline walkthrough — `/process`
+
+All six stages already ran on every request; only the final composite was ever
+returned. The backend now emits each intermediate frame with a caption carrying
+that run's real numbers. Full detail in `documentation.md` §4c.
+
+Verified with 21 renderer unit tests (empty masks, zero detections, `masks=None`,
+missing results) and an end-to-end run on a real road photo: accepted at 17.1%
+coverage, six stages, 269 KB total, with Box Filtering genuinely exercised — 2
+candidates in, 1 kept, 1 suppressed.
+
+### ✅ Box filtering was invisible, not broken
+
+Reported as *"box filtering doesn't seem to work properly."* The NMS logic was
+correct; the **rendering** was the bug. Discarded boxes were drawn 1 px grey on
+grey asphalt. Quantified: against a mid-grey road the old render changed **zero
+pixels** above a visibility threshold. It was literally invisible, so the stage
+looked like it had done nothing.
+
+Now: kept boxes solid green at 3 px, discarded boxes **dashed magenta** at 2 px,
+discarded drawn first so a survivor overlapping one sits on top. Dash-vs-solid is
+the primary cue with colour secondary — the same belt-and-braces the severity
+badges use, so it still reads with red-green colour deficiency.
+
+Two related fixes:
+
+- **The honest no-op case.** When NMS finds nothing to suppress, stage 4 is
+  genuinely identical to stage 3, which reads as broken. It now says so:
+  *"No detections overlapped by more than 40%, so all N were kept."*
+- **A bug of mine.** The suppression count was gated on `masks is not None`, so a
+  result with boxes but no masks would have reported *every* detection as a
+  discarded duplicate — blaming NMS for something it never ran. Suppression needs
+  only boxes; the gate is gone.
+
+### ✅ The result screen is returnable
+
+Wiring the `/process` back-arrow exposed that its destination was broken. The
+result screen calls `clearPendingScan()` after analysing, so re-mounting it found
+nothing and showed *"No image found to analyze. Please upload one again."* **That
+applied to the browser's back button too, and had done since long before
+`/process` existed.** It was only found by tracing what the new link would land
+on.
+
+The finished result is now kept in `sessionStorage`, keyed by path so a scan's
+result cannot surface on the report screen.
+
+That in turn opened a worse hole: a restored screen would show the Submit button
+again and let the same report be filed twice. The stored result therefore carries
+a `submitted` flag, and a restored screen that was already filed comes back
+showing the confirmation.
+
+The stored return URL is validated to same-site absolute paths — a tampered or
+stale value cannot turn the arrow into an open redirect. Twelve tests against the
+real compiled `parseStagePayload` cover it: query strings survive intact;
+`https://`, `//host` and `javascript:` all fall back to `/`.
+
+### ✅ Copy removed
+
+"— the image is not re-processed." struck from the scan result's report prompt.
+
+### Not done, noted
+
+**Export CSV omits the correction columns.** `corrected_severity`,
+`corrected_damage_type` and `correction_note` are the RQ3/RQ4 paired data, and
+the dashboard export does not include them. Worth adding before the analysis.

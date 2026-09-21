@@ -270,6 +270,16 @@ and escalated one step when density reaches 25%.
   "crack_density_pct": 10.24,
   "ipm_applied": true,
   "privacy_blur_applied": true,
+  "road_coverage_pct": 17.1,
+  "stages": [
+    {
+      "key": "road_detection",
+      "title": "Road Detection",
+      "summary": "Isolates the road surface",
+      "detail": "17.1% of the frame was identified as road. Anything below 15% is rejected rather than assessed.",
+      "image": "data:image/jpeg;base64,..."
+    }
+  ],
   "distresses": [
     {
       "label": "Alligator Crack",
@@ -296,6 +306,9 @@ and escalated one step when density reaches 25%.
 
 `fileUrl` is the annotated image: green bounding boxes, red skeleton overlay, and
 a `label (severity)` caption per detection.
+
+`stages` is the six-frame pipeline walkthrough — see §4c. It is best-effort: if a
+frame fails to render the array comes back empty and the assessment is unaffected.
 
 > `gemini_bulletin` is a legacy field name. The text now comes from a local model;
 > the field is renamed in Phase 2 to avoid a breaking change mid-phase.
@@ -434,6 +447,49 @@ update "UserDetail" set role = 'admin' where email = 'you@example.com';
 
 ---
 
+## 4c. Pipeline walkthrough
+
+Every stage of the pipeline already ran on every request; until now only the
+final composite was returned. The API now also emits what each step produced, so
+a reader asked to trust a severity grade can see how it was reached.
+
+| # | Stage | Frame |
+|---|---|---|
+| 1 | Road Detection | green wash and contour over the road mask, on the pre-warp frame |
+| 2 | Perspective Correction | the 700×700 IPM warp |
+| 3 | Defect Detection | every raw candidate box, orange |
+| 4 | Box Filtering | survivors **solid green**, suppressed duplicates **dashed magenta** |
+| 5 | SAM Masking | the SAM ∩ YOLO consensus mask |
+| 6 | Skeletonization | centrelines on a darkened frame |
+
+Each carries a caption with that run's real numbers — road coverage, candidate
+count, how many duplicates non-maximum suppression discarded.
+
+**Cost.** Frames are downscaled to 560 px at JPEG quality 72: roughly 270 KB for
+all six, measured. Full-size frames would triple the response and would not fit
+in `sessionStorage` alongside the annotated image.
+
+**Storage.** The frames are held under their own `sessionStorage` key
+(`oasys.pipelineStages`), deliberately *not* folded into `oasys.pendingAnalysis`.
+That key is what carries a finished scan into the report flow; if the frames
+pushed it past the browser's quota, a user would lose a 25-second analysis to a
+page they might never open. Separate keys mean the frames can fail to save on
+their own, and the result screen hides the entry point rather than offering a
+walkthrough that would open empty.
+
+**Rendering choices that matter.** Discarded boxes were first drawn 1 px grey,
+which on grey asphalt changed zero pixels above a visibility threshold — the
+stage looked like a no-op. They are now dashed magenta at 2 px, with dash-vs-solid
+as the primary cue and colour secondary, the same belt-and-braces the severity
+badges use for colour vision deficiency. When suppression discards nothing the
+caption says so outright, because an unchanged frame otherwise reads as broken.
+
+The walkthrough lives at `/process` and is reached from **Show Process** on either
+result screen. It returns to the exact screen it came from, query string included
+— for a report that carries the pinned location.
+
+---
+
 ## 5. Database
 
 Supabase Postgres. Run `migration.sql` in the SQL editor; it is idempotent.
@@ -459,15 +515,32 @@ One row per submitted assessment.
 | `severity` | text | overall, worst-of |
 | `state` | text | `Needs Action`, `Pending`, `In Review`, `Resolved` |
 | `uploadtime` | timestamptz | |
-| `address`, `latitude`, `longitude` | | reverse-geocoded pin |
+| `address` | text | reverse-geocoded pin |
+| `lat`, `lng` | numeric | **not** `latitude`/`longitude` — the earlier name here was wrong |
 | `image_url` | text | annotated image |
-| `file_name`, `confidence` | text | |
+| `file_name` | text | |
+| `confidence` | real | numeric, not text |
 | `detection_details` | text | generated bulletin |
 | `observation_details` | jsonb | full distress array |
 | `gsd_mm_px` | double precision | GSD used for this image |
 | `severity_fuzzy`, `severity_crisp`, `severity_confidence` | text | Phase 2 |
+| `severity_dpwh_nw` | text | literal DPWH Narrow/Wide verdict |
 | `membership_trace` | jsonb | Phase 2, explainability |
 | `crack_density_pct` | double precision | Phase 2 |
+| `corrected_severity`, `corrected_damage_type` | text | admin's verdict, stored **beside** the model's |
+| `correction_note` | text | why it was corrected |
+| `corrected_at` | timestamptz | |
+| `corrected_by` | uuid | the admin who corrected it |
+
+`lat`, `lng` and `confidence` have no NOT NULL constraint: a quick scan can be
+submitted without a pin, and dropping those constraints is what allows it.
+
+**Corrections are additive, never destructive.** `severity` and `damage_type` are
+model output; overwriting them would destroy the evidence RQ3 and RQ4 rest on.
+`address`, `lat` and `lng` are user-supplied, so a wrong pin is corrected in
+place. Every correction is a licensed engineer disagreeing with the model on a
+specific detection — the paired data Cohen's Kappa needs, collected as a
+by-product of ordinary use. `backend/eval/compare.py` computes it.
 
 ### Row Level Security
 
@@ -577,6 +650,33 @@ which inspectors assess without seeing system output.
 ---
 
 ## 9. Changelog
+
+### Phase 5 — Console, canvas and the pipeline walkthrough (2026-09-20)
+
+- **Admin navigation** now shows Console · Dashboard · Reports · Users. The
+  wordmark links to `/admin` for admins rather than the public home page.
+- **One background for every tab.** There were three: a flat `#525252` on the
+  admin tabs, a flat `#1a1a1a` on `/report-damage`, and nothing elsewhere. The
+  grey was the worst — black panels on a mid-grey sheet read as holes punched
+  through the page rather than cards raised off it. A single canvas is now
+  painted on a fixed `body::before` (not `background-attachment: fixed`, which
+  iOS sizes wrongly and which repaints per scroll frame), and the whole surface
+  scale was re-ordered so lightness means elevation.
+- **`/admin/users` brought onto the pattern** — it was the one admin tab with no
+  hero band and a flat `bg-zinc-900` card.
+- **"Fix report" button added.** The modal, its state and its save handler had
+  all shipped; nothing called `setFixing`. The feature was complete except for
+  the way in.
+- **Pipeline walkthrough** — see §4c. New `/process` route.
+- **The result screen is returnable.** It cleared the pending scan after
+  analysing, so re-mounting it showed *"No image found to analyze"* — which broke
+  the browser's back button too, and had done since before `/process` existed.
+  The finished result is now kept, keyed by path, and carries a `submitted` flag
+  so a restored screen cannot file the same report twice.
+- **Contrast re-checked against the new surfaces.** `text-gray-600` measured
+  2.4:1 on dark and moved to `gray-500` in four places; the three uses on white
+  were left alone. The severity palette still passes — the High badge uses
+  `#f87171` for text at 6.5:1, with `#dc2626` only as a 15% fill.
 
 ### Phase 0 — Security and reproducibility (2026-09-17)
 
