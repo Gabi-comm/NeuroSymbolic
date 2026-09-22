@@ -52,6 +52,22 @@ alter table "FileUpload" add column if not exists severity_confidence text;
 alter table "FileUpload" add column if not exists severity_dpwh_nw    text;
 alter table "FileUpload" add column if not exists membership_trace    jsonb;
 
+-- Admin corrections, stored BESIDE the model's output rather than over it.
+--
+-- severity and damage_type are what the system decided; overwriting them would
+-- destroy the evidence RQ3 and RQ4 rest on. Location is user-supplied, so a
+-- wrong pin is corrected in place on the existing address/lat/lng columns and
+-- needs nothing here.
+--
+-- Every populated row is a licensed engineer disagreeing with the model on one
+-- specific detection: corrected_severity against severity_fuzzy is the paired
+-- comparison Cohen's Kappa needs. backend/eval/compare.py computes it.
+alter table "FileUpload" add column if not exists corrected_severity    text;
+alter table "FileUpload" add column if not exists corrected_damage_type text;
+alter table "FileUpload" add column if not exists correction_note       text;
+alter table "FileUpload" add column if not exists corrected_at          timestamptz;
+alter table "FileUpload" add column if not exists corrected_by          uuid;
+
 
 -- ---------------------------------------------------------------------------
 -- 2. UserDetail.role default was broken
@@ -146,11 +162,17 @@ create or replace function public.is_admin() returns boolean
 as $$ select exists (select 1 from "UserDetail"
                      where userloginuuid = auth.uid() and role = 'admin'); $$;
 
+-- Postgres has no `create policy if not exists`, so each policy drops ITS OWN
+-- name as well as the old one it replaces. Without the second drop this file
+-- fails on a re-run with 42710 "policy already exists" — harmless to data, but
+-- it aborts partway and reads like a broken setup.
 drop policy if exists "Allow everyone to read users" on "UserDetail";
+drop policy if exists "admins read all users" on "UserDetail";
 create policy "admins read all users" on "UserDetail"
   for select to authenticated using (public.is_admin());
 
 drop policy if exists "Admins can update users" on "UserDetail";
+drop policy if exists "admins update users" on "UserDetail";
 create policy "admins update users" on "UserDetail"
   for update to authenticated using (public.is_admin()) with check (public.is_admin());
 
@@ -205,6 +227,7 @@ create table if not exists public.role_change_log (
   old_role text, new_role text not null
 );
 alter table public.role_change_log enable row level security;
+drop policy if exists "admins read role log" on public.role_change_log;
 create policy "admins read role log" on public.role_change_log
   for select to authenticated using (public.is_admin());
 -- No write policies: only the SECURITY DEFINER trigger inserts. An audit log a
