@@ -80,6 +80,9 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
   const [showMap, setShowMap] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  // Read from the auth subscription, never awaited in the save handler. See the
+  // note in handleSave for why that distinction is the whole bug.
+  const [adminId, setAdminId] = useState<string | null>(null);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -93,6 +96,17 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
       document.body.style.overflow = previous;
     };
   }, [onClose]);
+
+  // INITIAL_SESSION fires as soon as this subscribes, so the id arrives without
+  // an await that could hang. Separate from the Escape/scroll effect above
+  // because that one re-runs whenever onClose changes identity, and
+  // resubscribing to auth on every parent render is pointless churn.
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAdminId(session?.user?.id ?? null);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
   const lookUpAddress = async (lat: number, lng: number) => {
     try {
@@ -114,9 +128,17 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
     setErrorMsg('');
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      // Deliberately NOT calling supabase.auth.getUser() here.
+      //
+      // supabase-js serialises auth operations through the Web Locks API, and
+      // Navigation holds an onAuthStateChange subscription on every page —
+      // including this one. Calling an auth method from a click handler while
+      // that subscription is active can deadlock: the await never settles, the
+      // finally never runs, and the modal sits on "Saving…" with its blurred
+      // backdrop up, with no way out. That was the bug.
+      //
+      // The subscription above already has the id, so there is nothing to wait
+      // for. Same fix as handleSubmitReport in UploadResultUi.
 
       const patch = {
         // In place: user-supplied, no evidence to preserve.
@@ -129,13 +151,27 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
         corrected_severity: severityChanged ? severity : null,
         correction_note: note.trim() || null,
         corrected_at: new Date().toISOString(),
-        corrected_by: user?.id ?? null,
+        corrected_by: adminId,
       };
 
-      const { error } = await supabase
+      // Bounded on purpose. The deadlock above was one way this modal could
+      // hang forever; a request that never comes back is another, and the user
+      // cannot tell them apart. A modal with no exit is the failure to avoid,
+      // so every path out of here either succeeds or shows an error.
+      const updatePromise = supabase
         .from('FileUpload')
         .update(patch)
         .eq('id', report.id);
+
+      const { error } = await Promise.race([
+        updatePromise,
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('The server did not respond. Please try again.')),
+            30_000
+          )
+        ),
+      ]);
 
       if (error) throw new Error(error.message);
 

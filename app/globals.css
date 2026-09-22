@@ -174,8 +174,22 @@ nav {
   }
 }
 
+/* fill-mode is `backwards`, NOT `both`, and that is load-bearing.
+
+   With `both`, transform stays under the animation's control after it ends and
+   computes to matrix(1,0,0,1,0,0) — the identity matrix, but not `none`. Any
+   transform other than `none` makes the element a containing block for
+   `position: fixed` descendants, so every modal in the app resolved `inset-0`
+   against THIS element instead of the viewport. On a page whose in-flow height
+   was 0 that collapsed the overlay to its padding (32px) and `overflow-y-auto`
+   clipped the panel away entirely: the Fix report dialog rendered at full size,
+   in the DOM, and painted nothing.
+
+   `backwards` still plays the entrance, then hands the properties back. The
+   base style already matches the `to` frame (opacity 1, no transform), so
+   nothing jumps at the end. */
 .page-enter {
-  animation: page-enter 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: page-enter 0.32s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 /* Sliding underline on the active nav item. */
