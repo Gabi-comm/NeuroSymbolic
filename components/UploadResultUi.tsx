@@ -522,9 +522,17 @@ export default function UploadResultUi({
                 administrator will assess it and mark it resolved.
               </p>
             </div>
-            <Link href="/" className="btn-blue px-8 py-3.5 w-full sm:w-auto shrink-0">
-              Done
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-3 shrink-0 w-full sm:w-auto">
+              <button
+                onClick={handleScanAnother}
+                className="px-6 py-3.5 rounded-full font-bold bg-white/10 hover:bg-white/20 border border-white/15 transition-colors w-full sm:w-auto"
+              >
+                Report another
+              </button>
+              <Link href="/my-reports" className="btn-blue px-8 py-3.5 w-full sm:w-auto">
+                Track my reports
+              </Link>
+            </div>
           </section>
         ) : (
           <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
