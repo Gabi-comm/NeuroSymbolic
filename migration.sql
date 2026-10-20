@@ -283,6 +283,112 @@ create trigger log_role_change_trigger after update on "UserDetail"
   for each row execute function public.log_role_change();
 
 
+-- ============================================================================
+-- F. City Engineer revision (2026-10-21) — NOT YET APPLIED, run in Supabase
+--
+-- Scan is gone, so every report now has a location; reports carry pavement
+-- type (it decides the repair), how the location and the scale were obtained,
+-- and the symbolic recommendation. Re-runnable, like A-E.
+-- ============================================================================
+
+alter table "FileUpload" add column if not exists pavement_type       text;
+alter table "FileUpload" add column if not exists road_class          text;
+alter table "FileUpload" add column if not exists road_name           text;
+alter table "FileUpload" add column if not exists barangay            text;
+alter table "FileUpload" add column if not exists location_accuracy_m double precision;
+alter table "FileUpload" add column if not exists location_source     text;
+alter table "FileUpload" add column if not exists scale_source        text;
+alter table "FileUpload" add column if not exists recommendation      jsonb;
+
+alter table "FileUpload" drop constraint if exists fileupload_pavement_type_check;
+alter table "FileUpload" add constraint fileupload_pavement_type_check
+  check (pavement_type is null or pavement_type in ('concrete', 'asphalt'));
+alter table "FileUpload" drop constraint if exists fileupload_location_source_check;
+alter table "FileUpload" add constraint fileupload_location_source_check
+  check (location_source is null or location_source in ('device_gps', 'photo_exif', 'manual_pin'));
+alter table "FileUpload" drop constraint if exists fileupload_scale_source_check;
+alter table "FileUpload" add constraint fileupload_scale_source_check
+  check (scale_source is null or scale_source in ('assumed_height', 'reference_card'));
+
+create index if not exists fileupload_severity_idx on "FileUpload" (severity);
+
+-- Who filed it. Role stays user/admin (it is the security boundary); user_type
+-- is descriptive only and grants nothing.
+alter table "UserDetail" add column if not exists user_type text not null default 'Civilian';
+alter table "UserDetail" drop constraint if exists userdetail_user_type_check;
+alter table "UserDetail" add constraint userdetail_user_type_check
+  check (user_type in ('Civilian', 'Reporter', 'Inspector'));
+
+-- Section 4 relaxed lat/lng for Scan. Restore NOT NULL only when no legacy
+-- row would violate it; otherwise leave it and say so.
+do $$
+begin
+  if exists (select 1 from "FileUpload" where lat is null or lng is null) then
+    raise notice 'FileUpload has rows without lat/lng; NOT NULL not restored.';
+  else
+    alter table "FileUpload" alter column lat set not null;
+    alter table "FileUpload" alter column lng set not null;
+  end if;
+end $$;
+
+-- Sign-up records the user type the person picked.
+create or replace function public.handle_new_user() returns trigger
+  language plpgsql security definer set search_path = public
+as $$
+declare picked text := new.raw_user_meta_data ->> 'user_type';
+begin
+  insert into "UserDetail" (username, email, userloginuuid, role, user_type)
+  values (coalesce(nullif(trim(new.raw_user_meta_data ->> 'username'), ''),
+                   split_part(new.email, '@', 1)),
+          new.email, new.id, 'user',
+          case when picked in ('Civilian', 'Reporter', 'Inspector') then picked
+               else 'Civilian' end);
+  return new;
+end $$;
+
+-- Column guards. The own-row policies ("users update own profile", "edit or
+-- delete own upload") are row-level: without these a user could promote
+-- themselves to admin, or overwrite the grade on their own report. Only the
+-- City Engineer (admin) changes roles, user types, grades and corrections.
+create or replace function public.guard_userdetail_columns() returns trigger
+  language plpgsql security definer set search_path = public
+as $$
+begin
+  if not public.is_admin() and auth.uid() is not null and
+     (new.role is distinct from old.role or new.user_type is distinct from old.user_type) then
+    raise exception 'Only the City Engineer can change roles or user types.'
+      using errcode = 'insufficient_privilege';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists guard_userdetail_columns_trigger on "UserDetail";
+create trigger guard_userdetail_columns_trigger before update on "UserDetail"
+  for each row execute function public.guard_userdetail_columns();
+
+create or replace function public.guard_fileupload_grading() returns trigger
+  language plpgsql security definer set search_path = public
+as $$
+begin
+  if not public.is_admin() and auth.uid() is not null and (
+       new.severity              is distinct from old.severity
+    or new.state                 is distinct from old.state
+    or new.corrected_severity    is distinct from old.corrected_severity
+    or new.corrected_damage_type is distinct from old.corrected_damage_type
+    or new.correction_note       is distinct from old.correction_note
+    or new.corrected_at          is distinct from old.corrected_at
+    or new.corrected_by          is distinct from old.corrected_by) then
+    raise exception 'Only the City Engineer can change a grade or status.'
+      using errcode = 'insufficient_privilege';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists guard_fileupload_grading_trigger on "FileUpload";
+create trigger guard_fileupload_grading_trigger before update on "FileUpload"
+  for each row execute function public.guard_fileupload_grading();
+
+
 -- ---------------------------------------------------------------------------
 -- Promoting the first administrator
 --
