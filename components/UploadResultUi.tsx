@@ -7,9 +7,6 @@ import { supabase } from '@/utils/supabase';
 import LoginModal from './LoginModal';
 import { readPendingScan, clearPendingScan } from '@/utils/pendingScan';
 import {
-  savePendingAnalysis,
-  readPendingAnalysis,
-  clearPendingAnalysis,
   saveLastResult,
   readLastResult,
   type AnalysisData,
@@ -26,21 +23,11 @@ import DistressCarousel from './DistressCarousel';
 interface UploadResultUiProps {
   backLinkHref: string;
   analysisData?: AnalysisData;
-  /**
-   * 'scan'   — informational only. Figure 7.5 of the paper states a report
-   *            "would not proceed without an attached image or an address",
-   *            and a scan has no address, so it offers a route into the report
-   *            flow instead of a submit button.
-   * 'report' — came from /report-damage, so a location exists and the result
-   *            can be submitted to the admin queue.
-   */
-  mode?: 'scan' | 'report';
 }
 
 export default function UploadResultUi({
   backLinkHref,
   analysisData,
-  mode = 'report',
 }: UploadResultUiProps) {
   const router = useRouter();
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -91,18 +78,6 @@ export default function UploadResultUi({
     // directly from the browser: a hardcoded localhost only works in dev.
     const fetchAiData = async () => {
       if (analysisData) return;
-
-      // Arriving from a scan: the analysis is already done. Re-running it would
-      // cost another road pass, SAM segmentation and bulletin for a result we
-      // already have.
-      const carried = readPendingAnalysis();
-      if (carried) {
-        setData(carried);
-        saveLastResult(window.location.pathname, carried);
-        clearPendingAnalysis();
-        clearPendingScan();
-        return;
-      }
 
       const pending = readPendingScan();
       if (!pending) {
@@ -204,22 +179,10 @@ export default function UploadResultUi({
    *
    * The only way off this screen used to be the back arrow, which left the
    * stored scan in place; the next analysis could then pick up the previous
-   * image. Clearing both stores makes "scan another" mean exactly that.
+   * image. Clearing the store makes "report another" mean exactly that.
    */
   const handleScanAnother = () => {
-    clearPendingAnalysis();
     clearPendingScan();
-    router.push('/upload-media');
-  };
-
-  /**
-   * Hand this analysis to the report flow so the user only has to drop a pin.
-   *
-   * If sessionStorage refuses the payload the report flow simply re-analyses,
-   * which is slower but still correct — so the hop is never blocked.
-   */
-  const handleAddLocation = () => {
-    if (data) savePendingAnalysis(data);
     router.push('/report-damage');
   };
 
@@ -535,37 +498,7 @@ export default function UploadResultUi({
         </section>
 
         {/* Action: report it, or submit it */}
-        {mode === 'scan' ? (
-          /* A scan has no address, and Figure 7.5 of the paper states a report
-             "would not proceed without an attached image or an address". So
-             this offers the route into the report flow rather than a submit
-             button that would file an undispatchable report — one the admin
-             map could never show, because it filters on coordinates. */
-          <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-            <div>
-              <h2 className="font-black mb-0.5">Needs fixing?</h2>
-              <p className="text-sm text-gray-400 max-w-lg leading-snug">
-                Add the location to file this with road maintenance. Your
-                analysis is kept, so you only need to drop a pin.
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 shrink-0 w-full sm:w-auto">
-              <button
-                onClick={handleScanAnother}
-                className="px-6 py-3.5 rounded-full font-bold bg-white/10 hover:bg-white/20 border border-white/15 transition-colors w-full sm:w-auto"
-              >
-                Scan another image
-              </button>
-              <button
-                onClick={handleAddLocation}
-                className="btn-blue px-8 py-3.5 w-full sm:w-auto"
-              >
-                Add location and report
-              </button>
-            </div>
-          </section>
-        ) : submitState === 'done' ? (
+        {submitState === 'done' ? (
           /* A whole-panel confirmation, not a line of small green text. The
              submission is the end of the task; it should be unmistakable that
              it worked. */
