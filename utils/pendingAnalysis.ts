@@ -1,15 +1,8 @@
-import { useSyncExternalStore } from 'react';
-
-// Carries a finished analysis from the Scan result into the Report flow.
+// Shapes of a finished analysis, and the last result per result screen.
 //
-// Per the paper (Figure 7.5) a report "would not proceed without an attached
-// image or an address", so a scan — which has no address — cannot be submitted.
-// What it can do is hand its result to the report flow, where the user only has
-// to drop a pin.
-//
-// Without this, that hop would re-upload and re-analyse the same image: another
-// road-detection pass, SAM segmentation and LLM bulletin, roughly 25 seconds of
-// work to produce a result we already hold.
+// This file once also carried a Scan result into the Report flow. Scan was
+// removed in the City Engineer revision (one flow: photo, location, analyse,
+// submit), so only the types and the returnable-result store remain.
 //
 // sessionStorage rather than localStorage: an in-progress report should not
 // survive closing the browser.
@@ -52,8 +45,6 @@ export interface AnalysisData {
   privacy_blur_applied?: boolean;
 }
 
-const KEY = 'oasys.pendingAnalysis';
-
 // ---------------------------------------------------------------------------
 // The last finished result, per result screen.
 //
@@ -64,8 +55,7 @@ const KEY = 'oasys.pendingAnalysis';
 // and reported "No image found to analyze."
 //
 // Keeping the finished result makes the screen returnable. It is keyed by path
-// because /upload-media/result and /report-damage/result are different
-// screens, and a scan's result must not surface on the report screen.
+// so a result can only ever surface on the screen that produced it.
 // ---------------------------------------------------------------------------
 
 const LAST_KEY = 'oasys.lastResult';
@@ -106,69 +96,4 @@ export function readLastResult(
   } catch {
     return null;
   }
-}
-
-export function savePendingAnalysis(data: AnalysisData): boolean {
-  try {
-    sessionStorage.setItem(KEY, JSON.stringify(data));
-    emit();
-    return true;
-  } catch {
-    // The annotated image is a base64 data URL of a few hundred KB; a browser
-    // with a tight quota can refuse it. The caller falls back to re-analysing.
-    return false;
-  }
-}
-
-export function readPendingAnalysis(): AnalysisData | null {
-  try {
-    const raw = sessionStorage.getItem(KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as AnalysisData;
-    // A half-written or stale entry should not crash the result screen.
-    return parsed && Array.isArray(parsed.distresses) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-export function clearPendingAnalysis(): void {
-  try {
-    sessionStorage.removeItem(KEY);
-    emit();
-  } catch {
-    // Private-mode browsers can throw; nothing to clean up if so.
-  }
-}
-
-// sessionStorage is an external store, so it is read through
-// useSyncExternalStore rather than copied into state inside an effect: no extra
-// render pass, and server and client snapshots are explicit.
-let listeners: Array<() => void> = [];
-
-function subscribe(callback: () => void): () => void {
-  listeners.push(callback);
-  return () => {
-    listeners = listeners.filter((l) => l !== callback);
-  };
-}
-
-function emit(): void {
-  for (const listener of listeners) listener();
-}
-
-/** True when a scan handed its analysis to the report flow. */
-function hasCarriedAnalysis(): boolean {
-  try {
-    return sessionStorage.getItem(KEY) !== null;
-  } catch {
-    return false;
-  }
-}
-
-/** The server has no sessionStorage, so it always reports "nothing carried". */
-const getServerSnapshot = () => false;
-
-export function useHasCarriedAnalysis(): boolean {
-  return useSyncExternalStore(subscribe, hasCarriedAnalysis, getServerSnapshot);
 }
