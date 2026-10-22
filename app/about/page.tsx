@@ -196,10 +196,7 @@ export default function AboutUs() {
       </section>
 
       <div className="flex flex-col sm:flex-row gap-4 justify-center pt-2">
-        <Link href="/upload-media" className="btn-blue px-8 py-4">
-          Scan an image
-        </Link>
-        <Link href="/report-damage" className="btn-blue px-8 py-4 bg-zinc-700 hover:bg-zinc-600">
+        <Link href="/report-damage" className="btn-blue px-8 py-4">
           Report damage
         </Link>
       </div>

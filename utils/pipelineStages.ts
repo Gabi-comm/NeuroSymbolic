@@ -2,10 +2,9 @@ import { useSyncExternalStore } from 'react';
 
 // The six pipeline stages, carried from the result screen to /process.
 //
-// Kept under its own sessionStorage key rather than folded into
-// [pendingAnalysis]. Six JPEG frames add roughly 270KB, and pendingAnalysis is
-// what carries a finished scan into the report flow -- if the stages push that
-// payload past the browser's quota, the user loses a 25-second analysis to a
+// Kept under its own sessionStorage key rather than folded into the stored
+// result. Six JPEG frames add roughly 270KB -- if the stages pushed the result
+// past the browser's quota, the user would lose a 25-second analysis to a
 // feature they may never open. Separate keys mean the stages can fail to save
 // on their own, and everything else still works.
 
@@ -26,10 +25,9 @@ interface StagePayload {
   /**
    * The result screen these frames came from, path and query included.
    *
-   * Stored rather than inferred, because there are two of them -- a scan ends
-   * on /upload-media/result and a report on /report-damage/result -- and the
-   * report's address, latitude and longitude live in its query string, so
-   * returning to a bare path would drop the location the user just pinned.
+   * Stored rather than inferred: the report's address, latitude and longitude
+   * live in its query string, so returning to a bare path would drop the
+   * location the user just pinned.
    *
    * Recorded here instead of relying on history.back(), which follows whatever
    * the user did last rather than where this page came from, and which has

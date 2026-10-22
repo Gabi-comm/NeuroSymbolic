@@ -69,10 +69,10 @@ export default function HomePage() {
             Report damage
           </Link>
           <Link
-            href="/upload-media"
+            href="/about"
             className="btn-blue flex-1 px-8 py-4 text-lg sm:text-xl bg-zinc-700 hover:bg-zinc-600"
           >
-            Scan
+            How it works
           </Link>
         </div>
       </div>

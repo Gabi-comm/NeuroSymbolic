@@ -108,7 +108,7 @@ export default function Navigation() {
   const isAdmin = dbProfile?.role?.toLowerCase() === 'admin';
 
   // Admins get the console's sections; everyone else gets the public site.
-  // Showing Scan / Report / About to an administrator mixed two different jobs
+  // Showing Report / About to an administrator mixed two different jobs
   // in one header and buried the pages they actually work in.
   const links = isAdmin
     ? [
@@ -119,8 +119,8 @@ export default function Navigation() {
       ]
     : [
         { href: '/', label: 'Home' },
-        { href: '/upload-media', label: 'Scan' },
         { href: '/report-damage', label: 'Report' },
+        ...(authUser ? [{ href: '/my-reports', label: 'My reports' }] : []),
         { href: '/about', label: 'About' },
       ];
 

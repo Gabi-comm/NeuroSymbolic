@@ -58,11 +58,11 @@ export default function ProcessPage() {
           </span>
           <h1 className="text-2xl font-black mb-2">No analysis to walk through</h1>
           <p className="text-sm text-gray-400 leading-snug mb-7">
-            This page shows the detection stages for an image you have just
-            scanned. Scan one and the walkthrough opens from the result screen.
+            This page shows how a photo you have just reported was graded.
+            Report one and the walkthrough opens from the result screen.
           </p>
-          <Link href="/upload-media" className="btn-blue w-full px-6 py-3">
-            Scan an image
+          <Link href="/report-damage" className="btn-blue w-full px-6 py-3">
+            Report damage
           </Link>
         </div>
       </div>
