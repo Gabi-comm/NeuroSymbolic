@@ -331,18 +331,17 @@ begin
   end if;
 end $$;
 
--- Sign-up records the user type the person picked.
+-- Every account starts as a Civilian. The user type is assigned by the City
+-- Engineer on /admin/users, never picked at sign-up: raw_user_meta_data is
+-- whatever the browser sent, so nothing in it is trusted beyond the username.
 create or replace function public.handle_new_user() returns trigger
   language plpgsql security definer set search_path = public
 as $$
-declare picked text := new.raw_user_meta_data ->> 'user_type';
 begin
   insert into "UserDetail" (username, email, userloginuuid, role, user_type)
   values (coalesce(nullif(trim(new.raw_user_meta_data ->> 'username'), ''),
                    split_part(new.email, '@', 1)),
-          new.email, new.id, 'user',
-          case when picked in ('Civilian', 'Reporter', 'Inspector') then picked
-               else 'Civilian' end);
+          new.email, new.id, 'user', 'Civilian');
   return new;
 end $$;
 

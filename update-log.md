@@ -936,3 +936,11 @@ backend as concrete and as asphalt, `npx tsc --noEmit`, eslint, `npm run build`.
 - `utils/captures.ts` holds the storage/table calls; `downscaleToDataUrl` in `utils/pendingScan.ts` is now exported and reused.
 - `migration.sql` section G: bucket, owner-folder storage policies, table with RLS (owner CRUD, City Engineer read) and an explicit GRANT to `authenticated`. Not yet run.
 - Wording: "damage" in the UI is now "distress" (titles, headings, report button, admin labels). Routes and DB columns keep their names.
+
+## Step 2: role views — 2026-10-22
+
+- Reporter type (Civilian / Reporter / Inspector) is assigned by the City Engineer on `/admin/users`, not picked at sign-up. Every new account starts as Civilian: section F's `handle_new_user` no longer reads `user_type` from sign-up metadata.
+- On screen the admin role is "City Engineer" (console heading, users page chip, buttons and dialog, sign-in notice, submit messages). The DB value stays `admin`.
+- `/my-reports`: the reporter's own reports with severity, status, address and repair activity.
+- `/admin/reports`: each report shows who filed it and their reporter type.
+- Only the City Engineer changes grades, status, roles or reporter types: enforced by section F's guard triggers.

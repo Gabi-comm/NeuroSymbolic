@@ -18,6 +18,7 @@ const ReportsMap = dynamic(() => import('@/components/ReportsMap'), {
 });
 
 interface Report extends MapReport {
+  userid: string | null;
   uploadtime: string | null;
   image_url: string | null;
   file_name: string | null;
@@ -31,8 +32,16 @@ interface Report extends MapReport {
   corrected_at: string | null;
 }
 
+interface Filer {
+  username: string | null;
+  user_type: string | null;
+}
+
 export default function AdminReports() {
   const [reports, setReports] = useState<Report[]>([]);
+  // Who filed each report, keyed by auth uid (FileUpload.userid ->
+  // UserDetail.userloginuuid). The City Engineer can read every profile.
+  const [filers, setFilers] = useState<Record<string, Filer>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -60,6 +69,21 @@ export default function AdminReports() {
 
         if (error) throw error;
         if (isMounted) setReports(data ?? []);
+
+        const ids = [...new Set((data ?? []).map((r) => r.userid).filter(Boolean))];
+        if (ids.length) {
+          const { data: people } = await supabase
+            .from('UserDetail')
+            .select('userloginuuid, username, user_type')
+            .in('userloginuuid', ids);
+          if (isMounted && people) {
+            setFilers(
+              Object.fromEntries(
+                people.map((p) => [p.userloginuuid, { username: p.username, user_type: p.user_type }])
+              )
+            );
+          }
+        }
       } catch (err) {
         if (isMounted) {
           setLoadError(err instanceof Error ? err.message : 'Could not load reports.');
@@ -193,6 +217,15 @@ export default function AdminReports() {
               {report.address || 'Location unknown'}
               {report.uploadtime && ` · ${new Date(report.uploadtime).toLocaleDateString('en-GB')}`}
             </p>
+            {report.userid && (
+              <p className="text-zinc-500 text-xs mt-0.5">
+                Filed by{' '}
+                <span className="font-bold text-zinc-700">
+                  {filers[report.userid]?.username ?? 'Unknown user'}
+                </span>
+                {filers[report.userid]?.user_type && ` · ${filers[report.userid]?.user_type}`}
+              </p>
+            )}
           </div>
 
           <button

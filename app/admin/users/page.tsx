@@ -8,7 +8,15 @@ interface UserProfile {
   username: string | null;
   email: string | null;
   role: string | null;
+  user_type: string | null;
 }
+
+// Assigned here by the City Engineer, never chosen at sign-up. Descriptive
+// only: what an account may do is decided by role, not by this.
+const USER_TYPES = ['Civilian', 'Reporter', 'Inspector'] as const;
+
+/** The DB keeps "admin"; on screen that role is the City Engineer. */
+const roleLabel = (role: string) => (role === 'admin' ? 'City Engineer' : 'User');
 
 export default function UserManagementPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -20,6 +28,7 @@ export default function UserManagementPage() {
   // dismissed with a click outside, and reads poorly to screen readers.
   const [pending, setPending] = useState<{ user: UserProfile; newRole: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [savingType, setSavingType] = useState<string | null>(null);
 
   const adminCount = users.filter((u) => (u.role || '').toLowerCase() === 'admin').length;
 
@@ -64,7 +73,7 @@ export default function UserManagementPage() {
 
     // Server-side guard is the RLS policy; this only prevents the obvious mistake.
     if (user.userloginuuid === currentAdminId) {
-      setActionError('You cannot change your own admin status.');
+      setActionError('You cannot change your own City Engineer access.');
       setPending(null);
       return;
     }
@@ -84,6 +93,25 @@ export default function UserManagementPage() {
       );
     }
     setPending(null);
+  };
+
+  const applyUserType = async (user: UserProfile, userType: string) => {
+    setActionError(null);
+    setSavingType(user.userloginuuid);
+    const { error } = await supabase
+      .from('UserDetail')
+      .update({ user_type: userType })
+      .eq('userloginuuid', user.userloginuuid);
+    if (error) {
+      setActionError(`Could not update the reporter type: ${error.message}`);
+    } else {
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.userloginuuid === user.userloginuuid ? { ...u, user_type: userType } : u
+        )
+      );
+    }
+    setSavingType(null);
   };
 
   return (
@@ -114,7 +142,7 @@ export default function UserManagementPage() {
                 {adminCount > 0 && (
                   <>
                     , <strong className="text-white">{adminCount}</strong> with
-                    administrator access
+                    City Engineer access
                   </>
                 )}
                 .
@@ -159,6 +187,25 @@ export default function UserManagementPage() {
                       <p className="text-gray-400 text-sm truncate">{user.email || 'No email'}</p>
                     </div>
 
+                    {role !== 'admin' && (
+                      <label className="flex items-center gap-2 shrink-0 text-xs text-gray-400 font-bold">
+                        <span className="sr-only sm:not-sr-only">Type</span>
+                        <select
+                          value={user.user_type ?? 'Civilian'}
+                          disabled={savingType === user.userloginuuid}
+                          onChange={(e) => applyUserType(user, e.target.value)}
+                          aria-label={`Reporter type for ${user.username || user.email || 'this user'}`}
+                          className="bg-zinc-800 text-white border border-white/15 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-60"
+                        >
+                          {USER_TYPES.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-bold uppercase shrink-0 w-max ${
                         role === 'admin'
@@ -166,11 +213,11 @@ export default function UserManagementPage() {
                           : 'bg-white/5 text-gray-400 border border-white/10'
                       }`}
                     >
-                      {role}
+                      {roleLabel(role)}
                     </span>
 
                     {isSelf ? (
-                      <span className="text-xs text-gray-500 italic shrink-0 sm:w-32 sm:text-right">
+                      <span className="text-xs text-gray-500 italic shrink-0 sm:w-44 sm:text-right">
                         Protected
                       </span>
                     ) : (
@@ -178,9 +225,9 @@ export default function UserManagementPage() {
                         onClick={() =>
                           setPending({ user, newRole: role === 'admin' ? 'user' : 'admin' })
                         }
-                        className="text-xs font-bold text-white bg-zinc-700 hover:bg-zinc-600 px-4 py-2 rounded-lg transition-colors shrink-0 sm:w-32"
+                        className="text-xs font-bold text-white bg-zinc-700 hover:bg-zinc-600 px-4 py-2 rounded-lg transition-colors shrink-0 sm:w-44"
                       >
-                        Make {role === 'admin' ? 'user' : 'admin'}
+                        {role === 'admin' ? 'Remove City Engineer' : 'Make City Engineer'}
                       </button>
                     )}
                   </li>
@@ -200,13 +247,13 @@ export default function UserManagementPage() {
         >
           <div className="bg-white rounded-panel p-7 max-w-sm w-full shadow-2xl text-black">
             <h2 id="role-dialog-title" className="text-xl font-black mb-2">
-              Change role to {pending.newRole}?
+              {pending.newRole === 'admin' ? 'Make City Engineer?' : 'Remove City Engineer access?'}
             </h2>
             <p className="text-zinc-600 font-medium text-sm mb-7">
               {pending.user.username || pending.user.email || 'This account'} will
               {pending.newRole === 'admin'
                 ? ' gain full access to every report and user.'
-                : ' lose administrator access.'}
+                : ' lose City Engineer access and become a regular user.'}
             </p>
             <div className="flex gap-3">
               <button

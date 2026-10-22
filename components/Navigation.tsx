@@ -155,7 +155,7 @@ export default function Navigation() {
           <Link
             href={isAdmin ? '/admin' : '/'}
             className="flex items-center gap-2.5 shrink-0"
-            aria-label={isAdmin ? 'OASYS admin console' : 'OASYS home'}
+            aria-label={isAdmin ? 'OASYS City Engineer console' : 'OASYS home'}
           >
             <Image
               src="/oasys-logo-small.png"
