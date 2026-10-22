@@ -389,6 +389,96 @@ create trigger guard_fileupload_grading_trigger before update on "FileUpload"
   for each row execute function public.guard_fileupload_grading();
 
 
+-- ============================================================================
+-- G. Captured Distress (2026-10-22) — NOT YET APPLIED, run in Supabase
+--
+-- A reporter on the road photographs the damage now and files the report
+-- later. The photo goes to the private "captures" bucket under the reporter's
+-- own folder ({auth uid}/{uuid}.jpg); the row keeps where it was taken, read
+-- at the moment of capture, so the report filed later still points at the
+-- right spot. reported_at is set once it has been filed. Re-runnable.
+--
+-- New tables are not exposed to the Data API automatically (Supabase change of
+-- 2026-04-28), hence the explicit GRANT. RLS limits every row to its owner;
+-- the City Engineer can read all of them.
+-- ============================================================================
+
+insert into storage.buckets (id, name, public)
+values ('captures', 'captures', false)
+on conflict (id) do nothing;
+
+drop policy if exists "captures: owner reads"   on storage.objects;
+drop policy if exists "captures: owner uploads" on storage.objects;
+drop policy if exists "captures: owner deletes" on storage.objects;
+drop policy if exists "captures: admin reads"   on storage.objects;
+
+create policy "captures: owner reads" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'captures' and (storage.foldername(name))[1] = (select auth.uid()::text));
+create policy "captures: owner uploads" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'captures' and (storage.foldername(name))[1] = (select auth.uid()::text));
+create policy "captures: owner deletes" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'captures' and (storage.foldername(name))[1] = (select auth.uid()::text));
+create policy "captures: admin reads" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'captures' and public.is_admin());
+
+create table if not exists public.captured_distress (
+  id                  uuid primary key default gen_random_uuid(),
+  user_id             uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  image_path          text not null,
+  file_name           text,
+  lat                 double precision not null,
+  lng                 double precision not null,
+  location_accuracy_m double precision,
+  location_source     text not null,
+  address             text,
+  barangay            text,
+  road_name           text,
+  road_class          text,
+  surface             text,
+  captured_at         timestamptz not null default now(),
+  reported_at         timestamptz
+);
+
+alter table public.captured_distress drop constraint if exists captured_distress_location_source_check;
+alter table public.captured_distress add constraint captured_distress_location_source_check
+  check (location_source in ('device_gps', 'photo_exif', 'manual_pin'));
+alter table public.captured_distress drop constraint if exists captured_distress_road_class_check;
+alter table public.captured_distress add constraint captured_distress_road_class_check
+  check (road_class is null or road_class in ('national', 'city'));
+alter table public.captured_distress drop constraint if exists captured_distress_surface_check;
+alter table public.captured_distress add constraint captured_distress_surface_check
+  check (surface is null or surface in ('concrete', 'asphalt'));
+
+create index if not exists captured_distress_user_idx
+  on public.captured_distress (user_id, captured_at desc);
+
+alter table public.captured_distress enable row level security;
+
+drop policy if exists "captured_distress: owner reads"   on public.captured_distress;
+drop policy if exists "captured_distress: owner inserts" on public.captured_distress;
+drop policy if exists "captured_distress: owner updates" on public.captured_distress;
+drop policy if exists "captured_distress: owner deletes" on public.captured_distress;
+drop policy if exists "captured_distress: admin reads"   on public.captured_distress;
+
+create policy "captured_distress: owner reads" on public.captured_distress
+  for select to authenticated using ((select auth.uid()) = user_id);
+create policy "captured_distress: owner inserts" on public.captured_distress
+  for insert to authenticated with check ((select auth.uid()) = user_id);
+create policy "captured_distress: owner updates" on public.captured_distress
+  for update to authenticated
+  using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+create policy "captured_distress: owner deletes" on public.captured_distress
+  for delete to authenticated using ((select auth.uid()) = user_id);
+create policy "captured_distress: admin reads" on public.captured_distress
+  for select to authenticated using (public.is_admin());
+
+grant select, insert, update, delete on public.captured_distress to authenticated;
+
+
 -- ---------------------------------------------------------------------------
 -- Promoting the first administrator
 --

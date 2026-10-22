@@ -8,11 +8,15 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.responses import JSONResponse
+from typing import Literal
+
 from pydantic import BaseModel
 import requests
 from ultralytics import YOLO
 
 import fuzzy_engine
+import measure
+import scale
 from segment_anything import sam_model_registry, SamPredictor
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -40,9 +44,10 @@ OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2")
 
 # --- Ground Sample Distance (decision D3) ------------------------------------
 # mm per pixel in the bird's-eye view. Default is the value stated in the paper,
-# section 3.3.C. Callers may override it per image once capture height and
-# distance are known. The previous hardcoded 1.5 understated every measurement
-# by a factor of ~2.9 (and every area by ~8.4).
+# section 3.3.C: the capture rule frames one 3.05 m lane across the 700 px warp.
+# A reference card in the photo replaces it with a measured value (scale.py).
+# The previous hardcoded 1.5 understated every measurement by a factor of ~2.9
+# (and every area by ~8.4).
 DEFAULT_GSD_MM_PX = float(os.environ.get("DEFAULT_GSD_MM_PX", "4.357"))
 
 # --- Road gate ----------------------------------------------------------------
@@ -122,6 +127,9 @@ class ImageRequest(BaseModel):
     image_base64: str
     # Optional per-image override once capture height/distance are known (D3).
     gsd_mm_px: float | None = None
+    # Decides the repair: reblocking is a concrete repair, patching and overlay
+    # are asphalt ones. Samson Road, the study's main segment, is concrete.
+    pavement_type: Literal["concrete", "asphalt"] = fuzzy_engine.DEFAULT_PAVEMENT
 
 SEVERITY_RANK = {"Low": 0, "Medium": 1, "High": 2}
 
@@ -330,21 +338,8 @@ def filter_overlapping_boxes(boxes, iou_threshold=0.4):
     return [int(i) for i in np.array(indices).flatten()]
 
 
-def skeletonize_opencv(img):
-    skel = np.zeros(img.shape, np.uint8)
-    element = cv2.getStructuringElement(cv2.MORPH_CROSS, (3,3))
-
-    while True:
-        open_ = cv2.morphologyEx(img, cv2.MORPH_OPEN, element)
-        temp = cv2.subtract(img, open_)
-        eroded = cv2.erode(img, element)
-        skel = cv2.bitwise_or(skel, temp)
-        img = eroded.copy()
-
-        if cv2.countNonZero(img) == 0:
-            break
-
-    return skel
+# Moved to measure.py so width measurement can be tested without the models.
+skeletonize_opencv = measure.skeletonize
 
 # ---------------------------------------------------------------------------
 # Pipeline stage visualisation.
@@ -354,8 +349,7 @@ def skeletonize_opencv(img):
 # turns the pipeline from a claim into something a reader can check.
 #
 # They are deliberately small. Six full-size frames would roughly triple the
-# response and would not fit in sessionStorage alongside the annotated image,
-# which is what carries a scan into the report flow.
+# response and would not fit in sessionStorage alongside the annotated image.
 # ---------------------------------------------------------------------------
 
 STAGE_MAX_W = 560
@@ -466,7 +460,8 @@ def render_skeleton(img, skeleton):
     return out
 
 
-def trace_cracks(image, crack_results, predictor, gsd, road_area_px):
+def trace_cracks(image, crack_results, predictor, gsd, road_area_px,
+                 pavement=fuzzy_engine.DEFAULT_PAVEMENT):
     """Measure every surviving detection, then grade it.
 
     Two passes on purpose. Crack density is a property of the whole road segment,
@@ -531,11 +526,12 @@ def trace_cracks(image, crack_results, predictor, gsd, road_area_px):
         if mask_pixels < 10:
             continue
 
-        skel = skeletonize_opencv(cleaned_cracks)
-        length_px = cv2.countNonZero(skel)
-
-        # Mean width: mask area divided by centreline length, scaled to mm.
-        width_mm = (mask_pixels / length_px * gsd) if length_px > 0 else 0.0
+        # Predominant width along the centreline, the way DPWH rates it; the
+        # old area-over-length figure rides along for comparison (measure.py).
+        widths = measure.measure_width(cleaned_cracks, gsd)
+        skel = widths["skeleton"]
+        length_px = widths["length_px"]
+        width_mm = widths["width_mm"]
 
         if label in fuzzy_engine.AREA_DEFECT_LABELS:
             physical_metric = (mask_pixels * (gsd ** 2)) / 1_000_000.0
@@ -556,6 +552,7 @@ def trace_cracks(image, crack_results, predictor, gsd, road_area_px):
             "metric_value": physical_metric,
             "unit": unit,
             "width_mm": width_mm,
+            "width_mm_area_ratio": widths["width_mm_area_ratio"],
             "mask_pixels": mask_pixels,
             "confidence": float(confidences[i]),
             "box": (int(x1), int(y1)),
@@ -569,6 +566,10 @@ def trace_cracks(image, crack_results, predictor, gsd, road_area_px):
     density_pct = float(min(density_pct, 100.0))
 
     # ---- Pass 2: symbolic reasoning ----------------------------------------
+    # DPWH counts potholes, so a pothole's grade depends on how many share the
+    # photo -- another reason grading waits until everything is measured.
+    pothole_count = sum(1 for m in measured if m["label"] == fuzzy_engine.POTHOLE_LABEL)
+
     traced = []
     for m in measured:
         grades = fuzzy_engine.evaluate(
@@ -576,6 +577,8 @@ def trace_cracks(image, crack_results, predictor, gsd, road_area_px):
             width_mm=m["width_mm"],
             density_pct=density_pct,
             confidence=m["confidence"],
+            area_m2=m["metric_value"] if m["unit"] == "sq.m" else None,
+            pothole_count=pothole_count,
         )
 
         x1, y1 = m.pop("box")
@@ -585,6 +588,9 @@ def trace_cracks(image, crack_results, predictor, gsd, road_area_px):
         # "severity" stays the headline field the UI already reads; it now carries
         # the fuzzy grade, with the two baselines alongside it for RQ3.
         entry["severity"] = grades["severity_fuzzy"]
+        entry["recommendation"] = fuzzy_engine.intervention_for(
+            m["label"], entry["severity"], pavement
+        )
         traced.append(entry)
 
         cv2.putText(
@@ -626,7 +632,8 @@ Plain prose only: no headings, no bullet points, no asterisks."""
         return f"[Error generating summary with local model: {e}]"
 
 
-def generate_maintenance_bulletin(distresses, density_pct, ipm_applied):
+def generate_maintenance_bulletin(distresses, density_pct, ipm_applied,
+                                  pavement=fuzzy_engine.DEFAULT_PAVEMENT):
     """Assemble a DPWH-style maintenance bulletin.
 
     Only the opening narrative comes from the language model. The intervention
@@ -681,11 +688,16 @@ def generate_maintenance_bulletin(distresses, density_pct, ipm_applied):
 
     summary = _summary_prose("\n".join(context_lines))
 
-    interventions = "\n".join(
-        f"  {label} - severity {info['severity']} - "
-        f"{fuzzy_engine.intervention_for(label, info['severity'])} "
-        f"({info['count']} detected)"
-        for label, info in ordered
+    def intervention_lines(label, info):
+        rec = fuzzy_engine.intervention_for(label, info["severity"], pavement)
+        return (
+            f"  {label} - severity {info['severity']} ({info['count']} detected)\n"
+            f"    {rec['activity']}: {rec['method']}\n"
+            f"    Response: {rec['response']}"
+        )
+
+    interventions = f"  Pavement: {pavement}\n" + "\n".join(
+        intervention_lines(label, info) for label, info in ordered
     )
 
     worst_types = ", ".join(
@@ -764,11 +776,22 @@ async def analyze_road(request: ImageRequest):
         print("Running crack detection...")
         crack_results = detect_crack(crack_model, bev_img)
 
-        # 6. SAM tracing, metrics, and symbolic reasoning
-        gsd = request.gsd_mm_px or DEFAULT_GSD_MM_PX
+        # 6. Scale. A reference card in the warped view is a measurement; the
+        # default is the capture rule's one-lane assumption.
+        reference = scale.detect_reference_scale(bev_img)
+        if reference:
+            gsd = reference["mm_per_px"]
+            scale_source = "reference_card"
+            print(f"Reference card found: {gsd:.3f} mm/px (stretch {reference['stretch']:.2f}).")
+        else:
+            gsd = request.gsd_mm_px or DEFAULT_GSD_MM_PX
+            scale_source = "assumed_height"
+
+        # 7. SAM tracing, metrics, and symbolic reasoning
+        pavement = request.pavement_type
         print("Tracing with SAM, measuring, and grading...")
         traced_data, debug_img, skel, density_pct, consensus_mask = trace_cracks(
-            bev_img, crack_results, predictor, gsd, road_area_px
+            bev_img, crack_results, predictor, gsd, road_area_px, pavement
         )
 
         # 6b. Stage frames. Every one of these is a step that already ran; this
@@ -825,8 +848,9 @@ async def analyze_road(request: ImageRequest):
                 ("skeletonization", "Skeletonization",
                  "Traces the crack structure",
                  "The mask is thinned to a one-pixel centreline. Its length is the "
-                 "crack length; mask area divided by that length is the mean width "
-                 "the severity grade is built from.",
+                 "crack length; the width is read along it, from the distance to "
+                 "the mask edge, and the median is the predominant width DPWH "
+                 "grades on.",
                  render_skeleton(bev_img, skel)),
             ]
 
@@ -844,13 +868,13 @@ async def analyze_road(request: ImageRequest):
             print(f"Stage visualisation skipped: {stage_error}")
             stages = []
 
-        # 7. Encode the annotated image
+        # 8. Encode the annotated image
         _, buffer = cv2.imencode(".jpg", debug_img)
         image_url = "data:image/jpeg;base64," + base64.b64encode(buffer).decode("utf-8")
 
-        # 8. Maintenance bulletin from the local model
+        # 9. Maintenance bulletin from the local model
         print("Generating bulletin locally...")
-        bulletin = generate_maintenance_bulletin(traced_data, density_pct, ipm_applied)
+        bulletin = generate_maintenance_bulletin(traced_data, density_pct, ipm_applied, pavement)
 
         return {
             "fileUrl": image_url,
@@ -860,6 +884,9 @@ async def analyze_road(request: ImageRequest):
             "gemini_bulletin": bulletin,
             "overall_severity": worst_severity(traced_data),
             "gsd_mm_px": gsd,
+            "scale_source": scale_source,
+            "reference_card": reference,
+            "pavement_type": pavement,
             "crack_density_pct": round(density_pct, 2),
             "ipm_applied": ipm_applied,
             "road_coverage_pct": round(road_coverage * 100, 2),

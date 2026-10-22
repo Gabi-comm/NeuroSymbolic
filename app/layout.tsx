@@ -14,11 +14,11 @@ import AuthNotice from '@/components/AuthNotice';
 
 export const metadata: Metadata = {
   title: {
-    default: 'OASYS — Road Damage Assessment',
+    default: 'OASYS — Road Distress Assessment',
     template: '%s · OASYS',
   },
   description:
-    'Neuro-symbolic AI road damage assessment. Detects potholes and cracks from ' +
+    'Neuro-symbolic AI road distress assessment. Detects potholes and cracks from ' +
     'road images and grades severity against DPWH engineering standards.',
   applicationName: 'OASYS',
   keywords: ['road assessment', 'pavement distress', 'DPWH', 'pothole detection'],

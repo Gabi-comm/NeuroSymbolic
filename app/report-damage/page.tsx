@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { Position } from './Map';
 import { savePendingScan } from '@/utils/pendingScan';
-import { useHasAcknowledged, useAcknowledgedGsd } from '@/utils/captureSettings';
+import { loadCapture, captureFix } from '@/utils/captures';
+import { useHasAcknowledged, GSD_MM_PX } from '@/utils/captureSettings';
 import {
   readExifLocation,
   readDeviceLocation,
@@ -50,9 +51,11 @@ export default function ReportDamagePage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
+  // Set when the photo came from Captured Distress, so the capture can be
+  // marked reported once this report is filed.
+  const [captureId, setCaptureId] = useState<string | null>(null);
 
   const acknowledged = useHasAcknowledged();
-  const gsd = useAcknowledgedGsd();
   const inputRef = useRef<HTMLInputElement>(null);
   // Pins can be moved faster than the lookup answers; only the latest counts.
   const lookupSeq = useRef(0);
@@ -119,6 +122,7 @@ export default function ReportDamagePage() {
 
       setUploadError(null);
       setIsPreparing(true);
+      setCaptureId(null);
       try {
         // EXIF first, from the original file: the downscale strips metadata.
         const exif = await readExifLocation(file);
@@ -141,6 +145,38 @@ export default function ReportDamagePage() {
     },
     [applyFix, fix, locateDevice]
   );
+
+  // /report-damage?capture=<id>: arriving from Captured Distress. The photo
+  // and the location recorded when it was taken are loaded in; the location is
+  // the capture's, not wherever the reporter is sitting now.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('capture');
+    if (!id) return;
+    let cancelled = false;
+    (async () => {
+      setIsPreparing(true);
+      setUploadError(null);
+      try {
+        const { capture, file } = await loadCapture(id);
+        const preview = await savePendingScan(file);
+        if (cancelled) return;
+        setMediaPreview(preview);
+        setFileName(file.name);
+        setCaptureId(capture.id);
+        setLocationNote(null);
+        applyFix(captureFix(capture), true);
+      } catch (err) {
+        if (!cancelled) {
+          setUploadError(err instanceof Error ? err.message : 'Could not load that capture.');
+        }
+      } finally {
+        if (!cancelled) setIsPreparing(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [applyFix]);
 
   const choosePavement = (value: PavementType) => {
     pavementChosenRef.current = true;
@@ -173,6 +209,7 @@ export default function ReportDamagePage() {
         road_name: place.road_name,
         road_class: place.road_class,
         pavement_type: pavement,
+        capture_id: captureId,
       }
     : null;
 
@@ -195,7 +232,7 @@ export default function ReportDamagePage() {
         <div className="flex items-start justify-between gap-4 mb-6">
           <div>
             <p className="text-oasys-blue font-bold text-sm uppercase tracking-wider mb-1">
-              Report damage
+              Report distress
             </p>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight">
               Where is the damage?
@@ -267,7 +304,15 @@ export default function ReportDamagePage() {
 
             {/* Photo + pavement */}
             <div className="lg:col-span-2 flex flex-col gap-3">
-              <h2 className="font-black text-white">Photo</h2>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-black text-white">Photo</h2>
+                <Link
+                  href="/captured-distress"
+                  className="px-3 py-1.5 rounded-full text-xs font-bold text-white bg-white/10 hover:bg-white/20 transition-colors"
+                >
+                  Use a captured photo
+                </Link>
+              </div>
 
               <div
                 onDragOver={onDragOver}
@@ -377,7 +422,7 @@ export default function ReportDamagePage() {
             <dl className="flex flex-wrap gap-x-7 gap-y-3 text-xs">
               <div>
                 <dt className="text-gray-500 font-bold uppercase tracking-wide mb-0.5">Scale</dt>
-                <dd className="text-white font-bold tabular-nums">{gsd.toFixed(3)} mm/px</dd>
+                <dd className="text-white font-bold tabular-nums">{GSD_MM_PX.toFixed(3)} mm/px</dd>
               </div>
 
               <div>

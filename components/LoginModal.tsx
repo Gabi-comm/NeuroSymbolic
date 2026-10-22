@@ -203,7 +203,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
             className="w-40 h-40 object-contain mb-6 drop-shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
           />
           <p className="font-black text-4xl tracking-tight text-white mb-2">OASYS</p>
-          <p className="text-gray-400 text-sm font-medium">Road damage assessment</p>
+          <p className="text-gray-400 text-sm font-medium">Road distress assessment</p>
         </aside>
 
         {/* Form */}
@@ -247,7 +247,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
               </h2>
               <p className="text-gray-400 text-sm mb-6">
                 {isLogin
-                  ? 'Sign in to submit and track road damage reports.'
+                  ? 'Sign in to submit and track road distress reports.'
                   : 'It takes a moment, and lets you submit reports.'}
               </p>
 

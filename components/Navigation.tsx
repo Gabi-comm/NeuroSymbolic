@@ -120,7 +120,12 @@ export default function Navigation() {
     : [
         { href: '/', label: 'Home' },
         { href: '/report-damage', label: 'Report' },
-        ...(authUser ? [{ href: '/my-reports', label: 'My reports' }] : []),
+        ...(authUser
+          ? [
+              { href: '/captured-distress', label: 'Captured Distress' },
+              { href: '/my-reports', label: 'My reports' },
+            ]
+          : []),
         { href: '/about', label: 'About' },
       ];
 

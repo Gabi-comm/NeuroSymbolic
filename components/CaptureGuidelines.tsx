@@ -1,13 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import {
   CAPTURE_GUIDELINES,
-  DEFAULT_ROAD_WIDTH_M,
-  MAX_ROAD_WIDTH_M,
-  MIN_ROAD_WIDTH_M,
-  gsdFromRoadWidth,
-  isRoadWidthValid,
+  GSD_MM_PX,
+  LANE_WIDTH_M,
   setAcknowledged,
 } from '@/utils/captureSettings';
 
@@ -18,19 +14,14 @@ import {
  * It is not decoration. Inverse Perspective Mapping relies on the capture
  * geometry being roughly what the system assumes; if the inspector shoots from
  * the hip or at an angle, every measurement downstream is wrong while still
- * looking authoritative. Acknowledging is also where the road width is captured,
- * which is what actually sets the Ground Sample Distance.
+ * looking authoritative.
+ *
+ * The scale is locked: the capture rule frames roughly one 3.05 m lane, so every
+ * photo is measured at 4.357 mm per pixel. Reporters no longer type a width.
  */
 export default function CaptureGuidelines({ onAcknowledge }: { onAcknowledge: () => void }) {
-  const [roadWidth, setRoadWidth] = useState<string>(String(DEFAULT_ROAD_WIDTH_M));
-
-  const parsed = Number(roadWidth);
-  const valid = isRoadWidthValid(parsed);
-  const gsd = valid ? gsdFromRoadWidth(parsed) : null;
-
   const accept = () => {
-    if (!valid || gsd === null) return;
-    setAcknowledged(gsd);
+    setAcknowledged();
     onAcknowledge();
   };
 
@@ -69,44 +60,22 @@ export default function CaptureGuidelines({ onAcknowledge }: { onAcknowledge: ()
       </ol>
 
       <div className="bg-black/25 rounded-2xl p-5 border border-white/5 mb-8">
-        <label htmlFor="road-width" className="block font-bold text-white mb-1">
-          Width of road surface in frame
-        </label>
+        <p className="font-bold text-white mb-1">One lane in frame</p>
         <p className="text-sm text-gray-400 mb-4 max-w-lg leading-snug">
-          Roughly how wide is the road you photographed, edge to edge? One standard
-          lane is about 3 m. This sets the scale used for every measurement.
+          Following the capture rule above guarantees roughly one lane of road in
+          the frame, about {LANE_WIDTH_M.toFixed(2)} m edge to edge. That sets the
+          scale for every measurement, so it is fixed for all reports.
         </p>
-
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <input
-              id="road-width"
-              type="number"
-              inputMode="decimal"
-              step="0.05"
-              min={MIN_ROAD_WIDTH_M}
-              max={MAX_ROAD_WIDTH_M}
-              value={roadWidth}
-              onChange={(e) => setRoadWidth(e.target.value)}
-              aria-describedby="road-width-help"
-              aria-invalid={!valid}
-              className="w-28 bg-white text-black font-bold px-4 py-2.5 rounded-xl outline-none focus:ring-2 focus:ring-oasys-blue"
-            />
-            <span className="font-bold text-gray-300">metres</span>
+        <dl className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+          <div>
+            <dt className="text-xs text-gray-500 font-bold uppercase tracking-wide">Road width in frame</dt>
+            <dd className="font-black text-white tabular-nums">{LANE_WIDTH_M.toFixed(2)} m</dd>
           </div>
-
-          <p id="road-width-help" className="text-sm font-bold">
-            {valid ? (
-              <span className="text-green-400">
-                Scale: {gsd!.toFixed(3)} mm per pixel
-              </span>
-            ) : (
-              <span className="text-red-400">
-                Enter a width between {MIN_ROAD_WIDTH_M} and {MAX_ROAD_WIDTH_M} m
-              </span>
-            )}
-          </p>
-        </div>
+          <div>
+            <dt className="text-xs text-gray-500 font-bold uppercase tracking-wide">Scale</dt>
+            <dd className="font-black text-white tabular-nums">{GSD_MM_PX.toFixed(3)} mm per pixel</dd>
+          </div>
+        </dl>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
@@ -116,7 +85,6 @@ export default function CaptureGuidelines({ onAcknowledge }: { onAcknowledge: ()
         </p>
         <button
           onClick={accept}
-          disabled={!valid}
           className="btn-blue px-8 py-3.5 text-base whitespace-nowrap w-full sm:w-auto"
         >
           I understand — continue

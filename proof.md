@@ -448,3 +448,26 @@ manual was unavailable.
   items. The current scope is flexible pavement only; state that explicitly.
 - **Terminology**: decide between "alligator" and DPWH's "crocodile" cracking and
   note the equivalence once (§2.4).
+
+---
+
+## 11. The City Engineer's bands (2026-10-22)
+
+| Severity | Width | Or | Basis |
+|---|---|---|---|
+| Low | under 3 mm | sparse cracking | DPWH Narrow, D.O. 120 s.2019; DILG LRBICS 2020 "Narrow ≤ 3 mm" |
+| Medium | 3 to 10 mm | one pothole up to 0.25 m² | DPWH Wide (> 3 mm), split at 10 mm by the City Engineer |
+| High | over 10 mm | alligator cracking over continuous sections; a larger pothole, or several | City Engineer; LRBICS Sec. III.5.2.5 "shattered slab"; D.O. 47 Table 5.1 BRM |
+
+- **10 mm has no published pavement standard behind it.** Nearest published
+  cuts: 13 mm (1/2 in) for concrete cracks in the FHWA LTPP manual and PAVER
+  (ASTM D6433). Cite 10 mm as the City Engineer's expert criterion for the study
+  area (Section 3.1 provides for refining the rule base from expert feedback),
+  with the signed validation letter in the appendix.
+- **Pothole rule.** DPWH counts potholes: *"One (1) pothole is equivalent to
+  0.25 m²"* (D.O. 120 s.2019). One pothole up to that unit is the engineer's
+  "moderate pothole"; larger or several is High. Depth is not used.
+- **Repairs** follow §6.2: Act. 111 / 112 / 121 for potholes, Act. 122 / 113 for
+  cracks, Blue Book Item 311 for concrete reblocking, reconstruction (Beyond
+  Routine Maintenance) for asphalt. Concrete and asphalt get different repairs,
+  so every report now carries a pavement type.

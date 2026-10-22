@@ -25,7 +25,7 @@ export interface PendingScan {
  * The backend warps to a 700x700 bird's-eye view anyway, so anything larger is
  * bytes we pay for twice (localStorage, then the request body) and never use.
  */
-function downscaleToDataUrl(file: File): Promise<string> {
+export function downscaleToDataUrl(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();

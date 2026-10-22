@@ -58,7 +58,7 @@ export default function HomePage() {
           OASYS
         </h1>
         <p className="text-base sm:text-lg max-w-md border-b-2 border-oasys-blue pb-4 mb-10 text-center">
-          Neuro-symbolic AI road damage assessment
+          Neuro-symbolic AI road distress assessment
         </p>
 
         <div className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-6 w-full max-w-xl">
@@ -66,7 +66,7 @@ export default function HomePage() {
             href="/report-damage"
             className="btn-blue flex-1 px-8 py-4 text-lg sm:text-xl whitespace-nowrap"
           >
-            Report damage
+            Report distress
           </Link>
           <Link
             href="/about"

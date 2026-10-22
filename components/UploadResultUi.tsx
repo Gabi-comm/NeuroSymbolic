@@ -16,9 +16,10 @@ import {
 
 export type { AnalysisData, Distress, Severity };
 import { savePipelineStages, useHasPipelineStages } from '@/utils/pipelineStages';
-import { getAcknowledgedGsd } from '@/utils/captureSettings';
+import { GSD_MM_PX } from '@/utils/captureSettings';
 import { fromQuery, SOURCE_LABEL, type ReportContext } from '@/utils/reportLocation';
-import { SEVERITY, SEVERITY_RANK, toSeverity } from './Severity';
+import { markCaptureReported } from '@/utils/captures';
+import { SEVERITY, SEVERITY_RANK, SeverityBadge, toSeverity } from './Severity';
 import DistressCarousel from './DistressCarousel';
 
 interface UploadResultUiProps {
@@ -92,8 +93,8 @@ export default function UploadResultUi({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             image_base64: pending.image,
-            // Scale the inspector set on the capture-guidelines screen.
-            gsd_mm_px: getAcknowledgedGsd(),
+            // Locked scale: the capture rule frames one 3.05 m lane.
+            gsd_mm_px: GSD_MM_PX,
             // Decides the repair: concrete and asphalt are fixed differently.
             pavement_type: reportContext?.pavement_type ?? 'concrete',
           }),
@@ -114,6 +115,8 @@ export default function UploadResultUi({
           gemini_bulletin: result.gemini_bulletin,
           distresses: result.distresses,
           gsd_mm_px: result.gsd_mm_px,
+          scale_source: result.scale_source,
+          pavement_type: result.pavement_type,
           crack_density_pct: result.crack_density_pct,
           ipm_applied: result.ipm_applied,
           privacy_blur_applied: result.privacy_blur_applied,
@@ -232,6 +235,8 @@ export default function UploadResultUi({
           detection_details: data.gemini_bulletin,
           observation_details: data.distresses,
           gsd_mm_px: data.gsd_mm_px ?? null,
+          scale_source: data.scale_source ?? 'assumed_height',
+          recommendation: primary?.recommendation ?? null,
           crack_density_pct: data.crack_density_pct ?? null,
           severity_fuzzy: primary?.severity_fuzzy ?? null,
           severity_crisp: primary?.severity_crisp ?? null,
@@ -252,6 +257,11 @@ export default function UploadResultUi({
       ]);
 
       if (insertError) throw new Error(insertError.message);
+      if (context.capture_id) {
+        // The report is filed either way; a capture left unmarked only stays
+        // in the "waiting" list, so this must not fail the submission.
+        await markCaptureReported(context.capture_id).catch(() => {});
+      }
       setSubmitState('done');
       saveLastResult(window.location.pathname, data, true);
     } catch (error) {
@@ -321,7 +331,7 @@ export default function UploadResultUi({
         <div className="flex flex-col items-center text-center">
           <div className="w-14 h-14 border-4 border-oasys-blue border-t-transparent rounded-full animate-spin mb-6" />
           <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">
-            Analyzing road damage
+            Analyzing road distress
           </h1>
           <p className="text-gray-400">This usually takes 20–30 seconds.</p>
         </div>
@@ -330,6 +340,27 @@ export default function UploadResultUi({
   }
 
   const primary = primaryDistress(data.distresses);
+
+  // One repair per defect type at its worst grade, worst first -- the same
+  // grouping the bulletin uses, so the two never disagree.
+  const repairs = Object.values(
+    data.distresses.reduce<
+      Record<string, { label: string; severity: Severity; count: number; rec: NonNullable<Distress['recommendation']> }>
+    >((acc, d) => {
+      if (!d.recommendation) return acc;
+      const prev = acc[d.label];
+      if (!prev) {
+        acc[d.label] = { label: d.label, severity: d.severity, count: 1, rec: d.recommendation };
+      } else {
+        prev.count += 1;
+        if ((SEVERITY_RANK[d.severity] ?? 0) > (SEVERITY_RANK[prev.severity] ?? 0)) {
+          prev.severity = d.severity;
+          prev.rec = d.recommendation;
+        }
+      }
+      return acc;
+    }, {})
+  ).sort((a, b) => (SEVERITY_RANK[b.severity] ?? 0) - (SEVERITY_RANK[a.severity] ?? 0));
   const severityKey = toSeverity(data.overall_severity);
   const accent = severityKey ? SEVERITY[severityKey] : null;
 
@@ -345,7 +376,7 @@ export default function UploadResultUi({
               Analysis complete
             </p>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black leading-tight">
-              Road damage report
+              Road distress report
             </h1>
           </div>
           <Link
@@ -395,7 +426,7 @@ export default function UploadResultUi({
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-gray-500 font-bold uppercase tracking-wide">Crack extent</dt>
+                <dt className="text-xs text-gray-500 font-bold uppercase tracking-wide">Distress extent</dt>
                 <dd className="font-black tabular-nums">
                   {data.crack_density_pct?.toFixed(2) ?? '—'}%
                 </dd>
@@ -404,6 +435,11 @@ export default function UploadResultUi({
                 <dt className="text-xs text-gray-500 font-bold uppercase tracking-wide">Scale</dt>
                 <dd className="font-black tabular-nums">
                   {data.gsd_mm_px?.toFixed(3) ?? '—'} mm/px
+                </dd>
+                <dd className="text-xs text-gray-500 font-bold">
+                  {data.scale_source === 'reference_card'
+                    ? 'Measured from reference card'
+                    : 'One-lane capture rule'}
                 </dd>
               </div>
             </dl>
@@ -415,7 +451,7 @@ export default function UploadResultUi({
           {/* Annotated image gets two thirds: it is the evidence. */}
           <section className="lg:col-span-2 bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="font-black">Detected damage</h2>
+              <h2 className="font-black">Detected distress</h2>
               <p className="text-xs text-gray-500 font-bold truncate max-w-[14rem]" title={data.filename}>
                 {data.filename}
               </p>
@@ -425,7 +461,7 @@ export default function UploadResultUi({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={data.fileUrl}
-                alt="Road image with detected damage outlined and crack centrelines traced"
+                alt="Road image with detected distress outlined and crack centrelines traced"
                 className="w-full h-auto max-h-[30rem] object-contain"
               />
             </div>
@@ -499,6 +535,41 @@ export default function UploadResultUi({
             )}
           </div>
         </div>
+
+        {repairs.length > 0 && (
+          <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-7">
+            <h2 className="font-black mb-1">Recommended repairs</h2>
+            <p className="text-xs text-gray-500 mb-4">
+              DPWH activity, method and response time for each defect, on{' '}
+              {(data.pavement_type ?? 'concrete') === 'concrete' ? 'concrete' : 'asphalt'} pavement.
+              Resolved from engineering rules, not by the language model.
+            </p>
+            <ul className="flex flex-col gap-3">
+              {repairs.map(({ label, severity, count, rec }) => (
+                <li
+                  key={`${label}-${severity}`}
+                  className="bg-black/30 border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-5"
+                >
+                  <div className="sm:w-48 shrink-0 flex flex-col gap-1.5">
+                    <p className="font-black leading-tight">
+                      {label}
+                      {count > 1 && <span className="text-gray-500 font-bold"> ×{count}</span>}
+                    </p>
+                    <SeverityBadge severity={severity} />
+                  </div>
+                  <div className="min-w-0 grow">
+                    <p className="font-bold text-white leading-snug">{rec.activity}</p>
+                    <p className="text-sm text-gray-300 leading-snug mt-0.5">{rec.method}</p>
+                  </div>
+                  <p className="sm:w-44 shrink-0 text-sm text-gray-400 leading-snug">
+                    <span className="block text-xs text-gray-500 font-bold uppercase tracking-wide">Response</span>
+                    {rec.response}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* Bulletin */}
         <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-7">

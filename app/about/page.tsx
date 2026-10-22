@@ -31,7 +31,7 @@ const PIPELINE = [
 
 const FEATURES = [
   { title: 'Explainable results', detail: 'Every grade traces to a rule and a measurement, not a score from a black box.' },
-  { title: 'Crack density measurement', detail: 'Defect area as a share of the road surface, not just per-defect size.' },
+  { title: 'Distress density measurement', detail: 'Defect area as a share of the road surface, not just per-defect size.' },
   { title: 'Real-world size estimation', detail: 'Lengths in metres and areas in square metres, not pixels.' },
   { title: 'Automated summary reports', detail: 'A maintenance bulletin generated locally, with no data leaving the device.' },
 ];
@@ -118,16 +118,17 @@ export default function AboutUs() {
         <h2 className="text-2xl font-black mb-2 uppercase">Severity levels</h2>
         <p className="text-gray-400 mb-6 max-w-2xl">
           Graded from measured crack width and crack extent against the DPWH Visual
-          Road Condition Assessment Manual — not from how confident the detector was.
+          Road Condition Assessment Manual and the City Engineer&apos;s validated bands —
+          not from how confident the detector was.
         </p>
         <div className="flex flex-col sm:flex-row gap-4">
           {(['Low', 'Medium', 'High'] as const).map((level) => (
             <div key={level} className="flex-1 bg-black/25 rounded-2xl p-5 border border-white/5">
               <SeverityBadge severity={level} size="md" className="mb-3" />
               <p className="text-sm text-gray-400 leading-snug">
-                {level === 'Low' && 'Narrow cracking — 3 mm or less average width — over limited extent.'}
-                {level === 'Medium' && 'Wide cracking above 3 mm, or narrow cracking spread across much of the surface.'}
-                {level === 'High' && 'Wide cracking over extensive area, or surface failure such as a pothole.'}
+                {level === 'Low' && 'Micro cracks under 3 mm (DPWH Narrow), sparse. Routine preventive maintenance.'}
+                {level === 'Medium' && 'Open cracks of 3 to 10 mm, or a single pothole up to 0.25 m². Localized patching or sealing.'}
+                {level === 'High' && 'Wide structural cracks over 10 mm, alligator cracking over continuous sections, or a larger pothole or several. The road is not serviceable.'}
               </p>
             </div>
           ))}
@@ -197,7 +198,7 @@ export default function AboutUs() {
 
       <div className="flex flex-col sm:flex-row gap-4 justify-center pt-2">
         <Link href="/report-damage" className="btn-blue px-8 py-4">
-          Report damage
+          Report distress
         </Link>
       </div>
     </div>

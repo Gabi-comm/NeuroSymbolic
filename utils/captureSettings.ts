@@ -16,20 +16,22 @@ import { useSyncExternalStore } from 'react';
  *     GSD (mm/px) = road width in frame (mm) / 700
  *
  * The paper's 4.357 mm/px implies 4.357 x 700 = 3050 mm, i.e. a 3.05 m road
- * width -- one standard lane. That is why a single constant works at all, and it
- * gives inspectors something physical to adjust rather than an opaque number.
+ * width -- one standard lane.
+ *
+ * Locked for every user (City Engineer revision, 2026-10-22). Reporters used to
+ * type the road width themselves, which made the scale depend on a guess no one
+ * could check. The capture rule -- chest height, about 2 m from the defect,
+ * camera level -- frames roughly one lane, so the scale is fixed instead and the
+ * rule is what guarantees it. A reference card in frame will override it per
+ * photo once the backend detects one.
  */
 
 /** Must match `width`/`height` in get_birds_eye_view (backend/api.py). */
 export const BEV_WIDTH_PX = 700;
 
-/** Paper section 3.3.C. Equivalent to a 3.05 m road width across the frame. */
-export const DEFAULT_GSD_MM_PX = 4.357;
-export const DEFAULT_ROAD_WIDTH_M = 3.05;
-
-/** Beyond this range the IPM warp is unlikely to be meaningful. */
-export const MIN_ROAD_WIDTH_M = 1.5;
-export const MAX_ROAD_WIDTH_M = 12;
+/** Paper section 3.3.C: one 3.05 m lane across the 700 px warp. */
+export const LANE_WIDTH_M = 3.05;
+export const GSD_MM_PX = 4.357;
 
 export interface CaptureGuideline {
   title: string;
@@ -55,21 +57,7 @@ export const CAPTURE_GUIDELINES: CaptureGuideline[] = [
   },
 ];
 
-/** Convert a measured road width into the GSD the backend should use. */
-export function gsdFromRoadWidth(roadWidthMetres: number): number {
-  return (roadWidthMetres * 1000) / BEV_WIDTH_PX;
-}
-
-export function isRoadWidthValid(roadWidthMetres: number): boolean {
-  return (
-    Number.isFinite(roadWidthMetres) &&
-    roadWidthMetres >= MIN_ROAD_WIDTH_M &&
-    roadWidthMetres <= MAX_ROAD_WIDTH_M
-  );
-}
-
 const ACK_KEY = 'oasys.capture.acknowledged';
-const GSD_KEY = 'oasys.capture.gsd';
 
 /**
  * Acknowledgement lives in sessionStorage, not localStorage: it should lapse when
@@ -84,10 +72,11 @@ export function hasAcknowledged(): boolean {
   }
 }
 
-export function setAcknowledged(gsdMmPx: number): void {
+export function setAcknowledged(): void {
   try {
     sessionStorage.setItem(ACK_KEY, 'true');
-    sessionStorage.setItem(GSD_KEY, String(gsdMmPx));
+    // A scale typed in before the lock would otherwise linger in old sessions.
+    sessionStorage.removeItem('oasys.capture.gsd');
   } catch {
     // Private-mode browsers throw; the gate simply reappears next navigation.
   }
@@ -116,27 +105,4 @@ const getServerSnapshot = () => false;
 /** True once the inspector has acknowledged the guidelines this session. */
 export function useHasAcknowledged(): boolean {
   return useSyncExternalStore(subscribe, hasAcknowledged, getServerSnapshot);
-}
-
-const getServerGsd = () => DEFAULT_GSD_MM_PX;
-
-/**
- * The acknowledged scale, read through the store.
- *
- * Calling getAcknowledgedGsd() directly during render would read sessionStorage
- * on the client and the default on the server, producing a hydration mismatch
- * whenever the inspector had entered a non-default road width.
- */
-export function useAcknowledgedGsd(): number {
-  return useSyncExternalStore(subscribe, getAcknowledgedGsd, getServerGsd);
-}
-
-export function getAcknowledgedGsd(): number {
-  try {
-    const stored = sessionStorage.getItem(GSD_KEY);
-    const parsed = stored ? Number(stored) : NaN;
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_GSD_MM_PX;
-  } catch {
-    return DEFAULT_GSD_MM_PX;
-  }
 }

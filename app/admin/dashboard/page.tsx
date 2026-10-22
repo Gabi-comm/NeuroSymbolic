@@ -266,7 +266,7 @@ export default function AdminDashboard() {
         </div>
 
         <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-white border border-white/10 mb-5">
-          <h2 className="font-bold text-sm text-gray-400 mb-6">Damage type breakdown</h2>
+          <h2 className="font-bold text-sm text-gray-400 mb-6">Distress type breakdown</h2>
           {isLoading ? (
             <p className="text-sm text-gray-500 font-bold py-8 text-center">Loading…</p>
           ) : (

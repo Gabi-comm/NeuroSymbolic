@@ -31,7 +31,7 @@ export default function DistressCarousel({ distresses }: { distresses: Distress[
 
   if (total === 0) {
     return (
-      <p className="text-center py-8 text-zinc-500 font-bold italic">No damage detected.</p>
+      <p className="text-center py-8 text-zinc-500 font-bold italic">No distress detected.</p>
     );
   }
 
@@ -63,7 +63,7 @@ export default function DistressCarousel({ distresses }: { distresses: Distress[
         tabIndex={0}
         role="group"
         aria-roledescription="carousel"
-        aria-label={`Detected damage, ${index + 1} of ${total}`}
+        aria-label={`Detected distress, ${index + 1} of ${total}`}
         onKeyDown={onKeyDown}
         className="grow min-w-0 h-44 overflow-hidden rounded-xl bg-white/60 border border-white/40 focus-visible:ring-2 focus-visible:ring-oasys-blue"
       >
@@ -98,7 +98,7 @@ export default function DistressCarousel({ distresses }: { distresses: Distress[
                   {distress.metric_value?.toFixed(3)} {distress.unit}
                 </dd>
 
-                <dt className="font-bold">Mean width</dt>
+                <dt className="font-bold">Width</dt>
                 <dd className="text-right tabular-nums">
                   {distress.width_mm?.toFixed(1)} mm
                 </dd>

@@ -65,6 +65,24 @@ Crocodile-Wide 5.9, Transverse-Narrow 3.3, Transverse-Wide 5.5.
 The literal DPWH two-band verdict is emitted alongside, as `severity_dpwh_nw`,
 so a rating can always be checked against the standard unmodified.
 
+THE CITY ENGINEER'S 10 mm BAND (2026-10-22)
+-------------------------------------------
+The study area's City Engineer validated three width bands: Low under 3 mm
+(micro cracks), Medium 3 to 10 mm (open cracks), High over 10 mm (wide
+structural cracks), with High also covering several alligator cracks spanning
+continuous sections. The 3 mm cut is DPWH's own (D.O. 120 s.2019; DILG LRBICS
+2020 uses the same "Wide > 3 mm"). No pavement standard uses 10 mm as a width
+cut: the nearest published basis is 13 mm (1/2 in) for concrete cracks in the
+FHWA LTPP manual and the PAVER (ASTM D6433) concrete manual. It is cited as the
+City Engineer's expert criterion, which Section 3.1 provides for. High is the
+LRBICS "shattered slab" condition (Sec. III.5.2.5), and over 10 mm is the
+engineer's field indicator for it.
+
+Potholes are now stratified by area, not graded by depth, which a 2D photo
+cannot measure: DPWH counts a pothole as 0.25 m2 (D.O. 120 s.2019), so a single
+pothole up to 0.25 m2 is the engineer's "moderate pothole" (Medium), and a
+larger one, or more than one in the photo, is High.
+
 TUNING
 ------
 Every number lives in the dicts at the top of this module. Section 3.1 commits to
@@ -93,15 +111,23 @@ from skfuzzy import control as ctrl
 # not categorically different, and an optical measurement through an IPM warp
 # cannot resolve 0.2 mm anyway -- which is the whole reason for fuzzifying a
 # threshold the standard states crisply.
+#
+# The City Engineer splits Wide at 10 mm (see the module docstring), so there are
+# three width terms: narrow (DPWH Narrow), open (3-10 mm) and wide (over 10 mm).
+# Each cut is fuzzified over +/-2 mm, the same treatment as the 3 mm cut.
 WIDTH_MF = {
     "narrow": [0.0, 0.0, 2.0, 4.0],
-    "wide":   [2.0, 4.0, 60.0, 60.0],
+    "open":   [2.0, 4.0, 8.0, 12.0],
+    "wide":   [8.0, 12.0, 60.0, 60.0],
 }
 # Generous headroom: DPWH's Wide band is unbounded above 3 mm.
 WIDTH_MAX_MM = 60.0
 
 # The DPWH cut itself, for the literal two-band verdict.
 DPWH_NARROW_MAX_MM = 3.0
+
+# City Engineer's criterion: above this a crack is wide and structural (High).
+ENGINEER_HIGH_MIN_MM = 10.0
 
 # Crack extent: defect mask area as a percentage of the analysed road surface.
 # This matches DPWH's own definition of extent -- "the total area of cracking
@@ -155,14 +181,15 @@ AREA_DEFECT_LABELS = {"Alligator Crack", "Pothole"}
 # potholes... One (1) pothole is equivalent to 0.25 m2" -- a count, not a grade
 # (D.O. 120 s.2019, POTHOLES (Flexible Pavement)).
 #
-# So a detected pothole is reported at a single fixed severity. High is used
-# because D.O. 47 s.2024 gives potholes a 3-working-day response time (the
-# shortest band, Table 4.1) and the highest inspection weight of any pavement
-# defect at 10% (Table 6.1a) -- the same judgement expressed as urgency.
+# Revised with the City Engineer (2026-10-22): the count unit itself gives a
+# size line. A single pothole up to one DPWH unit (0.25 m2) is a "moderate
+# pothole", Medium; one larger, or more than one in the photo, is High. Depth is
+# still not used. Neither grade is below Medium: D.O. 47 s.2024 gives potholes a
+# 3-working-day response (Table 4.1) and the highest inspection weight, 10%.
 POTHOLE_LABEL = "Pothole"
-POTHOLE_STRATIFIED = False
-POTHOLE_FIXED_SEVERITY = "High"
-POTHOLE_FIXED_SCORE = 100.0
+POTHOLE_STRATIFIED = True
+POTHOLE_UNIT_AREA_M2 = 0.25
+POTHOLE_SCORES = {"Medium": 50.0, "High": 100.0}
 
 # Baselines -------------------------------------------------------------------
 
@@ -171,7 +198,8 @@ POTHOLE_FIXED_SCORE = 100.0
 # Holding the inputs and cut points identical to the fuzzy engine isolates the
 # one variable RQ3 tests -- the reasoning method -- rather than confounding it
 # with a change of threshold values.
-CRISP_WIDTH_CUT_MM = 3.0
+CRISP_WIDTH_CUT_MM = DPWH_NARROW_MAX_MM
+CRISP_WIDTH_WIDE_MM = ENGINEER_HIGH_MIN_MM
 CRISP_EXTENT_MEDIUM_PCT = 15.0
 CRISP_EXTENT_DENSE_PCT = 50.0
 
@@ -212,48 +240,54 @@ def _build_antecedents():
     return width, density, severity
 
 
-def _linear_rules(width, density, severity):
-    """Longitudinal and Transverse cracking.
+# Rule tables: (width term, density term) -> severity term. One table per rule
+# base, read by BOTH the fuzzy engine and the crisp baseline, so the two methods
+# can only ever differ in how they reason, never in what the rules say.
 
-    Width leads. DPWH treats a Wide crack as materially worse regardless of how
-    much of the segment it covers: VCI weight 5.5 Wide against 3.3 Narrow for
-    transverse cracking (D.O. 120 s.2019, Table 4).
-    """
+# Longitudinal and Transverse cracking. Width leads: DPWH treats a Wide crack as
+# materially worse regardless of extent (VCI weight 5.5 Wide against 3.3 Narrow,
+# D.O. 120 s.2019, Table 4), and the City Engineer makes anything over 10 mm High
+# on width alone.
+LINEAR_RULES = {
+    ("narrow", "sparse"): "low",
+    ("narrow", "medium"): "low",
+    ("narrow", "dense"):  "medium",
+    ("open",   "sparse"): "medium",
+    ("open",   "medium"): "medium",
+    ("open",   "dense"):  "high",
+    ("wide",   "sparse"): "high",
+    ("wide",   "medium"): "high",
+    ("wide",   "dense"):  "high",
+}
+
+# Crocodile (alligator) cracking. Extent leads and escalates faster: DPWH weights
+# crocodile above transverse at both severities (5.9 / 3.5 against 5.5 / 3.3),
+# and declares it Beyond Routine Maintenance past 167.5 sq.m continuous -- the
+# engineer's "several alligator cracks spanning continuous road sections". Dense
+# is High whatever the width.
+AREA_RULES = {
+    ("narrow", "sparse"): "low",
+    ("open",   "sparse"): "medium",
+    ("wide",   "sparse"): "high",
+    ("narrow", "medium"): "medium",
+    ("open",   "medium"): "medium",
+    ("wide",   "medium"): "high",
+    ("narrow", "dense"):  "high",
+    ("open",   "dense"):  "high",
+    ("wide",   "dense"):  "high",
+}
+
+
+def _rules_from(table, width, density, severity):
     return [
-        ctrl.Rule(width["narrow"] & density["sparse"], severity["low"]),
-        ctrl.Rule(width["narrow"] & density["medium"], severity["low"]),
-        ctrl.Rule(width["narrow"] & density["dense"], severity["medium"]),
-
-        ctrl.Rule(width["wide"] & density["sparse"], severity["medium"]),
-        ctrl.Rule(width["wide"] & density["medium"], severity["high"]),
-        ctrl.Rule(width["wide"] & density["dense"], severity["high"]),
-    ]
-
-
-def _area_rules(width, density, severity):
-    """Crocodile (alligator) cracking.
-
-    Extent leads, and escalates faster than for linear cracking. DPWH weights
-    crocodile above transverse at both severities (5.9 / 3.5 against 5.5 / 3.3),
-    gives alligator cracking a 3-working-day response time and a 9% inspection
-    weight, and declares it Beyond Routine Maintenance past 167.5 sq.m
-    continuous -- none of which has a crack-width term in it.
-    """
-    return [
-        ctrl.Rule(density["sparse"] & width["narrow"], severity["low"]),
-        ctrl.Rule(density["sparse"] & width["wide"], severity["medium"]),
-
-        ctrl.Rule(density["medium"] & width["narrow"], severity["medium"]),
-        ctrl.Rule(density["medium"] & width["wide"], severity["high"]),
-
-        ctrl.Rule(density["dense"] & width["narrow"], severity["high"]),
-        ctrl.Rule(density["dense"] & width["wide"], severity["high"]),
+        ctrl.Rule(width[w] & density[d], severity[out])
+        for (w, d), out in table.items()
     ]
 
 
 _WIDTH, _DENSITY, _SEVERITY = _build_antecedents()
-_LINEAR_SYSTEM = ctrl.ControlSystem(_linear_rules(_WIDTH, _DENSITY, _SEVERITY))
-_AREA_SYSTEM = ctrl.ControlSystem(_area_rules(_WIDTH, _DENSITY, _SEVERITY))
+_LINEAR_SYSTEM = ctrl.ControlSystem(_rules_from(LINEAR_RULES, _WIDTH, _DENSITY, _SEVERITY))
+_AREA_SYSTEM = ctrl.ControlSystem(_rules_from(AREA_RULES, _WIDTH, _DENSITY, _SEVERITY))
 
 
 # ---------------------------------------------------------------------------
@@ -279,17 +313,36 @@ def dpwh_severity(width_mm: float) -> str:
     return "Narrow" if width_mm <= DPWH_NARROW_MAX_MM else "Wide"
 
 
-def crisp_severity(width_mm: float, density_pct: float) -> str:
-    """The same DPWH inputs combined with hard cuts: the rule-based baseline."""
-    wide = width_mm > CRISP_WIDTH_CUT_MM
+def _crisp_width_term(width_mm: float) -> str:
+    if width_mm <= CRISP_WIDTH_CUT_MM:
+        return "narrow"
+    if width_mm <= CRISP_WIDTH_WIDE_MM:
+        return "open"
+    return "wide"
 
-    if density_pct >= CRISP_EXTENT_DENSE_PCT:
+
+def _crisp_density_term(density_pct: float) -> str:
+    if density_pct < CRISP_EXTENT_MEDIUM_PCT:
+        return "sparse"
+    if density_pct < CRISP_EXTENT_DENSE_PCT:
+        return "medium"
+    return "dense"
+
+
+def crisp_severity(width_mm: float, density_pct: float, label: str | None = None) -> str:
+    """The same DPWH inputs and rule table with hard cuts: the rule-based baseline."""
+    table = AREA_RULES if label in AREA_DEFECT_LABELS else LINEAR_RULES
+    term = table[(_crisp_width_term(width_mm), _crisp_density_term(density_pct))]
+    return term.capitalize()
+
+
+def pothole_severity(area_m2: float | None, pothole_count: int) -> str:
+    """Medium for one pothole up to one DPWH unit (0.25 m2); High otherwise."""
+    if pothole_count > 1:
         return "High"
-    if wide and density_pct >= CRISP_EXTENT_MEDIUM_PCT:
+    if area_m2 is None or area_m2 > POTHOLE_UNIT_AREA_M2:
         return "High"
-    if wide or density_pct >= CRISP_EXTENT_MEDIUM_PCT:
-        return "Medium"
-    return "Low"
+    return "Medium"
 
 
 def confidence_severity(confidence: float) -> str:
@@ -320,9 +373,9 @@ def membership_trace(width_mm: float, density_pct: float) -> dict:
     """Degree to which the inputs belong to each linguistic term.
 
     This is the explainable logic trace the architecture model promises: it shows
-    an engineer *why* a grade was assigned, e.g. a 5.8 mm crack reading 0.48
-    Moderate and 0.32 Wide rather than being silently forced to one side of a
-    6.0 mm line.
+    an engineer *why* a grade was assigned, e.g. a 9 mm crack reading 0.75 open
+    and 0.25 wide rather than being silently forced to one side of the 10 mm
+    line.
     """
     width_mm = float(np.clip(width_mm, 0.0, WIDTH_MAX_MM))
     density_pct = float(np.clip(density_pct, 0.0, DENSITY_MAX_PCT))
@@ -348,25 +401,33 @@ def membership_trace(width_mm: float, density_pct: float) -> dict:
     }
 
 
-def evaluate(label: str, width_mm: float, density_pct: float, confidence: float) -> dict:
+def evaluate(
+    label: str,
+    width_mm: float,
+    density_pct: float,
+    confidence: float,
+    area_m2: float | None = None,
+    pothole_count: int = 1,
+) -> dict:
     """Grade one detection with all three methods.
 
     Returns the fuzzy grade and score, the two baselines, the rule base used, and
-    the membership trace.
+    the membership trace. area_m2 and pothole_count are only read for potholes.
     """
     width_mm = float(np.clip(width_mm, 0.0, WIDTH_MAX_MM))
     density_pct = float(np.clip(density_pct, 0.0, DENSITY_MAX_PCT))
 
-    # Potholes are not a graded distress under the standard; see POTHOLE_* above.
-    if label == POTHOLE_LABEL and not POTHOLE_STRATIFIED:
+    # Potholes: graded on DPWH's count unit, not on width; see POTHOLE_* above.
+    if label == POTHOLE_LABEL:
+        grade = pothole_severity(area_m2, pothole_count)
         return {
-            "severity_fuzzy": POTHOLE_FIXED_SEVERITY,
-            "severity_score": POTHOLE_FIXED_SCORE,
-            "severity_crisp": POTHOLE_FIXED_SEVERITY,
+            "severity_fuzzy": grade,
+            "severity_score": POTHOLE_SCORES[grade],
+            "severity_crisp": grade,
             "severity_confidence": confidence_severity(confidence),
             "severity_legacy_crisp": legacy_crisp_severity(width_mm),
             "severity_dpwh_nw": "Not rated",
-            "rule_base": "pothole-unstratified",
+            "rule_base": "pothole-area",
             "membership_trace": membership_trace(width_mm, density_pct),
         }
 
@@ -387,12 +448,12 @@ def evaluate(label: str, width_mm: float, density_pct: float, confidence: float)
         # Total rule failure should be impossible: the trapezoids span both
         # universes. Fall back to the crisp baseline rather than 500 the request.
         score = float("nan")
-        fuzzy_label = crisp_severity(width_mm, density_pct)
+        fuzzy_label = crisp_severity(width_mm, density_pct, label)
 
     return {
         "severity_fuzzy": fuzzy_label,
         "severity_score": None if np.isnan(score) else round(score, 2),
-        "severity_crisp": crisp_severity(width_mm, density_pct),
+        "severity_crisp": crisp_severity(width_mm, density_pct, label),
         "severity_confidence": confidence_severity(confidence),
         "severity_legacy_crisp": legacy_crisp_severity(width_mm),
         "severity_dpwh_nw": dpwh_severity(width_mm),
@@ -413,42 +474,131 @@ def evaluate(label: str, width_mm: float, density_pct: float, confidence: float)
 # write prose around facts that are already settled -- which is the whole premise
 # of a neurosymbolic system.
 #
-# Aligned to standard asphalt maintenance practice for each distress class.
-# DPWH response-time rules set the urgency separately: potholes and cracks carry a
-# three-day repair window, scaling and depressions up to thirty days.
-# CONFIRM the exact intervention names against the DPWH manual before defence.
+# Keyed [defect][severity][pavement]. Concrete and asphalt are repaired
+# differently -- reblocking is a concrete repair, patching and overlay are
+# asphalt ones -- so without the pavement type the system would print a concrete
+# repair for an asphalt crack.
+#
+# Activity numbers and names are DPWH D.O. 47 s.2024 Appendix A-9 and the
+# response times Table 4.1, both quoted verbatim in proof.md section 6. Item 311
+# is the Blue Book (Standard Specifications, Vol. II) item for Portland Cement
+# Concrete Pavement. The one-line methods are standard maintenance practice,
+# approved by the City Engineer; record that approval in the appendix with the
+# validation letter.
 
-INTERVENTIONS = {
-    "Longitudinal Crack": {
-        "Low": "Crack sealing",
-        "Medium": "Crack sealing",
-        "High": "Rout and seal",
+ACT_111 = "Act. 111 Premix Patching"
+ACT_112 = "Act. 112 Penetration Patching"
+ACT_113 = "Act. 113 Sealing of Bituminous Pavement"
+ACT_121 = "Act. 121 Patching on Concrete Pavements"
+ACT_122 = "Act. 122 Crack and Joints Sealing of Concrete Pavements"
+ITEM_311 = "Blue Book Item 311, Portland Cement Concrete Pavement (slab reblocking)"
+RECONSTRUCTION = "Beyond Routine Maintenance: reconstruction"
+
+PAVEMENT_TYPES = ("concrete", "asphalt")
+DEFAULT_PAVEMENT = "concrete"
+
+
+def _rec(activity, method, response, response_days):
+    return {
+        "activity": activity,
+        "method": method,
+        "response": response,
+        "response_days": response_days,
+    }
+
+
+_LINEAR_CRACK = {
+    "Low": {
+        "concrete": _rec(
+            ACT_122,
+            "Routine preventive maintenance: clean and seal the crack with sealant "
+            "or epoxy. Monitor at the next inspection.",
+            "3 working days, or schedule with routine maintenance", 3),
+        "asphalt": _rec(
+            ACT_113, "Crack filling with asphalt sealant.",
+            "3 working days, or schedule with routine maintenance", 3),
     },
-    "Transverse Crack": {
-        "Low": "Crack sealing",
-        "Medium": "Crack sealing",
-        "High": "Rout and seal",
+    "Medium": {
+        "concrete": _rec(
+            ACT_122,
+            "Rout and seal the crack. If the edges are spalled, partial-depth "
+            "patch (Act. 121).",
+            "3 working days", 3),
+        "asphalt": _rec(
+            ACT_113,
+            "Rout and seal. Where cracks are many, localized patching or a thin "
+            "overlay.",
+            "3 working days", 3),
     },
-    "Alligator Crack": {
-        "Low": "Surface seal",
-        "Medium": "Partial-depth patching",
-        "High": "Mill-and-overlay",
-    },
-    "Pothole": {
-        "Low": "Cold-mix patching",
-        "Medium": "Cold-mix patching",
-        "High": "Full-depth patching",
+    "High": {
+        "concrete": _rec(
+            ITEM_311, "Not serviceable: full slab reblocking.",
+            "3 working days to make safe; repair as programmed", 3),
+        "asphalt": _rec(
+            RECONSTRUCTION,
+            "Not serviceable: complete structural replacement of the section.",
+            "3 working days to make safe; repair as programmed", 3),
     },
 }
 
-DEFAULT_INTERVENTION = "Inspect and assess on site"
+_POTHOLE = {
+    "concrete": _rec(ACT_121, "Patching on concrete pavement.", "3 working days", 3),
+    "asphalt": _rec(
+        f"{ACT_111} / {ACT_112}",
+        "Premix (hot) or penetration patching; add base material if no subgrade "
+        "repair is needed.",
+        "3 working days", 3),
+}
+
+INTERVENTIONS = {
+    "Longitudinal Crack": _LINEAR_CRACK,
+    "Transverse Crack": _LINEAR_CRACK,
+    "Alligator Crack": {
+        "Low": {
+            "concrete": _rec(
+                ACT_122, "Seal the cracks and inspect for subbase failure.",
+                "3 working days", 3),
+            "asphalt": _rec(ACT_113, "Surface seal over the area.", "3 working days", 3),
+        },
+        "Medium": {
+            "concrete": _rec(
+                ACT_121, "Partial or full-depth patch of the broken area.",
+                "3 working days", 3),
+            "asphalt": _rec(
+                f"{ACT_111} / {ACT_112}",
+                "Remove and patch full depth with premix, or penetration patching.",
+                "3 working days", 3),
+        },
+        "High": {
+            "concrete": _rec(
+                ITEM_311, "Not serviceable: full slab reblocking.",
+                "Program as rehabilitation (D.O. 47 Table 5.1)", None),
+            "asphalt": _rec(
+                RECONSTRUCTION,
+                "Not serviceable: complete structural replacement, programmed as "
+                "reconstruction.",
+                "Program as rehabilitation (D.O. 47 Table 5.1)", None),
+        },
+    },
+    # Potholes grade Medium or High; Low is kept so a lookup can never miss.
+    "Pothole": {"Low": _POTHOLE, "Medium": _POTHOLE, "High": _POTHOLE},
+}
+
+DEFAULT_INTERVENTION = _rec(
+    "Inspect and assess on site",
+    "No table entry for this defect; a City Engineer should inspect it.",
+    "As scheduled", None)
 
 # Overall priority from the worst severity present and the measured extent.
 PRIORITY_DENSITY_ESCALATION_PCT = 25.0
 
 
-def intervention_for(label: str, severity: str) -> str:
-    return INTERVENTIONS.get(label, {}).get(severity, DEFAULT_INTERVENTION)
+def intervention_for(label: str, severity: str, pavement: str = DEFAULT_PAVEMENT) -> dict:
+    """The DPWH activity, one-line method and response time for one defect."""
+    if pavement not in PAVEMENT_TYPES:
+        pavement = DEFAULT_PAVEMENT
+    entry = INTERVENTIONS.get(label, {}).get(severity)
+    return dict(entry[pavement]) if entry else dict(DEFAULT_INTERVENTION)
 
 
 def priority_level(worst_severity: str, density_pct: float) -> str:

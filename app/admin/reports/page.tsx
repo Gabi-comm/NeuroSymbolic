@@ -238,7 +238,7 @@ export default function AdminReports() {
               </div>
               {report.crack_density_pct != null && (
                 <p className="text-xs font-bold text-zinc-600">
-                  Crack density: {report.crack_density_pct.toFixed(2)}%
+                  Distress density: {report.crack_density_pct.toFixed(2)}%
                 </p>
               )}
             </div>
@@ -353,7 +353,7 @@ export default function AdminReports() {
             type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by location, severity, damage type or ID…"
+            placeholder="Search by location, severity, distress type or ID…"
             className="grow bg-white rounded-full px-6 py-3.5 text-black font-bold shadow-lg focus:outline-none focus:ring-4 focus:ring-oasys-blue/50 placeholder-gray-400"
           />
           <button

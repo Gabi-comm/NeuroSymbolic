@@ -38,7 +38,7 @@ const SECTIONS = [
   {
     href: '/admin/dashboard',
     title: 'Dashboard',
-    detail: 'Submission trends, damage-type breakdown and resolution status.',
+    detail: 'Submission trends, distress-type breakdown and resolution status.',
     icon: (
       <>
         <path d="M3 3v18h18" />

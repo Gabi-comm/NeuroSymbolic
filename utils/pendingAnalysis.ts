@@ -9,6 +9,18 @@
 
 export type Severity = 'Low' | 'Medium' | 'High';
 
+/** The symbolic layer's repair for one defect (fuzzy_engine.INTERVENTIONS). */
+export interface Recommendation {
+  /** DPWH activity, e.g. "Act. 122 Crack and Joints Sealing of Concrete Pavements". */
+  activity: string;
+  /** The method in one sentence. */
+  method: string;
+  /** DPWH response time, as text (D.O. 47 s.2024 Table 4.1). */
+  response: string;
+  /** The same in working days, when it is a fixed number. */
+  response_days: number | null;
+}
+
 export interface Distress {
   label: string;
   type?: string;
@@ -16,7 +28,10 @@ export interface Distress {
   measurement_type: string;
   metric_value: number;
   unit: string;
+  /** Predominant width along the centreline, the DPWH reading (measure.py). */
   width_mm: number;
+  /** The previous area / length estimate, kept for comparison. */
+  width_mm_area_ratio?: number;
   /** Headline grade shown in the UI; carries the fuzzy result. */
   severity: Severity;
   // Symbolic component outputs. The parallel severities are the RQ3 dataset.
@@ -28,9 +43,10 @@ export interface Distress {
   /** The literal DPWH two-band verdict: Narrow / Wide (D.O. 120 s.2019). */
   severity_dpwh_nw?: 'Narrow' | 'Wide' | 'Not rated';
   severity_score?: number | null;
-  rule_base?: 'linear' | 'area' | 'pothole-unstratified';
+  rule_base?: 'linear' | 'area' | 'pothole-area';
   crack_density_pct?: number;
   membership_trace?: Record<string, unknown>;
+  recommendation?: Recommendation;
 }
 
 export interface AnalysisData {
@@ -40,6 +56,9 @@ export interface AnalysisData {
   gemini_bulletin: string;
   distresses: Distress[];
   gsd_mm_px?: number;
+  /** reference_card when a marker in the photo set the scale. */
+  scale_source?: 'assumed_height' | 'reference_card';
+  pavement_type?: 'concrete' | 'asphalt';
   crack_density_pct?: number;
   ipm_applied?: boolean;
   privacy_blur_applied?: boolean;

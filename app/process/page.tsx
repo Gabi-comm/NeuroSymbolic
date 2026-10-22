@@ -62,7 +62,7 @@ export default function ProcessPage() {
             Report one and the walkthrough opens from the result screen.
           </p>
           <Link href="/report-damage" className="btn-blue w-full px-6 py-3">
-            Report damage
+            Report distress
           </Link>
         </div>
       </div>

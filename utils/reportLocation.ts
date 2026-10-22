@@ -31,6 +31,8 @@ export interface ReportContext extends LocationFix {
   road_name: string | null;
   road_class: 'national' | 'city' | null;
   pavement_type: PavementType;
+  /** The Captured Distress row this report was filed from, if any. */
+  capture_id?: string | null;
 }
 
 /** The study area's main segment, Samson Road near UE Caloocan. */
@@ -96,6 +98,7 @@ export function readDeviceLocation(): Promise<LocationFix> {
 const KEYS = {
   lat: 'lat', lng: 'lng', accuracy_m: 'acc', source: 'src', address: 'address',
   barangay: 'brgy', road_name: 'road', road_class: 'cls', pavement_type: 'pav',
+  capture_id: 'cap',
 } as const;
 
 export function toQuery(ctx: ReportContext): Record<string, string> {
@@ -127,6 +130,7 @@ export function fromQuery(params: URLSearchParams): ReportContext | null {
     road_name: params.get(KEYS.road_name),
     road_class: cls === 'national' || cls === 'city' ? cls : null,
     pavement_type: pav === 'asphalt' ? 'asphalt' : 'concrete',
+    capture_id: params.get(KEYS.capture_id),
   };
 }
 
