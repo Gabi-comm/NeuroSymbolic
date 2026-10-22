@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/utils/supabase';
 import { SeverityBadge } from '@/components/Severity';
 import type { MapReport } from '@/components/ReportsMap';
 import FixReportModal, { type FixableReport } from '@/components/FixReportModal';
+import Coordinates from '@/components/Coordinates';
 
 const ReportsMap = dynamic(() => import('@/components/ReportsMap'), {
   ssr: false,
@@ -40,7 +41,7 @@ interface Filer {
 export default function AdminReports() {
   const [reports, setReports] = useState<Report[]>([]);
   // Who filed each report, keyed by auth uid (FileUpload.userid ->
-  // UserDetail.userloginuuid). The City Engineer can read every profile.
+  // UserDetail.userloginuuid). Admins can read every profile.
   const [filers, setFilers] = useState<Record<string, Filer>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -48,6 +49,19 @@ export default function AdminReports() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showMap, setShowMap] = useState(true);
+  // "Track report": which report the map is following. The nonce lets the
+  // same button fly back to the same report after the map was panned away.
+  const [tracked, setTracked] = useState<{ id: string; nonce: number } | null>(null);
+  const mapRef = useRef<HTMLElement>(null);
+
+  const trackReport = (report: Report) => {
+    setShowMap(true);
+    setTracked((prev) => ({ id: String(report.id), nonce: (prev?.nonce ?? 0) + 1 }));
+    // After the map section has rendered (it may have been hidden).
+    requestAnimationFrame(() =>
+      mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    );
+  };
 
   const [pendingAction, setPendingAction] = useState<{
     id: string;
@@ -217,6 +231,7 @@ export default function AdminReports() {
               {report.address || 'Location unknown'}
               {report.uploadtime && ` · ${new Date(report.uploadtime).toLocaleDateString('en-GB')}`}
             </p>
+            <Coordinates lat={report.lat} lng={report.lng} tone="light" className="mt-0.5" />
             {report.userid && (
               <p className="text-zinc-500 text-xs mt-0.5">
                 Filed by{' '}
@@ -228,17 +243,31 @@ export default function AdminReports() {
             )}
           </div>
 
-          <button
-            onClick={() => setExpandedId(isOpen ? null : String(report.id))}
-            aria-expanded={isOpen}
-            className={`px-6 py-2 rounded-full font-bold text-xs transition-all shadow shrink-0 ${
-              isOpen
-                ? 'bg-zinc-200 text-zinc-700 hover:bg-zinc-300'
-                : 'bg-oasys-blue text-white hover:bg-blue-600'
-            }`}
-          >
-            {isOpen ? 'Close' : 'Review'}
-          </button>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={() => trackReport(report)}
+              disabled={report.lat == null || report.lng == null}
+              title={report.lat == null || report.lng == null ? 'This report has no coordinates' : undefined}
+              className={`px-5 py-2 rounded-full font-bold text-xs transition-all border shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+                tracked?.id === String(report.id)
+                  ? 'bg-blue-50 border-oasys-blue text-blue-700'
+                  : 'border-zinc-300 text-zinc-700 hover:bg-zinc-100'
+              }`}
+            >
+              Track report
+            </button>
+            <button
+              onClick={() => setExpandedId(isOpen ? null : String(report.id))}
+              aria-expanded={isOpen}
+              className={`px-6 py-2 rounded-full font-bold text-xs transition-all shadow shrink-0 ${
+                isOpen
+                  ? 'bg-zinc-200 text-zinc-700 hover:bg-zinc-300'
+                  : 'bg-oasys-blue text-white hover:bg-blue-600'
+              }`}
+            >
+              {isOpen ? 'Close' : 'Review'}
+            </button>
+          </div>
         </div>
 
         {isOpen && (
@@ -399,14 +428,23 @@ export default function AdminReports() {
         </div>
 
         {showMap && (
-          <section className="bg-panel-gradient rounded-panel p-4 sm:p-6 border border-white/10 mb-6">
+          <section
+            ref={mapRef}
+            className="bg-panel-gradient rounded-panel p-4 sm:p-6 border border-white/10 mb-6 scroll-mt-28"
+          >
             <h2 className="font-bold text-sm text-gray-400 mb-4">
               Defect locations{' '}
               <span className="text-gray-500">
                 ({filtered.filter((r) => r.lat != null).length} mapped)
               </span>
             </h2>
-            {!isLoading && <ReportsMap reports={filtered} />}
+            {!isLoading && (
+              <ReportsMap
+                reports={filtered}
+                trackedId={tracked?.id ?? null}
+                trackNonce={tracked?.nonce ?? 0}
+              />
+            )}
           </section>
         )}
 

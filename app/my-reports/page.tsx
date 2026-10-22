@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabase } from '@/utils/supabase';
 import { SeverityBadge } from '@/components/Severity';
 import LoginModal from '@/components/LoginModal';
+import Coordinates from '@/components/Coordinates';
 
 // The reporter's own reports and where each one stands. RLS on FileUpload
 // ("edit or delete own upload") already limits a user to their own rows; the
@@ -20,6 +21,8 @@ interface MyReport {
   state: string | null;
   address: string | null;
   barangay: string | null;
+  lat: number | null;
+  lng: number | null;
   image_url: string | null;
   recommendation: { activity?: string; response?: string } | null;
 }
@@ -57,7 +60,7 @@ export default function MyReportsPage() {
       const { data, error } = await supabase
         .from('FileUpload')
         .select(
-          'id, uploadtime, damage_type, severity, corrected_damage_type, corrected_severity, state, address, barangay, image_url, recommendation'
+          'id, uploadtime, damage_type, severity, corrected_damage_type, corrected_severity, state, address, barangay, lat, lng, image_url, recommendation'
         )
         .eq('userid', userId)
         .order('uploadtime', { ascending: false });
@@ -159,7 +162,7 @@ export default function MyReportsPage() {
                       </span>
                       {r.corrected_severity && (
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
-                          Reviewed by the City Engineer
+                          Reviewed by an admin
                         </span>
                       )}
                     </div>
@@ -167,6 +170,7 @@ export default function MyReportsPage() {
                       <span className="font-bold text-white">Full Address: </span>
                       {r.address ?? 'Not recorded'}
                     </p>
+                    <Coordinates lat={r.lat} lng={r.lng} />
                     {r.recommendation?.activity && (
                       <p className="text-xs text-gray-400">
                         {r.recommendation.activity}

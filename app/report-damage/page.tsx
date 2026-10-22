@@ -19,6 +19,7 @@ import {
 } from '@/utils/reportLocation';
 import type { GeocodeResult } from '@/app/api/geocode/route';
 import CaptureGuidelines from '@/components/CaptureGuidelines';
+import Coordinates from '@/components/Coordinates';
 
 const MapComponent = dynamic(() => import('./Map'), {
   ssr: false,
@@ -286,6 +287,7 @@ export default function ReportDamagePage() {
                   : isFetchingAddress
                     ? 'Looking up address…'
                     : place.address ?? 'Address not found. The pin location is still recorded.'}
+                {fix && <Coordinates lat={fix.lat} lng={fix.lng} className="mt-1" />}
                 {fix && (place.barangay || place.road_name) && !isFetchingAddress && (
                   <span className="block text-xs text-gray-400 mt-1">
                     {[place.road_name, place.road_class && `${place.road_class} road`, place.barangay]

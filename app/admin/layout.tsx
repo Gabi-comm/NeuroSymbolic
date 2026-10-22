@@ -70,7 +70,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         aria-live="polite"
       >
         <p className="font-bold tracking-widest uppercase text-sm text-center">
-          {authState === 'checking' ? 'Verifying City Engineer access…' : 'Access denied. Redirecting…'}
+          {authState === 'checking' ? 'Verifying admin access…' : 'Access denied. Redirecting…'}
         </p>
       </div>
     );

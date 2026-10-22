@@ -331,8 +331,8 @@ begin
   end if;
 end $$;
 
--- Every account starts as a Civilian. The user type is assigned by the City
--- Engineer on /admin/users, never picked at sign-up: raw_user_meta_data is
+-- Every account starts as a Civilian. The user type is assigned by an admin
+-- on /admin/users, never picked at sign-up: raw_user_meta_data is
 -- whatever the browser sent, so nothing in it is trusted beyond the username.
 create or replace function public.handle_new_user() returns trigger
   language plpgsql security definer set search_path = public
@@ -355,7 +355,7 @@ as $$
 begin
   if not public.is_admin() and auth.uid() is not null and
      (new.role is distinct from old.role or new.user_type is distinct from old.user_type) then
-    raise exception 'Only the City Engineer can change roles or user types.'
+    raise exception 'Only an admin can change roles or user types.'
       using errcode = 'insufficient_privilege';
   end if;
   return new;
@@ -377,7 +377,7 @@ begin
     or new.correction_note       is distinct from old.correction_note
     or new.corrected_at          is distinct from old.corrected_at
     or new.corrected_by          is distinct from old.corrected_by) then
-    raise exception 'Only the City Engineer can change a grade or status.'
+    raise exception 'Only an admin can change a grade or status.'
       using errcode = 'insufficient_privilege';
   end if;
   return new;

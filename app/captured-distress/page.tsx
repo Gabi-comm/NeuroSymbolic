@@ -18,6 +18,7 @@ import {
   type CapturedDistress,
 } from '@/utils/captures';
 import LoginModal from '@/components/LoginModal';
+import Coordinates from '@/components/Coordinates';
 import type { Position } from '../report-damage/Map';
 
 const MapComponent = dynamic(() => import('../report-damage/Map'), {
@@ -374,8 +375,9 @@ function CaptureList({
                 </p>
                 <p className="text-sm text-white leading-snug">
                   <span className="font-bold">Full Address: </span>
-                  {c.address ?? `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`}
+                  {c.address ?? 'Not found'}
                 </p>
+                <Coordinates lat={c.lat} lng={c.lng} />
                 <p className="text-xs text-gray-400">
                   {[
                     SOURCE_LABEL[c.location_source],

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/utils/supabase';
 import LoginModal from './LoginModal';
+import Coordinates from '@/components/Coordinates';
 import { readPendingScan, clearPendingScan } from '@/utils/pendingScan';
 import {
   saveLastResult,
@@ -493,6 +494,7 @@ export default function UploadResultUi({
                   ? context.address ?? `${context.lat.toFixed(5)}, ${context.lng.toFixed(5)}`
                   : 'No location set'}
               </p>
+              {context && <Coordinates lat={context.lat} lng={context.lng} className="mt-2" />}
               {context && (
                 <p className="text-xs text-gray-500 mt-2 leading-snug">
                   {[
@@ -603,9 +605,9 @@ export default function UploadResultUi({
                 Report has been submitted
               </h2>
               <p className="text-sm text-gray-300 leading-snug">
-                It is now in the City Engineer&apos;s review queue with a status of{' '}
-                <strong className="text-white">Needs Action</strong>. The City
-                Engineer will assess it and mark it resolved.
+                It is now in the admin review queue with a status of{' '}
+                <strong className="text-white">Needs Action</strong>. An admin
+                will assess it and mark it resolved.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 shrink-0 w-full sm:w-auto">
@@ -626,7 +628,7 @@ export default function UploadResultUi({
               <h2 className="font-black mb-0.5">Submit this report</h2>
               <p className="text-sm text-gray-400">
                 {isSignedIn
-                  ? 'Sends the assessment to the City Engineer for review.'
+                  ? 'Sends the assessment to an admin for review.'
                   : 'Sign in to send this to the review queue.'}
               </p>
               <p aria-live="assertive" className="text-xs font-bold mt-1.5">

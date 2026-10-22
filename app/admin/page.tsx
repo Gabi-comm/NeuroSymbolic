@@ -61,7 +61,7 @@ const SECTIONS = [
   {
     href: '/admin/users',
     title: 'Users',
-    detail: 'View accounts, assign reporter types and grant City Engineer access.',
+    detail: 'View accounts, assign reporter types and grant admin access.',
     icon: (
       <>
         <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -157,7 +157,7 @@ export default function AdminHome() {
       <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-10 pt-28 sm:pt-32 pb-20 shadow-[0_24px_70px_-24px_rgba(59,130,246,0.30)]">
         <div className="max-w-5xl mx-auto">
           <p className="text-oasys-blue text-sm font-bold uppercase tracking-widest mb-2">
-            City Engineer console
+            Admin console
           </p>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight mb-3">
             {username ? `Welcome back, ${username}` : 'Welcome back'}

@@ -108,7 +108,7 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  // Set only when the City Engineer moves the pin; the barangay follows it.
+  // Set only when an admin moves the pin; the barangay follows it.
   const [movedBarangay, setMovedBarangay] = useState<string | null | undefined>(undefined);
 
   const movePin = async (pos: Position) => {

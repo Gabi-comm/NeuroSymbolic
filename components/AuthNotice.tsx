@@ -26,7 +26,7 @@ function AuthNoticeInner() {
   const message = authError
     ? authError
     : signInRequired
-      ? 'Sign in with a City Engineer account to open the console.'
+      ? 'Sign in with an admin account to open the console.'
       : null;
 
   useEffect(() => {
