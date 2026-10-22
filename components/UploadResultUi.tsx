@@ -17,6 +17,7 @@ import {
 export type { AnalysisData, Distress, Severity };
 import { savePipelineStages, useHasPipelineStages } from '@/utils/pipelineStages';
 import { getAcknowledgedGsd } from '@/utils/captureSettings';
+import { fromQuery, SOURCE_LABEL, type ReportContext } from '@/utils/reportLocation';
 import { SEVERITY, SEVERITY_RANK, toSeverity } from './Severity';
 import DistressCarousel from './DistressCarousel';
 
@@ -38,11 +39,9 @@ export default function UploadResultUi({
   const [showLogin, setShowLogin] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [location, setLocation] = useState<{ lat: number | null; lng: number | null }>({
-    lat: null,
-    lng: null,
-  });
-  const [address, setAddress] = useState<string>('Loading…');
+  // Where the report is and what road it is on, from the /report-damage query.
+  // null means the page was opened without one; such a result cannot be filed.
+  const [context, setContext] = useState<ReportContext | null>(null);
 
   const [data, setData] = useState<AnalysisData | null>(analysisData || null);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -52,17 +51,8 @@ export default function UploadResultUi({
   const [submitMessage, setSubmitMessage] = useState<string>('');
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const urlAddress = params.get('address');
-      const urlLat = params.get('lat');
-      const urlLng = params.get('lng');
-
-      setAddress(urlAddress ?? 'Location not provided (quick scan)');
-      if (urlLat && urlLng) {
-        setLocation({ lat: parseFloat(urlLat), lng: parseFloat(urlLng) });
-      }
-    }
+    const reportContext = fromQuery(new URLSearchParams(window.location.search));
+    setContext(reportContext);
 
     // No getSession() call here.
     //
@@ -104,6 +94,8 @@ export default function UploadResultUi({
             image_base64: pending.image,
             // Scale the inspector set on the capture-guidelines screen.
             gsd_mm_px: getAcknowledgedGsd(),
+            // Decides the repair: concrete and asphalt are fixed differently.
+            pavement_type: reportContext?.pavement_type ?? 'concrete',
           }),
         });
 
@@ -207,6 +199,9 @@ export default function UploadResultUi({
       if (!userId) {
         throw new Error('You are not signed in. Please sign in again.');
       }
+      if (!context) {
+        throw new Error('This report has no location. Go back and set it on the map.');
+      }
 
       const primary = primaryDistress(data.distresses);
 
@@ -219,10 +214,16 @@ export default function UploadResultUi({
           severity: data.overall_severity,
           state: 'Needs Action',
           uploadtime: new Date().toISOString(),
-          address: address.startsWith('Location not provided') ? null : address,
+          address: context.address,
           // The columns are lat/lng, not latitude/longitude.
-          lat: location.lat,
-          lng: location.lng,
+          lat: context.lat,
+          lng: context.lng,
+          location_accuracy_m: context.accuracy_m,
+          location_source: context.source,
+          barangay: context.barangay,
+          road_name: context.road_name,
+          road_class: context.road_class,
+          pavement_type: context.pavement_type,
           image_url: data.fileUrl,
           file_name: data.filename,
           // confidence is a real (float4), not text. Stored as the raw 0-1
@@ -452,8 +453,22 @@ export default function UploadResultUi({
               <h2 className="font-black mb-2">Location</h2>
               <p className="text-sm text-gray-300 leading-snug break-words">
                 <span aria-hidden="true">📍 </span>
-                {address}
+                {context
+                  ? context.address ?? `${context.lat.toFixed(5)}, ${context.lng.toFixed(5)}`
+                  : 'No location set'}
               </p>
+              {context && (
+                <p className="text-xs text-gray-500 mt-2 leading-snug">
+                  {[
+                    `${SOURCE_LABEL[context.source]}${context.accuracy_m != null ? ` ±${context.accuracy_m} m` : ''}`,
+                    context.barangay,
+                    context.road_name,
+                    context.pavement_type === 'concrete' ? 'Concrete' : 'Asphalt',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+              )}
             </section>
 
             {/* Fills the gap this column left under Location, and answers the
@@ -557,7 +572,7 @@ export default function UploadResultUi({
             ) : isSignedIn ? (
               <button
                 onClick={handleSubmitReport}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !context}
                 className="btn-blue px-10 py-3.5 w-full sm:w-auto"
               >
                 {isSubmitting ? 'Submitting…' : 'Submit report'}

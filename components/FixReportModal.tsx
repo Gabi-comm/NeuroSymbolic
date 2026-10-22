@@ -108,15 +108,19 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  const lookUpAddress = async (lat: number, lng: number) => {
+  // Set only when the City Engineer moves the pin; the barangay follows it.
+  const [movedBarangay, setMovedBarangay] = useState<string | null | undefined>(undefined);
+
+  const movePin = async (pos: Position) => {
+    setPosition(pos);
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-      );
+      const response = await fetch(`/api/geocode?lat=${pos.lat}&lng=${pos.lng}`);
       const data = await response.json();
-      if (data?.display_name) setAddress(data.display_name);
+      if (data?.address) setAddress(data.address);
+      setMovedBarangay(data?.barangay ?? null);
     } catch {
       // Keep whatever the admin typed; the coordinates are what matter.
+      setMovedBarangay(null);
     }
   };
 
@@ -145,6 +149,12 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
         address: address.trim() || null,
         lat: position.lat,
         lng: position.lng,
+        // A moved pin is a hand-placed location, with no GPS accuracy.
+        ...(movedBarangay !== undefined && {
+          barangay: movedBarangay,
+          location_source: 'manual_pin',
+          location_accuracy_m: null,
+        }),
         // Beside the original: only recorded when the admin actually disagrees,
         // so an untouched field does not look like a reviewed one.
         corrected_damage_type: typeChanged ? damageType : null,
@@ -310,12 +320,12 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
                 <div className="h-64 rounded-2xl overflow-hidden border border-white/10">
                   <MapComponent
                     position={position}
-                    setPosition={setPosition}
-                    fetchAddress={lookUpAddress}
+                    accuracyM={null}
+                    onPick={movePin}
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-2 tabular-nums">
-                  Tap the map to move the pin · {position.lat.toFixed(5)},{' '}
+                  Tap or drag to move the pin · {position.lat.toFixed(5)},{' '}
                   {position.lng.toFixed(5)}
                 </p>
               </div>

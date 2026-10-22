@@ -1,9 +1,8 @@
-// Single source of truth for the image handed from an upload page to its result page.
+// Single source of truth for the image handed from /report-damage to its result page.
 //
-// Two problems this replaces:
-//   1. /upload-media wrote "pendingRoadScan" while /report-damage wrote
-//      "upload_image_base64", and the result component only ever read the second,
-//      so the two flows behaved differently for no reason.
+// It replaced two problems:
+//   1. Two upload flows once wrote different localStorage keys and the result
+//      component only read one of them.
 //   2. A raw phone photo base64-encodes to well over the ~5 MB localStorage
 //      quota, so setItem threw and the user got an alert telling them to find a
 //      smaller image. Downscaling first makes that essentially impossible.

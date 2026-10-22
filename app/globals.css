@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Tailwind scans every non-ignored file. A pasted transcript in the repo
+   root holds Windows paths whose backslashes read as invalid CSS escapes. */
+@source not "../OASYS_convo.txt";
 
 /* ===========================================================================
    OASYS design tokens

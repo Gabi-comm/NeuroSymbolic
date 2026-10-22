@@ -6,7 +6,17 @@ import dynamic from 'next/dynamic';
 import { Position } from './Map';
 import { savePendingScan } from '@/utils/pendingScan';
 import { useHasAcknowledged, useAcknowledgedGsd } from '@/utils/captureSettings';
-import { useHasCarriedAnalysis, readPendingAnalysis, clearPendingAnalysis } from '@/utils/pendingAnalysis';
+import {
+  readExifLocation,
+  readDeviceLocation,
+  toQuery,
+  DEFAULT_PAVEMENT,
+  SOURCE_LABEL,
+  type LocationFix,
+  type PavementType,
+  type ReportContext,
+} from '@/utils/reportLocation';
+import type { GeocodeResult } from '@/app/api/geocode/route';
 import CaptureGuidelines from '@/components/CaptureGuidelines';
 
 const MapComponent = dynamic(() => import('./Map'), {
@@ -18,63 +28,128 @@ const MapComponent = dynamic(() => import('./Map'), {
   ),
 });
 
+/** Beyond this, the fix may be on the wrong road: ask for a manual check. */
+const POOR_ACCURACY_M = 30;
+
+const EMPTY_PLACE: GeocodeResult = {
+  address: null,
+  barangay: null,
+  road_name: null,
+  road_class: null,
+  surface: null,
+};
+
 export default function ReportDamagePage() {
-  const [position, setPosition] = useState<Position>({ lat: 14.6566, lng: 120.9796 });
-  const [address, setAddress] = useState<string>('');
+  const [fix, setFix] = useState<LocationFix | null>(null);
+  const [place, setPlace] = useState<GeocodeResult>(EMPTY_PLACE);
   const [isFetchingAddress, setIsFetchingAddress] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationNote, setLocationNote] = useState<string | null>(null);
+
+  const [pavement, setPavement] = useState<PavementType>(DEFAULT_PAVEMENT);
+  // Once the reporter picks a pavement type, OSM no longer overrides it.
+  const [pavementChosen, setPavementChosen] = useState(false);
+  const [pavementFromOsm, setPavementFromOsm] = useState(false);
+
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
-  const [hasPinned, setHasPinned] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
 
   const acknowledged = useHasAcknowledged();
   const gsd = useAcknowledgedGsd();
-  // A scan can hand its finished analysis over so the user only drops a pin.
-  // The photo requirement is already met in that case.
-  const carriedAnalysis = useHasCarriedAnalysis();
-  const carriedImage = carriedAnalysis ? readPendingAnalysis()?.fileUrl ?? null : null;
   const inputRef = useRef<HTMLInputElement>(null);
+  // Pins can be moved faster than the lookup answers; only the latest counts.
+  const lookupSeq = useRef(0);
+  const pavementChosenRef = useRef(false);
 
-  const fetchAddress = async (lat: number, lng: number) => {
+  const lookUp = useCallback(async (lat: number, lng: number) => {
+    const seq = ++lookupSeq.current;
     setIsFetchingAddress(true);
-    setHasPinned(true);
-
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-      );
-      const data = await response.json();
-      setAddress(data?.display_name ?? 'Address not found for this location.');
+      const res = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`);
+      const data: GeocodeResult = res.ok ? await res.json() : EMPTY_PLACE;
+      if (seq !== lookupSeq.current) return;
+      setPlace(data);
+      if (!pavementChosenRef.current) {
+        setPavement(data.surface ?? DEFAULT_PAVEMENT);
+        setPavementFromOsm(data.surface !== null);
+      }
     } catch {
-      setAddress('Could not retrieve the address. The pin location is still recorded.');
+      if (seq === lookupSeq.current) setPlace(EMPTY_PLACE);
     } finally {
-      setIsFetchingAddress(false);
-    }
-  };
-
-  const acceptFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setUploadError('That is not an image. Upload a JPG or PNG photo of the damage.');
-      return;
-    }
-
-    setUploadError(null);
-    setIsPreparing(true);
-    try {
-      setMediaPreview(await savePendingScan(file));
-      setFileName(file.name);
-      // A different photo means the carried analysis no longer describes it.
-      clearPendingAnalysis();
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Could not read that image.');
-    } finally {
-      setIsPreparing(false);
+      if (seq === lookupSeq.current) setIsFetchingAddress(false);
     }
   }, []);
 
-  // Same missing-drop-handler gap the scan page had.
+  const applyFix = useCallback(
+    (next: LocationFix) => {
+      setFix(next);
+      lookUp(next.lat, next.lng);
+    },
+    [lookUp]
+  );
+
+  // A tap or a drag is the reporter overruling GPS, so it becomes a manual pin.
+  const onPick = useCallback(
+    (pos: Position) => {
+      setLocationNote(null);
+      applyFix({ lat: pos.lat, lng: pos.lng, accuracy_m: null, source: 'manual_pin' });
+    },
+    [applyFix]
+  );
+
+  const locateDevice = useCallback(async () => {
+    setIsLocating(true);
+    setLocationNote(null);
+    try {
+      applyFix(await readDeviceLocation());
+    } catch (err) {
+      setLocationNote(err instanceof Error ? err.message : 'Could not read your location.');
+    } finally {
+      setIsLocating(false);
+    }
+  }, [applyFix]);
+
+  const acceptFile = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith('image/')) {
+        setUploadError('That is not an image. Upload a JPG or PNG photo of the damage.');
+        return;
+      }
+
+      setUploadError(null);
+      setIsPreparing(true);
+      try {
+        // EXIF first, from the original file: the downscale strips metadata.
+        const exif = await readExifLocation(file);
+        setMediaPreview(await savePendingScan(file));
+        setFileName(file.name);
+
+        if (exif) {
+          setLocationNote(null);
+          applyFix(exif);
+        } else if (!fix || fix.source !== 'manual_pin') {
+          // No GPS in the photo: fall back to where the device is now. A pin
+          // the reporter already placed by hand is kept.
+          locateDevice();
+        }
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : 'Could not read that image.');
+      } finally {
+        setIsPreparing(false);
+      }
+    },
+    [applyFix, fix, locateDevice]
+  );
+
+  const choosePavement = (value: PavementType) => {
+    pavementChosenRef.current = true;
+    setPavementChosen(true);
+    setPavement(value);
+  };
+
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -90,8 +165,20 @@ export default function ReportDamagePage() {
     if (file) acceptFile(file);
   };
 
-  const hasPhoto = mediaPreview !== null || carriedAnalysis;
-  const isReadyToSubmit = hasPinned && hasPhoto;
+  const hasPhoto = mediaPreview !== null;
+  const isReadyToSubmit = fix !== null && hasPhoto && !isFetchingAddress;
+  const poorAccuracy = fix?.accuracy_m != null && fix.accuracy_m > POOR_ACCURACY_M;
+
+  const context: ReportContext | null = fix
+    ? {
+        ...fix,
+        address: place.address,
+        barangay: place.barangay,
+        road_name: place.road_name,
+        road_class: place.road_class,
+        pavement_type: pavement,
+      }
+    : null;
 
   if (!acknowledged) {
     return (
@@ -100,6 +187,11 @@ export default function ReportDamagePage() {
       </div>
     );
   }
+
+  const segment = (active: boolean) =>
+    `flex-1 px-4 py-2.5 rounded-full text-sm font-bold transition-colors ${
+      active ? 'bg-oasys-blue text-white' : 'text-gray-300 hover:bg-white/10'
+    }`;
 
   return (
     <div className="pt-28 sm:pt-32 px-4 sm:px-10 pb-16 min-h-screen">
@@ -131,31 +223,54 @@ export default function ReportDamagePage() {
             <div className="lg:col-span-3 flex flex-col gap-3">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="font-black text-white">Location</h2>
-                <span className="text-xs text-gray-500 font-bold">
-                  {hasPinned ? 'Tap again to move the pin' : 'Tap the map to drop a pin'}
-                </span>
+                <button
+                  type="button"
+                  onClick={locateDevice}
+                  disabled={isLocating}
+                  className="px-3 py-1.5 rounded-full text-xs font-bold text-white bg-white/10 hover:bg-white/20 transition-colors disabled:cursor-wait disabled:opacity-60"
+                >
+                  {isLocating ? 'Locating…' : 'Use my location'}
+                </button>
               </div>
 
               <div className="rounded-2xl h-[18rem] sm:h-[24rem] relative overflow-hidden border border-white/10">
-                <MapComponent position={position} setPosition={setPosition} fetchAddress={fetchAddress} />
+                <MapComponent
+                  position={fix ? { lat: fix.lat, lng: fix.lng } : null}
+                  accuracyM={fix?.accuracy_m ?? null}
+                  onPick={onPick}
+                />
               </div>
 
               <div
                 aria-live="polite"
                 className={`rounded-xl px-4 py-3 text-sm border ${
-                  hasPinned
-                    ? 'bg-black/30 border-white/10 text-white'
-                    : 'bg-black/20 border-white/5 text-gray-500 italic'
+                  fix ? 'bg-black/30 border-white/10 text-white' : 'bg-black/20 border-white/5 text-gray-500 italic'
                 }`}
               >
                 <span aria-hidden="true">📍 </span>
-                {isFetchingAddress
-                  ? 'Looking up address…'
-                  : address || 'No location selected yet'}
+                {!fix
+                  ? 'Add a photo and the location fills in from GPS, or tap the map.'
+                  : isFetchingAddress
+                    ? 'Looking up address…'
+                    : place.address ?? 'Address not found. The pin location is still recorded.'}
+                {fix && (place.barangay || place.road_name) && !isFetchingAddress && (
+                  <span className="block text-xs text-gray-400 mt-1">
+                    {[place.road_name, place.road_class && `${place.road_class} road`, place.barangay]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                )}
               </div>
+
+              {(locationNote || poorAccuracy) && (
+                <p role="status" className="bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm font-bold rounded-xl px-4 py-3">
+                  {locationNote ??
+                    `GPS is only accurate to about ${fix!.accuracy_m} m. Drag the pin onto the damage if it is off.`}
+                </p>
+              )}
             </div>
 
-            {/* Photo */}
+            {/* Photo + pavement */}
             <div className="lg:col-span-2 flex flex-col gap-3">
               <h2 className="font-black text-white">Photo</h2>
 
@@ -186,19 +301,15 @@ export default function ReportDamagePage() {
                   }}
                 />
 
-                {mediaPreview || carriedImage ? (
+                {mediaPreview ? (
                   <div className="p-3">
                     <div className="aspect-video rounded-xl overflow-hidden bg-black">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={mediaPreview ?? carriedImage ?? ''}
-                        alt={carriedImage && !mediaPreview ? "Analysed image carried over from your scan" : "The damage photo you selected"}
-                        className="w-full h-full object-contain"
-                      />
+                      <img src={mediaPreview} alt="The damage photo you selected" className="w-full h-full object-contain" />
                     </div>
                     <div className="flex items-center justify-between gap-2 mt-3">
                       <p className="text-xs text-gray-400 truncate min-w-0" title={fileName ?? ''}>
-                        {fileName ?? (carriedImage ? 'Carried over from your scan — already analysed' : '')}
+                        {fileName}
                       </p>
                       <button
                         onClick={() => inputRef.current?.click()}
@@ -213,7 +324,7 @@ export default function ReportDamagePage() {
                     type="button"
                     onClick={() => inputRef.current?.click()}
                     disabled={isPreparing}
-                    className="w-full h-[18rem] sm:h-[24rem] flex flex-col items-center justify-center gap-3 p-6 text-center disabled:cursor-wait"
+                    className="w-full h-[14rem] sm:h-[18rem] flex flex-col items-center justify-center gap-3 p-6 text-center disabled:cursor-wait"
                   >
                     <span
                       aria-hidden="true"
@@ -228,11 +339,10 @@ export default function ReportDamagePage() {
                     </span>
                     <span>
                       <span className="block font-black text-white mb-0.5">
-                        {isPreparing ? 'Preparing…' : isDragging ? 'Drop to add' : 'Add a photo'}
+                        {isPreparing ? 'Preparing…' : isDragging ? 'Drop to add' : 'Take or add a photo'}
                       </span>
                       <span className="block text-xs text-gray-400">
-                        Drag one in, or{' '}
-                        <span className="text-oasys-blue font-bold">browse</span>
+                        Drag one in, or <span className="text-oasys-blue font-bold">browse</span>
                       </span>
                     </span>
                   </button>
@@ -244,6 +354,33 @@ export default function ReportDamagePage() {
                   {uploadError}
                 </p>
               )}
+
+              {/* Pavement decides the repair: reblocking is a concrete repair,
+                  patching and overlay are asphalt ones. */}
+              <fieldset className="flex flex-col gap-2 mt-1">
+                <legend className="font-black text-white mb-2">Road surface</legend>
+                <div role="radiogroup" aria-label="Road surface" className="flex gap-1 p-1 rounded-full bg-black/30 border border-white/10">
+                  {(['concrete', 'asphalt'] as const).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={pavement === value}
+                      onClick={() => choosePavement(value)}
+                      className={segment(pavement === value)}
+                    >
+                      {value === 'concrete' ? 'Concrete' : 'Asphalt'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500">
+                  {pavementChosen
+                    ? 'Set by you.'
+                    : pavementFromOsm
+                      ? 'Pre-filled from OpenStreetMap. Tap to correct it.'
+                      : 'Defaults to concrete. Tap to change it.'}
+                </p>
+              </fieldset>
             </div>
           </div>
 
@@ -256,52 +393,29 @@ export default function ReportDamagePage() {
               </div>
 
               <div>
-                <dt className="text-gray-500 font-bold uppercase tracking-wide mb-0.5">Pin</dt>
-                <dd
-                  className={`font-bold tabular-nums flex items-center gap-1.5 ${
-                    hasPinned ? 'text-white' : 'text-gray-500'
-                  }`}
-                >
-                  {hasPinned && (
-                    <span aria-hidden="true" className="text-[#4ade80]">
-                      ✓
-                    </span>
-                  )}
-                  {hasPinned
-                    ? `${position.lat.toFixed(4)}, ${position.lng.toFixed(4)}`
+                <dt className="text-gray-500 font-bold uppercase tracking-wide mb-0.5">Location</dt>
+                <dd className={`font-bold tabular-nums flex items-center gap-1.5 ${fix ? 'text-white' : 'text-gray-500'}`}>
+                  {fix && <span aria-hidden="true" className="text-[#4ade80]">✓</span>}
+                  {fix
+                    ? `${SOURCE_LABEL[fix.source]}${fix.accuracy_m != null ? ` ±${fix.accuracy_m} m` : ''}`
                     : 'Not set'}
                 </dd>
               </div>
 
               <div className="min-w-0">
                 <dt className="text-gray-500 font-bold uppercase tracking-wide mb-0.5">Photo</dt>
-                <dd
-                  className={`font-bold flex items-center gap-1.5 ${
-                    hasPhoto ? 'text-white' : 'text-gray-500'
-                  }`}
-                >
-                  {hasPhoto && (
-                    <span aria-hidden="true" className="text-[#4ade80]">
-                      ✓
-                    </span>
-                  )}
+                <dd className={`font-bold flex items-center gap-1.5 ${hasPhoto ? 'text-white' : 'text-gray-500'}`}>
+                  {hasPhoto && <span aria-hidden="true" className="text-[#4ade80]">✓</span>}
                   <span className="truncate max-w-[12rem]" title={fileName ?? undefined}>
-                    {mediaPreview
-                      ? (fileName ?? 'Added')
-                      : carriedImage
-                        ? 'From scan'
-                        : 'Not added'}
+                    {hasPhoto ? (fileName ?? 'Added') : 'Not added'}
                   </span>
                 </dd>
               </div>
             </dl>
 
-            {isReadyToSubmit ? (
+            {isReadyToSubmit && context ? (
               <Link
-                href={{
-                  pathname: '/report-damage/result',
-                  query: { lat: position.lat, lng: position.lng, address },
-                }}
+                href={{ pathname: '/report-damage/result', query: toQuery(context) }}
                 className="btn-blue px-10 py-3.5 w-full sm:w-auto"
               >
                 Analyze and review
@@ -311,7 +425,7 @@ export default function ReportDamagePage() {
                 disabled
                 className="bg-white/5 text-gray-500 px-10 py-3.5 rounded-full font-bold cursor-not-allowed border border-white/10 w-full sm:w-auto"
               >
-                {!hasPinned ? 'Drop a pin first' : 'Add a photo first'}
+                {!hasPhoto ? 'Add a photo first' : !fix ? 'Set the location first' : 'Looking up address…'}
               </button>
             )}
           </div>
