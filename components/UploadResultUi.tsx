@@ -452,7 +452,7 @@ export default function UploadResultUi({
             <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-6">
               <h2 className="font-black mb-2">Location</h2>
               <p className="text-sm text-gray-300 leading-snug break-words">
-                <span aria-hidden="true">📍 </span>
+                {context && <span className="font-bold text-white">Full Address: </span>}
                 {context
                   ? context.address ?? `${context.lat.toFixed(5)}, ${context.lng.toFixed(5)}`
                   : 'No location set'}

@@ -28,9 +28,6 @@ const MapComponent = dynamic(() => import('./Map'), {
   ),
 });
 
-/** Beyond this, the fix may be on the wrong road: ask for a manual check. */
-const POOR_ACCURACY_M = 30;
-
 const EMPTY_PLACE: GeocodeResult = {
   address: null,
   barangay: null,
@@ -47,9 +44,6 @@ export default function ReportDamagePage() {
   const [locationNote, setLocationNote] = useState<string | null>(null);
 
   const [pavement, setPavement] = useState<PavementType>(DEFAULT_PAVEMENT);
-  // Once the reporter picks a pavement type, OSM no longer overrides it.
-  const [pavementChosen, setPavementChosen] = useState(false);
-  const [pavementFromOsm, setPavementFromOsm] = useState(false);
 
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -62,9 +56,11 @@ export default function ReportDamagePage() {
   const inputRef = useRef<HTMLInputElement>(null);
   // Pins can be moved faster than the lookup answers; only the latest counts.
   const lookupSeq = useRef(0);
+  // Once the reporter picks a pavement type, a moved pin no longer overrides it.
+  // "Use my location" does: it asks for the road actually under the device.
   const pavementChosenRef = useRef(false);
 
-  const lookUp = useCallback(async (lat: number, lng: number) => {
+  const lookUp = useCallback(async (lat: number, lng: number, preferOsm: boolean) => {
     const seq = ++lookupSeq.current;
     setIsFetchingAddress(true);
     try {
@@ -72,9 +68,11 @@ export default function ReportDamagePage() {
       const data: GeocodeResult = res.ok ? await res.json() : EMPTY_PLACE;
       if (seq !== lookupSeq.current) return;
       setPlace(data);
-      if (!pavementChosenRef.current) {
-        setPavement(data.surface ?? DEFAULT_PAVEMENT);
-        setPavementFromOsm(data.surface !== null);
+      if (data.surface !== null && (preferOsm || !pavementChosenRef.current)) {
+        pavementChosenRef.current = false;
+        setPavement(data.surface);
+      } else if (!pavementChosenRef.current) {
+        setPavement(DEFAULT_PAVEMENT);
       }
     } catch {
       if (seq === lookupSeq.current) setPlace(EMPTY_PLACE);
@@ -84,9 +82,9 @@ export default function ReportDamagePage() {
   }, []);
 
   const applyFix = useCallback(
-    (next: LocationFix) => {
+    (next: LocationFix, preferOsm = false) => {
       setFix(next);
-      lookUp(next.lat, next.lng);
+      lookUp(next.lat, next.lng, preferOsm);
     },
     [lookUp]
   );
@@ -104,7 +102,7 @@ export default function ReportDamagePage() {
     setIsLocating(true);
     setLocationNote(null);
     try {
-      applyFix(await readDeviceLocation());
+      applyFix(await readDeviceLocation(), true);
     } catch (err) {
       setLocationNote(err instanceof Error ? err.message : 'Could not read your location.');
     } finally {
@@ -146,7 +144,6 @@ export default function ReportDamagePage() {
 
   const choosePavement = (value: PavementType) => {
     pavementChosenRef.current = true;
-    setPavementChosen(true);
     setPavement(value);
   };
 
@@ -167,7 +164,6 @@ export default function ReportDamagePage() {
 
   const hasPhoto = mediaPreview !== null;
   const isReadyToSubmit = fix !== null && hasPhoto && !isFetchingAddress;
-  const poorAccuracy = fix?.accuracy_m != null && fix.accuracy_m > POOR_ACCURACY_M;
 
   const context: ReportContext | null = fix
     ? {
@@ -247,7 +243,7 @@ export default function ReportDamagePage() {
                   fix ? 'bg-black/30 border-white/10 text-white' : 'bg-black/20 border-white/5 text-gray-500 italic'
                 }`}
               >
-                <span aria-hidden="true">📍 </span>
+                {fix && <span className="font-bold">Full Address: </span>}
                 {!fix
                   ? 'Add a photo and the location fills in from GPS, or tap the map.'
                   : isFetchingAddress
@@ -262,10 +258,9 @@ export default function ReportDamagePage() {
                 )}
               </div>
 
-              {(locationNote || poorAccuracy) && (
+              {locationNote && (
                 <p role="status" className="bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm font-bold rounded-xl px-4 py-3">
-                  {locationNote ??
-                    `GPS is only accurate to about ${fix!.accuracy_m} m. Drag the pin onto the damage if it is off.`}
+                  {locationNote}
                 </p>
               )}
             </div>
@@ -373,13 +368,6 @@ export default function ReportDamagePage() {
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500">
-                  {pavementChosen
-                    ? 'Set by you.'
-                    : pavementFromOsm
-                      ? 'Pre-filled from OpenStreetMap. Tap to correct it.'
-                      : 'Defaults to concrete. Tap to change it.'}
-                </p>
               </fieldset>
             </div>
           </div>
