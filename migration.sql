@@ -478,6 +478,64 @@ create policy "captured_distress: admin reads" on public.captured_distress
 grant select, insert, update, delete on public.captured_distress to authenticated;
 
 
+-- ============================================================================
+-- H. Reports and profiles are private to their owner (2026-10-25)
+--    NOT YET APPLIED, run in Supabase
+--
+-- A signed-in, non-admin account could read every FileUpload row (34 of 34)
+-- and every UserDetail row (18 of 18) through the Data API. The live database
+-- has drifted from this file (section C's cleared legacy rows are still there),
+-- so instead of guessing which policy is the permissive one, every policy on
+-- the two tables is dropped and the intended set is created from scratch.
+--
+-- After this:
+--   FileUpload  a user reads and files only their own reports;
+--               the City Engineer (admin) reads and changes all of them.
+--   UserDetail  a user reads only their own profile;
+--               the City Engineer reads all and changes roles and types.
+--
+-- Nothing in the app needs more. A user never updates or deletes a report or
+-- their profile (sign-up writes the profile through handle_new_user, which is
+-- SECURITY DEFINER), so the old own-row update/delete policies are not
+-- recreated. Section F's guard triggers stay as a second line of defence.
+-- Re-runnable.
+-- ============================================================================
+
+do $$
+declare p record;
+begin
+  for p in
+    select policyname, tablename from pg_policies
+    where schemaname = 'public' and tablename in ('FileUpload', 'UserDetail')
+  loop
+    execute format('drop policy %I on public.%I', p.policyname, p.tablename);
+  end loop;
+end $$;
+
+alter table "FileUpload" enable row level security;
+alter table "UserDetail" enable row level security;
+
+create policy "fileupload: owner reads" on "FileUpload"
+  for select to authenticated using ((select auth.uid()) = userid);
+create policy "fileupload: owner inserts" on "FileUpload"
+  for insert to authenticated with check ((select auth.uid()) = userid);
+create policy "fileupload: admin manages" on "FileUpload"
+  for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+create policy "userdetail: owner reads" on "UserDetail"
+  for select to authenticated using ((select auth.uid()) = userloginuuid);
+create policy "userdetail: admin reads" on "UserDetail"
+  for select to authenticated using (public.is_admin());
+create policy "userdetail: admin updates" on "UserDetail"
+  for update to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- Signed-out visitors (anon) get no policy on either table, so they see
+-- nothing. Revoking the table grants makes that hold even if a permissive
+-- policy is added later by mistake.
+revoke all on "FileUpload" from anon;
+revoke all on "UserDetail" from anon;
+
+
 -- ---------------------------------------------------------------------------
 -- Promoting the first administrator
 --

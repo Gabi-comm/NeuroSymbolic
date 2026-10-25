@@ -953,3 +953,7 @@ backend as concrete and as asphalt, `npx tsc --noEmit`, eslint, `npm run build`.
 - `/admin/reports`: loads a light index of every report (no `image_url`, no bulletin) for the map, search and counts, so Defect locations still shows every defect. Needs action and Resolved page 5 at a time; card details load only for visible cards, and the photo only when a card is opened (Review). `?report=<id>` opens on the right page.
 - `/admin/users`: filter chips All / Civilian / Reporter / Inspector / Admin with counts (null type counts as Civilian), 5 accounts per page from the server.
 - Fix (found while testing): 14 of 18 `UserDetail` rows have a null `userloginuuid` (older accounts). The Users list keyed on it, so paging left stale rows on screen, and role/type updates matched on it, so they changed nothing on those accounts. Both now use the `id` primary key; the list orders by `username, id` so pages are stable.
+
+## RLS: users see only their own reports — 2026-10-25
+
+- `migration.sql` section H (not yet run): drops every policy on `FileUpload` and `UserDetail` (the live set had drifted; a non-admin could read all 34 reports and 18 profiles) and recreates: owner reads/inserts own reports, owner reads own profile, admin reads/manages all. No own-row update/delete (the app never does either). `anon` grants revoked on both tables.
