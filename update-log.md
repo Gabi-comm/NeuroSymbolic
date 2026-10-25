@@ -957,3 +957,7 @@ backend as concrete and as asphalt, `npx tsc --noEmit`, eslint, `npm run build`.
 ## RLS: users see only their own reports — 2026-10-25
 
 - `migration.sql` section H (not yet run): drops every policy on `FileUpload` and `UserDetail` (the live set had drifted; a non-admin could read all 34 reports and 18 profiles) and recreates: owner reads/inserts own reports, owner reads own profile, admin reads/manages all. No own-row update/delete (the app never does either). `anon` grants revoked on both tables.
+
+## Admin reports: queue toggle — 2026-10-25
+
+- `/admin/reports`: Needs action and Resolved are now a toggle above one full-width list instead of two columns. Each view keeps its own page (5 per page); only the selected view's cards load details. `?report=<id>` switches to the right view and page.

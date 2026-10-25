@@ -58,6 +58,8 @@ export default function AdminReports() {
   const [details, setDetails] = useState<Record<string, Detail>>({});
   // Photos, fetched one at a time when a card is opened. undefined = not yet.
   const [images, setImages] = useState<Record<string, string | null>>({});
+  // One queue on screen at a time; each keeps its own page.
+  const [view, setView] = useState<'needs' | 'resolved'>('needs');
   const [needsPage, setNeedsPage] = useState(1);
   const [resolvedPage, setResolvedPage] = useState(1);
   // Who filed each report, keyed by auth uid (FileUpload.userid ->
@@ -117,6 +119,7 @@ export default function AdminReports() {
             const page = Math.floor(column.indexOf(hit) / PAGE_SIZE) + 1;
             if (isResolved) setResolvedPage(page);
             else setNeedsPage(page);
+            setView(isResolved ? 'resolved' : 'needs');
           }
           setExpandedId(target);
         }
@@ -217,10 +220,12 @@ export default function AdminReports() {
     (resolvedPageShown - 1) * PAGE_SIZE,
     resolvedPageShown * PAGE_SIZE
   );
+  const isResolvedView = view === 'resolved';
+  const shown = isResolvedView ? resolvedVisible : needsVisible;
   // A stable key, so the detail fetch runs when the cards change, not every render.
-  const visibleKey = [...needsVisible, ...resolvedVisible].map((r) => String(r.id)).join(',');
+  const visibleKey = shown.map((r) => String(r.id)).join(',');
 
-  // Details and filers for the cards on screen only, at most 10 rows.
+  // Details and filers for the cards on screen only, at most 5 rows.
   useEffect(() => {
     const ids = visibleKey ? visibleKey.split(',') : [];
     const missing = ids.filter((id) => !(id in details));
@@ -567,45 +572,56 @@ export default function AdminReports() {
         )}
 
         {!isLoading && filtered.length > 0 && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-            <section className="flex flex-col gap-5">
-              <h2 className="flex items-center gap-3 px-1 text-lg font-black text-white uppercase tracking-widest">
-                <span aria-hidden="true" className="w-3 h-3 rounded-full bg-[#fbbf24]" />
-                Needs action ({unresolved.length})
-              </h2>
-              {unresolved.length === 0 ? (
-                <p className="text-zinc-300 font-medium px-1 italic">
-                  All caught up — nothing pending.
-                </p>
-              ) : (
-                needsVisible.map((report) => renderCard(report, false))
-              )}
-              <Pagination
-                page={needsPageShown}
-                total={unresolved.length}
-                onChange={setNeedsPage}
-                label="Needs action"
-              />
-            </section>
+          <section className="flex flex-col gap-5">
+            <div
+              role="group"
+              aria-label="Report queue"
+              className="flex w-full sm:w-max rounded-full bg-white/5 border border-white/10 p-1"
+            >
+              {(
+                [
+                  { key: 'needs', label: 'Needs action', count: unresolved.length, dot: 'bg-[#fbbf24]' },
+                  { key: 'resolved', label: 'Resolved', count: resolved.length, dot: 'bg-[#16a34a]' },
+                ] as const
+              ).map((tab) => {
+                const active = view === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setView(tab.key)}
+                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-5 sm:px-7 py-2.5 rounded-full text-sm font-black uppercase tracking-widest transition-colors ${
+                      active ? 'bg-white text-black shadow' : 'text-zinc-300 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <span aria-hidden="true" className={`w-2.5 h-2.5 rounded-full ${tab.dot}`} />
+                    {tab.label}
+                    <span className="tabular-nums text-zinc-500">
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
 
-            <section className="flex flex-col gap-5">
-              <h2 className="flex items-center gap-3 px-1 text-lg font-black text-white uppercase tracking-widest">
-                <span aria-hidden="true" className="w-3 h-3 rounded-full bg-[#16a34a]" />
-                Resolved ({resolved.length})
-              </h2>
-              {resolved.length === 0 ? (
-                <p className="text-zinc-300 font-medium px-1 italic">No resolved reports.</p>
-              ) : (
-                resolvedVisible.map((report) => renderCard(report, true))
-              )}
-              <Pagination
-                page={resolvedPageShown}
-                total={resolved.length}
-                onChange={setResolvedPage}
-                label="Resolved"
-              />
-            </section>
-          </div>
+            {shown.length === 0 ? (
+              <p className="text-zinc-300 font-medium px-1 italic">
+                {isResolvedView ? 'No resolved reports.' : 'All caught up — nothing pending.'}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-5">
+                {shown.map((report) => renderCard(report, isResolvedView))}
+              </div>
+            )}
+            <Pagination
+              key={view}
+              page={isResolvedView ? resolvedPageShown : needsPageShown}
+              total={isResolvedView ? resolved.length : unresolved.length}
+              onChange={isResolvedView ? setResolvedPage : setNeedsPage}
+              label={isResolvedView ? 'Resolved' : 'Needs action'}
+            />
+          </section>
         )}
       </div>
 
