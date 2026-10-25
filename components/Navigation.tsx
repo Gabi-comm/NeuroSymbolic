@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
@@ -59,6 +59,12 @@ export default function Navigation() {
     return null;
   }, []);
 
+  // Who was signed in before the latest auth event. Supabase fires SIGNED_IN
+  // not only on a real sign-in but again whenever the browser tab regains
+  // focus and the session is re-checked, so the event alone cannot tell a
+  // login from a tab switch.
+  const signedInUserRef = useRef<string | null>(null);
+
   useEffect(() => {
     // As in UploadResultUi: no awaited getSession(). onAuthStateChange fires
     // INITIAL_SESSION on subscribe, which is all this needs, and awaiting an
@@ -68,10 +74,18 @@ export default function Navigation() {
       setAuthUser(session?.user ?? null);
       setAuthChecked(true);
 
+      const previousUserId = signedInUserRef.current;
+      signedInUserRef.current = session?.user?.id ?? null;
+
       if (!session?.user) {
         setDbProfile(null);
         return;
       }
+
+      // Only a transition from signed out to signed in is a login. INITIAL_SESSION
+      // (page load) and the SIGNED_IN that a tab refocus fires both arrive with
+      // the same user already recorded, and must not move the admin off the page.
+      const justSignedIn = event === 'SIGNED_IN' && previousUserId !== session.user.id;
 
       // Deferred out of the callback on purpose. Supabase documents that
       // calling its own methods inside an onAuthStateChange handler can
@@ -81,7 +95,7 @@ export default function Navigation() {
       const userId = session.user.id;
       setTimeout(async () => {
         const profile = await fetchUserProfile(userId);
-        if (event === 'SIGNED_IN' && profile?.role?.toLowerCase() === 'admin') {
+        if (justSignedIn && profile?.role?.toLowerCase() === 'admin') {
           router.push('/admin');
         }
       }, 0);

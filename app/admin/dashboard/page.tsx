@@ -1,20 +1,12 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/utils/supabase';
+import { useAdminSummary, type ReportSummary } from '@/utils/adminData';
 import { SeverityBadge } from '@/components/Severity';
 import { BarTally, TrendLine, type TrendPoint } from '@/components/Charts';
 
-interface Report {
-  id: number | string;
-  damage_type: string | null;
-  severity: string | null;
-  state: string | null;
-  uploadtime: string | null;
-  address: string | null;
-  crack_density_pct: number | null;
-}
+type Report = ReportSummary;
 
 const RANGES = {
   '7d': { label: 'Last 7 days', days: 7, bucket: 'day' as const },
@@ -26,40 +18,12 @@ type RangeKey = keyof typeof RANGES;
 const RESOLVED_STATES = ['resolved', 'done'];
 
 export default function AdminDashboard() {
-  const [reports, setReports] = useState<Report[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // Shared with the Console and usually already loaded by the admin layout;
+  // see utils/adminData. Charts and CSV are computed from it here.
+  const { data, error: loadError } = useAdminSummary();
+  const reports = useMemo(() => data?.reports ?? [], [data]);
+  const isLoading = !data && !loadError;
   const [range, setRange] = useState<RangeKey>('7d');
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchDashboardData = async () => {
-      try {
-        setIsLoading(true);
-        const { data, error } = await supabase
-          .from('FileUpload')
-          .select('id, damage_type, severity, state, uploadtime, address, crack_density_pct')
-          .order('uploadtime', { ascending: false });
-
-        if (error) throw error;
-        if (isMounted) setReports(data ?? []);
-      } catch (err) {
-        if (isMounted) {
-          setLoadError(
-            err instanceof Error ? err.message : 'Could not load reports from the database.'
-          );
-        }
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    };
-
-    fetchDashboardData();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   const stats = useMemo(() => {
     const isResolved = (r: Report) =>

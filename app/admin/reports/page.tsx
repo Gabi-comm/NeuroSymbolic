@@ -8,6 +8,7 @@ import { SeverityBadge } from '@/components/Severity';
 import type { MapReport } from '@/components/ReportsMap';
 import FixReportModal, { type FixableReport } from '@/components/FixReportModal';
 import Coordinates from '@/components/Coordinates';
+import { invalidateAdminSummary } from '@/utils/adminData';
 import Pagination, { PAGE_SIZE, lastPage } from '@/components/Pagination';
 
 const ReportsMap = dynamic(() => import('@/components/ReportsMap'), {
@@ -149,6 +150,8 @@ export default function AdminReports() {
     if (error) {
       setActionError(`Could not update the report: ${error.message}`);
     } else {
+      // The Console and Dashboard counts are cached; make them refetch.
+      invalidateAdminSummary();
       setReports((prev) =>
         prev.map((r) => (String(r.id) === String(id) ? { ...r, state: to } : r))
       );
@@ -667,11 +670,12 @@ export default function AdminReports() {
         <FixReportModal
           report={fixing as FixableReport}
           onClose={() => setFixing(null)}
-          onSaved={(patch) =>
+          onSaved={(patch) => {
+            invalidateAdminSummary();
             setReports((prev) =>
               prev.map((r) => (String(r.id) === String(fixing.id) ? { ...r, ...patch } : r))
-            )
-          }
+            );
+          }}
         />
       )}
 

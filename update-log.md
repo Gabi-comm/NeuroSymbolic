@@ -961,3 +961,8 @@ backend as concrete and as asphalt, `npx tsc --noEmit`, eslint, `npm run build`.
 ## Admin reports: queue toggle — 2026-10-25
 
 - `/admin/reports`: Needs action and Resolved are now a toggle above one full-width list instead of two columns. Each view keeps its own page (5 per page); only the selected view's cards load details. `?report=<id>` switches to the right view and page.
+
+## Fix: tab switch no longer throws the admin back to the console — 2026-10-25
+
+- Cause: `components/Navigation.tsx` sent admins to `/admin` on every `SIGNED_IN` event. Supabase auth-js (2.100) also fires `SIGNED_IN` from `_recoverAndRefresh()` whenever the browser tab becomes visible again, so every tab switch looked like a fresh login.
+- Fix: a ref remembers who was signed in before each auth event; the redirect runs only on a signed-out → signed-in transition. Verified by simulating tab hide/show: old code jumped `/admin/users` → `/admin`, new code stays put across repeated switches.

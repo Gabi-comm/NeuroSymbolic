@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/utils/supabase';
 import { SeverityBadge } from '@/components/Severity';
+import { useAdminSession, useAdminSummary } from '@/utils/adminData';
 
 /**
  * Front door for the admin side.
  *
- * Sits inside app/admin/layout.tsx, which enforces the role check, so this page
- * carries no auth logic of its own.
+ * Sits inside app/admin/layout.tsx, which enforces the role check and hands down
+ * the username, so this page carries no auth logic of its own. Its numbers come
+ * from the summary the layout already started loading (utils/adminData).
  *
  * Leads with what needs doing rather than with totals: an administrator opening
  * this wants to know whether anything is waiting, not how many reports have ever
@@ -22,16 +23,6 @@ interface Stats {
   resolved: number;
   users: number;
   corrected: number;
-}
-
-interface RecentReport {
-  id: number | string;
-  damage_type: string | null;
-  severity: string | null;
-  corrected_severity: string | null;
-  state: string | null;
-  uploadtime: string | null;
-  address: string | null;
 }
 
 const SECTIONS = [
@@ -73,82 +64,27 @@ const SECTIONS = [
 ];
 
 export default function AdminHome() {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [recent, setRecent] = useState<RecentReport[]>([]);
-  const [username, setUsername] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const username = useAdminSession()?.username ?? null;
+  const { data, error: loadError } = useAdminSummary();
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const load = async () => {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (user && isMounted) {
-          const { data: profile } = await supabase
-            .from('UserDetail')
-            .select('username')
-            .eq('userloginuuid', user.id)
-            .maybeSingle();
-          setUsername(profile?.username ?? user.email ?? null);
-        }
-
-        // head:true returns the count without the rows. The dashboard fetches
-        // everything because it also charts it; this page does not need to.
-        const [reports, pending, high, resolved, users, corrected, latest] =
-          await Promise.all([
-            supabase.from('FileUpload').select('id', { count: 'exact', head: true }),
-            supabase
-              .from('FileUpload')
-              .select('id', { count: 'exact', head: true })
-              .neq('state', 'Resolved'),
-            supabase
-              .from('FileUpload')
-              .select('id', { count: 'exact', head: true })
-              .ilike('severity', 'high'),
-            supabase
-              .from('FileUpload')
-              .select('id', { count: 'exact', head: true })
-              .eq('state', 'Resolved'),
-            supabase.from('UserDetail').select('id', { count: 'exact', head: true }),
-            supabase
-              .from('FileUpload')
-              .select('id', { count: 'exact', head: true })
-              .not('corrected_at', 'is', null),
-            supabase
-              .from('FileUpload')
-              .select('id, damage_type, severity, corrected_severity, state, uploadtime, address')
-              .neq('state', 'Resolved')
-              .order('uploadtime', { ascending: false })
-              .limit(4),
-          ]);
-
-        if (isMounted) {
-          setStats({
-            total: reports.count ?? 0,
-            pending: pending.count ?? 0,
-            high: high.count ?? 0,
-            resolved: resolved.count ?? 0,
-            users: users.count ?? 0,
-            corrected: corrected.count ?? 0,
-          });
-          setRecent(latest.data ?? []);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setLoadError(err instanceof Error ? err.message : 'Could not load overview.');
-        }
-      }
+  // Derived from the one summary instead of six count queries. A report with
+  // no state counts as waiting, as it does on the Reports page.
+  const { stats, recent } = useMemo(() => {
+    if (!data) return { stats: null as Stats | null, recent: [] };
+    const { reports } = data;
+    const waiting = reports.filter((r) => r.state !== 'Resolved');
+    return {
+      stats: {
+        total: reports.length,
+        pending: waiting.length,
+        high: reports.filter((r) => (r.severity ?? '').toLowerCase() === 'high').length,
+        resolved: reports.length - waiting.length,
+        users: data.userCount,
+        corrected: reports.filter((r) => r.corrected_at != null).length,
+      },
+      recent: waiting.slice(0, 4),
     };
-
-    load();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  }, [data]);
 
   const nothingWaiting = stats !== null && stats.pending === 0;
 
