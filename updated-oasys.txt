@@ -1,0 +1,1852 @@
+ ▐▛███▛█   Claude Code v2.1.310
+▝▜██████▀  Opus 5.5 · Claude Pro
+ ▝▝   ▝▝   ~\Documents\GitHub\NeuroSymbolic
+
+
+● Since April 2026, new tables need explicit GRANTs to be exposed via the API,
+  and per-user storage folders key off auth.jwt()->>'sub'. Now I'll search for
+  every "Road Cracks"-style wording.
+
+  Searched for 5 patterns, ran 1 shell command (ctrl+o to expand)
+  ⎿  Read ..\..\..\AppData\Local\Temp\claude\C--Users-Gab\0444059f-a96a-4d05-a1b
+     d-6400e17e69e2\scratchpad\probe_api.py (50 lines)
+  ⎿  Read ..\..\..\AppData\Local\Temp\claude\C--Users-Gab\0444059f-a96a-4d05-a1b
+     d-6400e17e69e2\scratchpad\edit_front.py (116 lines)
+  ⎿  Read backend\tests\test_symbolic.py (187 lines)
+  ⎿  Read backend\eval\synthetic_width.py (96 lines)
+  ⎿  Read backend\tools\make_reference_card.py (115 lines)
+  ⎿  Plan file referenced (~\.claude\plans\federated-jumping-parnas.md)
+  ⎿  Skills restored (supabase:supabase)
+
+● The repo has no literal "Road Cracks" text, so I'm renaming the generic
+  "damage" wording to "distress" (route paths and DB columns stay as they are).
+  Then I'll build the Captured Distress section.
+
+● Bash(cat > "$TEMP/claude/C--Users-Gab/0444059f-a96a-4d05-a1bd-6400e17e69e2/scr
+      atchpad/rename.py" <<'EOF'
+      import pathlib…)
+  ⎿  ok
+  ⎿  Updated app\about\page.tsx (+2 -2)
+      31  
+      32  const FEATURES = [
+      33    { title: 'Explainable results', detail: 'Every grade traces t
+          o a rule and a measurement, not a score from a black box.' },
+      34 -  { title: 'Crack density measurement', detail: 'Defect area as
+         - a share of the road surface, not just per-defect size.' },    
+      34 +  { title: 'Distress density measurement', detail: 'Defect area
+         + as a share of the road surface, not just per-defect size.' }, 
+      35    { title: 'Real-world size estimation', detail: 'Lengths in me
+          tres and areas in square metres, not pixels.' },
+      36    { title: 'Automated summary reports', detail: 'A maintenance 
+          bulletin generated locally, with no data leaving the device.' }
+          ,
+      37  ];
+     ...
+      198  
+      199        <div className="flex flex-col sm:flex-row gap-4 justify-
+           center pt-2">
+      200          <Link href="/report-damage" className="btn-blue px-8 p
+           y-4">
+      201 -          Report damage                                       
+      201 +          Report distress                                     
+      202          </Link>
+      203        </div>
+      204      </div>
+  ⎿  Updated app\layout.tsx (+49 -49)
+       1 -import './globals.css';                                        
+       2 -import type { Metadata, Viewport } from 'next';                
+       3 -import Navigation from '@/components/Navigation';              
+       4 -import PageTransition from '@/components/PageTransition';      
+       5 -import AuthNotice from '@/components/AuthNotice';              
+       6 -                                                               
+       7 -// This file was "use client", which opted the entire app out o
+         -f Server                                                       
+       8 -// Components and made a `metadata` export impossible -- the si
+         -te had no title,                                               
+       9 -// no description and no favicon metadata at all. Navigation is
+         - already a client                                              
+      10 -// component, so the directive was never needed here.          
+      11 -//                                                             
+      12 -// The removed logic hid the nav on "/admin/reports/<id>". That
+         - route does not                                                
+      13 -// exist; reports expand inline on /admin/reports, so the condi
+         -tion never fired.                                              
+      14 -                                                               
+      15 -export const metadata: Metadata = {                            
+      16 -  title: {                                                     
+      17 -    default: 'OASYS — Road Damage Assessment',                 
+      18 -    template: '%s · OASYS',                                    
+      19 -  },                                                           
+      20 -  description:                                                 
+      21 -    'Neuro-symbolic AI road damage assessment. Detects potholes
+         - and cracks from ' +                                           
+      22 -    'road images and grades severity against DPWH engineering s
+         -tandards.',                                                    
+      23 -  applicationName: 'OASYS',                                    
+      24 -  keywords: ['road assessment', 'pavement distress', 'DPWH', 'p
+         -othole detection'],                                            
+      25 -  robots: { index: false, follow: false }, // localised researc
+         -h tool, not for search                                         
+      26 -};                                                             
+      27 -                                                               
+      28 -export const viewport: Viewport = {                            
+      29 -  width: 'device-width',                                       
+      30 -  initialScale: 1,                                             
+      31 -  themeColor: '#08090c',                                       
+      32 -};                                                             
+      33 -                                                               
+      34 -export default function RootLayout({ children }: { children: Re
+         -act.ReactNode }) {                                             
+      35 -  return (                                                     
+      36 -    <html lang="en">                                           
+      37 -      <body className="text-white">                            
+      38 -        <a href="#content" className="skip-link">              
+      39 -          Skip to content                                      
+      40 -        </a>                                                   
+     … 58 more lines (ctrl+o to expand)
+  ⎿  Updated app\page.tsx (+81 -81)
+       1 -'use client';                                                  
+       2 -                                                               
+       3 -import { useState } from 'react';                              
+       4 -import Image from 'next/image';                                
+       5 -import Link from 'next/link';                                  
+       6 -                                                               
+       7 -export default function HomePage() {                           
+       8 -  const [offset, setOffset] = useState({ x: 0, y: 0 });        
+       9 -                                                               
+      10 -  // Pointer parallax only. Touch devices get the static map, w
+         -hich is correct:                                               
+      11 -  // there is no hover on a phone and tracking touch here would
+         - fight scrolling.                                              
+      12 -  const handleMouseMove = (e: React.MouseEvent) => {           
+      13 -    const moveX = (e.clientX / window.innerWidth - 0.5) * 30;  
+      14 -    const moveY = (e.clientY / window.innerHeight - 0.5) * 30; 
+      15 -    setOffset({ x: -moveX, y: -moveY });                       
+      16 -  };                                                           
+      17 -                                                               
+      18 -  return (                                                     
+      19 -    <main                                                      
+      20 -      className="relative min-h-screen flex items-center justif
+         -y-center w-full overflow-hidden px-4"                          
+      21 -      onMouseMove={handleMouseMove}                            
+      22 -    >                                                          
+      23 -      <div                                                     
+      24 -        aria-hidden="true"                                     
+      25 -        className="absolute z-0 pointer-events-none transition-
+         -transform duration-75 ease-out motion-reduce:transform-none"   
+      26 -        style={{                                               
+      27 -          width: '110vw',                                      
+      28 -          height: '110vh',                                     
+      29 -          left: '-5vw',                                        
+      30 -          top: '-5vh',                                         
+      31 -          transform: `translate(${offset.x}px, ${offset.y}px)`,
+      32 -        }}                                                     
+      33 -      >                                                        
+      34 -        <iframe                                                
+      35 -          title="Map of South Caloocan City"                   
+      36 -          width="100%"                                         
+      37 -          height="100%"                                        
+      38 -          frameBorder="0"                                      
+      39 -          scrolling="no"                                       
+      40 -          loading="lazy"                                       
+     … 122 more lines (ctrl+o to expand)
+  ⎿  Updated app\report-damage\page.tsx (+1 -1)
+      194          <div className="flex items-start justify-between gap-4
+            mb-6">
+      195            <div>
+      196              <p className="text-oasys-blue font-bold text-sm up
+           percase tracking-wider mb-1">
+      197 -              Report damage                                   
+      197 +              Report distress                                 
+      198              </p>
+      199              <h1 className="text-3xl sm:text-4xl lg:text-5xl fo
+           nt-black text-white leading-tight">
+      200                Where is the damage?
+  ⎿  Updated components\DistressCarousel.tsx (+2 -2)
+      31  
+      32    if (total === 0) {
+      33      return (
+      34 -      <p className="text-center py-8 text-zinc-500 font-bold it
+         -alic">No damage detected.</p>                                  
+      34 +      <p className="text-center py-8 text-zinc-500 font-bold it
+         +alic">No distress detected.</p>                                
+      35      );
+      36    }
+      37  
+     ...
+      63          tabIndex={0}
+      64          role="group"
+      65          aria-roledescription="carousel"
+      66 -        aria-label={`Detected damage, ${index + 1} of ${total}`
+         -}                                                              
+      66 +        aria-label={`Detected distress, ${index + 1} of ${total
+         +}`}                                                            
+      67          onKeyDown={onKeyDown}
+      68          className="grow min-w-0 h-44 overflow-hidden rounded-xl
+           bg-white/60 border border-white/40 focus-visible:ring-2 focus-
+          visible:ring-oasys-blue"
+      69        >
+  ⎿  … 7 more files changed
+
+  Read 3 files, ran 3 shell commands (ctrl+o to expand)
+
+● The wording rename is done. Next I'm writing migration section G: the captures
+  bucket and the captured_distress table.
+
+● Update(migration.sql)
+  ⎿  Added 90 lines
+      389    for each row execute function public.guard_fileupload_gradin
+           g();
+      390  
+      391  
+      392 +-- ===========================================================
+          +=================                                             
+      393 +-- G. Captured Distress (2026-10-22) — NOT YET APPLIED, run in
+          + Supabase                                                     
+      394 +--                                                            
+      395 +-- A reporter on the road photographs the damage now and files
+          + the report                                                   
+      396 +-- later. The photo goes to the private "captures" bucket unde
+          +r the reporter's                                              
+      397 +-- own folder ({auth uid}/{uuid}.jpg); the row keeps where it 
+          +was taken, read                                               
+      398 +-- at the moment of capture, so the report filed later still p
+          +oints at the                                                  
+      399 +-- right spot. reported_at is set once it has been filed. Re-r
+          +unnable.                                                      
+      400 +--                                                            
+      401 +-- New tables are not exposed to the Data API automatically (S
+          +upabase change of                                             
+      402 +-- 2026-04-28), hence the explicit GRANT. RLS limits every row
+          + to its owner;                                                
+      403 +-- the City Engineer can read all of them.                    
+      404 +-- ===========================================================
+          +=================                                             
+      405 +                                                              
+      406 +insert into storage.buckets (id, name, public)                
+      407 +values ('captures', 'captures', false)                        
+      408 +on conflict (id) do nothing;                                  
+      409 +                                                              
+      410 +drop policy if exists "captures: owner reads"   on storage.obj
+          +ects;                                                         
+      411 +drop policy if exists "captures: owner uploads" on storage.obj
+          +ects;                                                         
+      412 +drop policy if exists "captures: owner deletes" on storage.obj
+          +ects;                                                         
+      413 +drop policy if exists "captures: admin reads"   on storage.obj
+          +ects;                                                         
+      414 +                                                              
+      415 +create policy "captures: owner reads" on storage.objects      
+      416 +  for select to authenticated                                 
+      417 +  using (bucket_id = 'captures' and (storage.foldername(name))
+          +[1] = (select auth.uid()::text));                             
+      418 +create policy "captures: owner uploads" on storage.objects    
+      419 +  for insert to authenticated                                 
+      420 +  with check (bucket_id = 'captures' and (storage.foldername(n
+          +ame))[1] = (select auth.uid()::text));                        
+      421 +create policy "captures: owner deletes" on storage.objects    
+      422 +  for delete to authenticated                                 
+      423 +  using (bucket_id = 'captures' and (storage.foldername(name))
+          +[1] = (select auth.uid()::text));                             
+      424 +create policy "captures: admin reads" on storage.objects      
+      425 +  for select to authenticated                                 
+      426 +  using (bucket_id = 'captures' and public.is_admin());       
+      427 +                                                              
+      428 +create table if not exists public.captured_distress (         
+      429 +  id                  uuid primary key default gen_random_uuid
+          +(),                                                           
+      430 +  user_id             uuid not null default auth.uid() referen
+          +ces auth.users (id) on delete cascade,                        
+      431 +  image_path          text not null,                          
+      432 +  file_name           text,                                   
+      433 +  lat                 double precision not null,              
+      434 +  lng                 double precision not null,              
+      435 +  location_accuracy_m double precision,                       
+      436 +  location_source     text not null,                          
+      437 +  address             text,                                   
+      438 +  barangay            text,                                   
+      439 +  road_name           text,                                   
+      440 +  road_class          text,                                   
+      441 +  surface             text,                                   
+      442 +  captured_at         timestamptz not null default now(),     
+      443 +  reported_at         timestamptz                             
+      444 +);                                                            
+      445 +                                                              
+      446 +alter table public.captured_distress drop constraint if exists
+          + captured_distress_location_source_check;                     
+      447 +alter table public.captured_distress add constraint captured_d
+          +istress_location_source_check                                 
+      448 +  check (location_source in ('device_gps', 'photo_exif', 'manu
+          +al_pin'));                                                    
+      449 +alter table public.captured_distress drop constraint if exists
+          + captured_distress_road_class_check;                          
+      450 +alter table public.captured_distress add constraint captured_d
+          +istress_road_class_check                                      
+      451 +  check (road_class is null or road_class in ('national', 'cit
+          +y'));                                                         
+      452 +alter table public.captured_distress drop constraint if exists
+          + captured_distress_surface_check;                             
+      453 +alter table public.captured_distress add constraint captured_d
+          +istress_surface_check                                         
+      454 +  check (surface is null or surface in ('concrete', 'asphalt')
+          +);                                                            
+      455 +                                                              
+      456 +create index if not exists captured_distress_user_idx         
+      457 +  on public.captured_distress (user_id, captured_at desc);    
+      458 +                                                              
+      459 +alter table public.captured_distress enable row level security
+          +;                                                             
+      460 +                                                              
+      461 +drop policy if exists "captured_distress: owner reads"   on pu
+          +blic.captured_distress;                                       
+      462 +drop policy if exists "captured_distress: owner inserts" on pu
+          +blic.captured_distress;                                       
+      463 +drop policy if exists "captured_distress: owner updates" on pu
+          +blic.captured_distress;                                       
+      464 +drop policy if exists "captured_distress: owner deletes" on pu
+          +blic.captured_distress;                                       
+      465 +drop policy if exists "captured_distress: admin reads"   on pu
+          +blic.captured_distress;                                       
+      466 +                                                              
+      467 +create policy "captured_distress: owner reads" on public.captu
+          +red_distress                                                  
+      468 +  for select to authenticated using ((select auth.uid()) = use
+          +r_id);                                                        
+      469 +create policy "captured_distress: owner inserts" on public.cap
+          +tured_distress                                                
+      470 +  for insert to authenticated with check ((select auth.uid()) 
+          += user_id);                                                   
+      471 +create policy "captured_distress: owner updates" on public.cap
+          +tured_distress                                                
+      472 +  for update to authenticated                                 
+      473 +  using ((select auth.uid()) = user_id) with check ((select au
+          +th.uid()) = user_id);                                         
+      474 +create policy "captured_distress: owner deletes" on public.cap
+          +tured_distress                                                
+      475 +  for delete to authenticated using ((select auth.uid()) = use
+          +r_id);                                                        
+      476 +create policy "captured_distress: admin reads" on public.captu
+          +red_distress                                                  
+      477 +  for select to authenticated using (public.is_admin());      
+      478 +                                                              
+      479 +grant select, insert, update, delete on public.captured_distre
+          +ss to authenticated;                                          
+      480 +                                                              
+      481 +                                                              
+      482  -- -----------------------------------------------------------
+           ----------------
+      483  -- Promoting the first administrator
+      484  --
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Now the shared helpers: export the downscale and add a utils/captures.ts data
+  module.
+
+● Bash(python - <<'EOF'
+      import pathlib…)
+  ⎿  ok
+  ⎿  Updated utils\pendingScan.ts (+93 -93)
+       1 -// Single source of truth for the image handed from /report-dam
+         -age to its result page.                                        
+       2 -//                                                             
+       3 -// It replaced two problems:                                   
+       4 -//   1. Two upload flows once wrote different localStorage keys
+         - and the result                                                
+       5 -//      component only read one of them.                       
+       6 -//   2. A raw phone photo base64-encodes to well over the ~5 MB
+         - localStorage                                                  
+       7 -//      quota, so setItem threw and the user got an alert telli
+         -ng them to find a                                              
+       8 -//      smaller image. Downscaling first makes that essentially
+         - impossible.                                                   
+       9 -                                                               
+      10 -const IMAGE_KEY = 'oasys.pendingScan.image';                   
+      11 -const NAME_KEY = 'oasys.pendingScan.filename';                 
+      12 -                                                               
+      13 -/** Longest edge, in pixels, of the image sent for analysis. */
+      14 -const MAX_EDGE = 1600;                                         
+      15 -const JPEG_QUALITY = 0.85;                                     
+      16 -                                                               
+      17 -export interface PendingScan {                                 
+      18 -  image: string;                                               
+      19 -  filename: string;                                            
+      20 -}                                                              
+      21 -                                                               
+      22 -/**                                                            
+      23 - * Downscale to MAX_EDGE and re-encode as JPEG.                
+      24 - *                                                             
+      25 - * The backend warps to a 700x700 bird's-eye view anyway, so an
+         -ything larger is                                               
+      26 - * bytes we pay for twice (localStorage, then the request body)
+         - and never use.                                                
+      27 - */                                                            
+      28 -function downscaleToDataUrl(file: File): Promise<string> {     
+      29 -  return new Promise((resolve, reject) => {                    
+      30 -    const objectUrl = URL.createObjectURL(file);               
+      31 -    const img = new Image();                                   
+      32 -                                                               
+      33 -    img.onload = () => {                                       
+      34 -      URL.revokeObjectURL(objectUrl);                          
+      35 -                                                               
+      36 -      const scale = Math.min(1, MAX_EDGE / Math.max(img.width, 
+         -img.height));                                                  
+      37 -      const canvas = document.createElement('canvas');         
+      38 -      canvas.width = Math.round(img.width * scale);            
+      39 -      canvas.height = Math.round(img.height * scale);          
+      40 -                                                               
+     … 146 more lines (ctrl+o to expand)
+  ⎿  Updated utils\reportLocation.ts (+141 -137)
+        1 -// Where a report is, how that was established, and what kind 
+          -of road it is on.                                             
+        2 -//                                                            
+        3 -// Location sources, most trusted first:                      
+        4 -//   photo_exif  GPS the camera wrote into the photo at the mo
+          -ment of capture                                               
+        5 -//   device_gps  the browser's Geolocation API, read when the 
+          -photo is added                                                
+        6 -//   manual_pin  the reporter placed or dragged the pin themse
+          -lves                                                          
+        7 -//                                                            
+        8 -// EXIF wins over device GPS because it describes where the ph
+          -oto was taken,                                                
+        9 -// not where the reporter is when they upload it. It is a bonu
+          -s rather than the                                             
+       10 -// main source: Messenger, Facebook and some Android pickers s
+          -trip it.                                                      
+       11 -//                                                            
+       12 -// Geolocation needs a secure context. localhost is exempt, a 
+          -LAN address over                                              
+       13 -// plain http is not -- the browser refuses without even askin
+          -g.                                                            
+       14 -                                                              
+       15 -import exifr from 'exifr';                                    
+       16 -                                                              
+       17 -export type LocationSource = 'device_gps' | 'photo_exif' | 'ma
+          -nual_pin';                                                    
+       18 -export type PavementType = 'concrete' | 'asphalt';            
+       19 -                                                              
+       20 -export interface LocationFix {                                
+       21 -  lat: number;                                                
+       22 -  lng: number;                                                
+       23 -  /** Radius of uncertainty in metres; null when unknown (EXIF
+          -, manual pin). */                                             
+       24 -  accuracy_m: number | null;                                  
+       25 -  source: LocationSource;                                     
+       26 -}                                                             
+       27 -                                                              
+       28 -export interface ReportContext extends LocationFix {          
+       29 -  address: string | null;                                     
+       30 -  barangay: string | null;                                    
+       31 -  road_name: string | null;                                   
+       32 -  road_class: 'national' | 'city' | null;                     
+       33 -  pavement_type: PavementType;                                
+       34 -}                                                             
+       35 -                                                              
+       36 -/** The study area's main segment, Samson Road near UE Calooca
+          -n. */                                                         
+       37 -export const DEFAULT_CENTER = { lat: 14.6566, lng: 120.9796 };
+       38 -                                                              
+       39 -/**                                                           
+       40 - * Samson Road (N120) is a concrete national road, so concrete
+          - is the default                                               
+     … 238 more lines (ctrl+o to expand)
+
+● Write(utils\captures.ts)
+  ⎿  Wrote 158 lines to utils\captures.ts
+      1 'use client';
+      3 // Captured Distress: photos taken on the road now and reported l
+        ater.
+      5 // The photo is downscaled the same way a report's is (pendingSca
+        n) and stored
+        er, which is
+      7 // what the storage policies in migration section G check. The ro
+      8 // where the photo was taken at the moment of capture, so a repor
+        t filed hours
+        t of the desk.
+     … +176 lines (ctrl+o to expand)
+
+● Now the /captured-distress page.
+
+● Write(app\captured-distress\page.tsx)
+  ⎿  Wrote 433 lines to app\captured-distress\page.tsx
+       1 'use client';
+       2 
+       3 import { useCallback, useEffect, useRef, useState } from 'react'
+         ;
+       4 import Link from 'next/link';
+       6 import { supabase } from '@/utils/supabase';
+       7 import {
+       8   readExifLocation,
+       9   readDeviceLocation,
+      10   SOURCE_LABEL,
+     … +497 lines (ctrl+o to expand)
+
+● Now wire the report page to load a capture and link to the section.
+
+● Bash(python - <<'EOF'
+      import pathlib…)
+  ⎿  ok
+
+     C:\Users\Gab\Documents\GitHub\NeuroSymbolic\app\captured-distress\page
+     … +6 lines (ctrl+o to expand)
+  ⎿  Updated app\report-damage\page.tsx (+48 -2)
+       1  'use client';
+       2  
+       3 -import { useCallback, useRef, useState } from 'react';         
+       3 +import { useCallback, useEffect, useRef, useState } from 'react
+         +';                                                             
+       4  import Link from 'next/link';
+       5  import dynamic from 'next/dynamic';
+       6  import { Position } from './Map';
+       7  import { savePendingScan } from '@/utils/pendingScan';
+       8 +import { loadCapture, captureFix } from '@/utils/captures';    
+       9  import { useHasAcknowledged, GSD_MM_PX } from '@/utils/captureS
+          ettings';
+      10  import {
+      11    readExifLocation,
+     ...
+      51    const [uploadError, setUploadError] = useState<string | null>
+          (null);
+      52    const [isDragging, setIsDragging] = useState(false);
+      53    const [isPreparing, setIsPreparing] = useState(false);
+      54 +  // Set when the photo came from Captured Distress, so the cap
+         +ture can be                                                    
+      55 +  // marked reported once this report is filed.                
+      56 +  const [captureId, setCaptureId] = useState<string | null>(nul
+         +l);                                                            
+      57  
+      58    const acknowledged = useHasAcknowledged();
+      59    const inputRef = useRef<HTMLInputElement>(null);
+     ...
+      122  
+      123        setUploadError(null);
+      124        setIsPreparing(true);
+      125 +      setCaptureId(null);                                     
+      126        try {
+      127          // EXIF first, from the original file: the downscale s
+           trips metadata.
+      128          const exif = await readExifLocation(file);
+     ...
+      146      [applyFix, fix, locateDevice]
+      147    );
+      148  
+      149 +  // /report-damage?capture=<id>: arriving from Captured Distr
+          +ess. The photo                                                
+      150 +  // and the location recorded when it was taken are loaded in
+          +; the location is                                             
+      151 +  // the capture's, not wherever the reporter is sitting now. 
+      152 +  useEffect(() => {                                           
+      153 +    const id = new URLSearchParams(window.location.search).get
+          +('capture');                                                  
+      154 +    if (!id) return;                                          
+      155 +    let cancelled = false;                                    
+      156 +    (async () => {                                            
+      157 +      setIsPreparing(true);                                   
+     … 49 more lines (ctrl+o to expand)
+  ⎿  Updated components\UploadResultUi.tsx (+6 -0)
+      18  import { savePipelineStages, useHasPipelineStages } from '@/uti
+          ls/pipelineStages';
+      19  import { GSD_MM_PX } from '@/utils/captureSettings';
+      20  import { fromQuery, SOURCE_LABEL, type ReportContext } from '@/
+          utils/reportLocation';
+      21 +import { markCaptureReported } from '@/utils/captures';        
+      22  import { SEVERITY, SEVERITY_RANK, SeverityBadge, toSeverity } f
+          rom './Severity';
+      23  import DistressCarousel from './DistressCarousel';
+      24  
+     ...
+      257        ]);
+      258  
+      259        if (insertError) throw new Error(insertError.message);
+      260 +      if (context.capture_id) {                               
+      261 +        // The report is filed either way; a capture left unma
+          +rked only stays                                               
+      262 +        // in the "waiting" list, so this must not fail the su
+          +bmission.                                                     
+      263 +        await markCaptureReported(context.capture_id).catch(()
+          + => {});                                                      
+      264 +      }                                                       
+      265        setSubmitState('done');
+      266        saveLastResult(window.location.pathname, data, true);
+      267      } catch (error) {
+  ⎿  … 1 more file changed
+
+● Update(app\captured-distress\page.tsx)
+  ⎿  Removed 2 lines
+      88    }, []);
+      89  
+      90    useEffect(() => {
+      91 -    // Loading the list is syncing with Supabase, an external s
+         -ystem.                                                         
+      92 -    // eslint-disable-next-line react-hooks/set-state-in-effect
+      91      if (userId) refresh(userId);
+      92    }, [userId, refresh]);
+      93  
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The build passes. A quick browser check on Gab's dev server:
+
+  Called plugin:chrome-devtools-mcp:chrome-devtools 4 times (ctrl+o to expand)
+
+● I'll add a short entry to update-log.md:
+
+● Bash(cat >> update-log.md <<'EOF'…)
+  ⎿  Updated update-log.md (+8 -0)
+      928  **Verification:** 25 unit tests (`python -m unittest discover 
+           -s tests`),
+      929  synthetic width check, two dataset test images run end to end 
+           through the live
+      930  backend as concrete and as asphalt, `npx tsc --noEmit`, eslint
+           , `npm run build`.
+      931 +                                                              
+      932 +## Captured Distress — 2026-10-22                             
+      933 +                                                              
+      934 +- New page `/captured-distress` (nav: "Captured Distress", sig
+          +ned-in users). Take a photo on the road; it is saved with its 
+          +location (photo EXIF, else device GPS, else a pin) to the priv
+          +ate `captures` bucket and the `captured_distress` table, and l
+          +isted as "Waiting to be reported" / "Already reported".       
+      935 +- "Report this" opens `/report-damage?capture=<id>`, which loa
+          +ds the photo and the location recorded at capture. The report 
+          +page has a "Use a captured photo" link. Submitting sets `repor
+          +ted_at` on the capture (query key `cap`).                     
+      936 +- `utils/captures.ts` holds the storage/table calls; `downscal
+          +eToDataUrl` in `utils/pendingScan.ts` is now exported and reus
+          +ed.                                                           
+      937 +- `migration.sql` section G: bucket, owner-folder storage poli
+          +cies, table with RLS (owner CRUD, City Engineer read) and an e
+          +xplicit GRANT to `authenticated`. Not yet run.                
+      938 +- Wording: "damage" in the UI is now "distress" (titles, headi
+          +ngs, report button, admin labels). Routes and DB columns keep 
+          +their names.                                                  
+
+● I've built the Captured Distress section and changed the wording, but none of
+  the saving works yet because migration section G hasn't been run in Supabase.
+  Until you run it, saving a capture will fail. tsc, eslint and npm run build
+  pass. In the browser I only checked the signed-out page: it renders, the "Sign
+  in to capture" prompt shows, and there are no console errors. I haven't
+  tested taking a photo, saving it or reporting it, because those need the table
+  and bucket first. Nothing is committed.
+
+  What you need to do: run section G of migration.sql in the Supabase SQL
+  Editor. It's the block starting -- G. Captured Distress (2026-10-22), right
+  after section F. Run F first if you haven't yet. Section G creates:
+  - A private captures bucket. Each user uploads to, reads and deletes only
+    their own folder ({user id}/...). The City Engineer can read all of them.
+  - A captured_distress table holding the image path, lat/lng, accuracy,
+    location source, address, barangay, road, surface, captured_at and
+    reported_at. Row security lets each user see and change only their own rows,
+    and lets the City Engineer read all of them.
+  - A GRANT to signed-in users. Since April 2026, Supabase doesn't expose new
+    tables to the app until they're granted, so the page can't reach the table
+    without this.
+
+  How it works:
+  - New page /captured-distress: it appears as "Captured Distress" in the nav
+    for signed-in users.
+    - Taking a photo: "Take a photo" opens the camera. The location comes from
+      the photo's GPS data, or from the device if the photo has none. If both
+      fail you tap the map to pin it, and you can drag the pin to correct it.
+      "Save capture" uploads a downscaled copy and saves the row.
+    - Your list: captures appear under "Waiting to be reported" and "Already
+      reported". Each card has a thumbnail, the date, "Full Address:", the
+      location source, a Report this button and a Delete button that asks you to
+      confirm.
+  - Report page: the Photo panel now has a Use a captured photo link to that
+    section. Report this opens /report-damage?capture=<id>. That loads the saved
+    photo and the location from when it was taken, not where you are now. Once
+    the report is submitted, the capture moves to "Already reported". If you
+    pick a different photo instead, the link to the capture is dropped.
+
+  Wording change: the exact phrase "Road Cracks" doesn't appear anywhere in the
+  app. What it had was "damage", so I took that to be what you meant, and every
+  user-facing "damage" is now "distress". That includes the site title ("OASYS —
+  Road Distress Assessment"), the home tagline, the "Report distress" buttons
+  and headings, "Detected distress", "Road distress report" and "Analyzing road
+  distress". In the admin pages it covers "Distress type breakdown", "Distress
+  type" and the search hint. I also renamed "Crack extent" and "Crack density"
+  to "Distress extent" and "Distress density". Defect names like "Longitudinal
+  Crack" stay as they are, because those are the model's classes and the DPWH
+  terms. URLs such as /report-damage and database columns such as damage_type
+  keep their names. Tell me if you meant something narrower and I'll revert the
+  parts you don't want.
+
+  The new code is in utils/captures.ts and app/captured-distress/page.tsx, and I
+  added an entry to update-log.md.
+✻ Crunched for 6m 33s · done Thursday 8:36 PM
+
+> What you need to do: run section G of migration.sql in the Supabase SQL       
+  Editor. It's the block starting -- G. Captured Distress (2026-10-22), right   
+  after section F. Run F first if you haven't yet. Section G creates:           
+  - A private captures bucket. Each user uploads to, reads and deletes only     
+  their own folder ({user id}/...). The City Engineer can read all of them.     
+  - A captured_distress table holding the image path, lat/lng, accuracy,        
+  location source, address, barangay, road, surface, captured_at and            
+  reported_at. Row security lets each user see and change only their own rows,  
+  and lets the City Engineer read all of them.                                  
+  - A GRANT to signed-in users. Since April 2026, Supabase doesn't expose new   
+  tables to the app until they're granted, so the page can't reach the table    
+  without this.                                                                 
+    how to do                                                                   
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● This is the same way you ran section F.
+
+  1. Open the SQL Editor
+  1. Go to https://supabase.com/dashboard and open the OASYS project (ref
+     vybijjvazuopatbewras).
+  2. Click SQL Editor in the left sidebar, then + New query.
+
+  2. Run section F first, if you haven't already
+
+  Section F is lines 285–391 of migration.sql. Paste it into the query, click
+  Run (or press Ctrl+Enter), and wait for "Success. No rows returned". Then open
+  another + New query for section G.
+
+  3. Copy section G
+
+  I've already copied it into a separate file:
+  C:\Users\Gab\AppData\Local\Temp\claude\C--Users-Gab\0444059f-a96a-4d05-a1bd-64
+  00e17e69e2\scratchpad\section_G.sql
+
+  Open that file, select all with Ctrl+A, and copy with Ctrl+C. You can also
+  copy lines 392–479 of migration.sql, starting at the -- ==== line above -- G. 
+  Captured Distress (2026-10-22) and ending at grant select, insert, update, 
+  delete on public.captured_distress to authenticated;.
+
+  4. Paste and run
+
+  Paste it into the new query and click Run. You should see "Success. No rows
+  returned". If Supabase warns that the query contains destructive operations,
+  that's the drop policy if exists lines. They only remove old copies of these
+  same policies so the script can be run again safely, so click Run this query.
+
+  5. Check that it worked
+
+  Run this in a new query:
+
+  select id, public from storage.buckets where id = 'captures';
+  select relrowsecurity from pg_class where relname = 'captured_distress';
+  select policyname from pg_policies
+  where tablename = 'captured_distress'
+     or (tablename = 'objects' and policyname like 'captures:%');
+
+  You should get:
+  - Bucket: one row, captures | false.
+  - Row security: true.
+  - Policies: 9 names, 5 starting captured_distress: and 4 starting captures:.
+
+  In the dashboard, Storage should now list a captures bucket marked Private,
+  and Table Editor should list captured_distress.
+
+  6. Try it in the app
+
+  Reload http://localhost:3000. Sign in as a normal user (not the admin) and
+  click Captured Distress in the nav. Take or choose a photo, let it find the
+  location, and click Save capture. The capture should appear under "Waiting to
+  be reported". Click Report this and run the report flow through to Submit 
+  report. When you come back, the capture should be under "Already reported".
+
+  If anything fails, send me the exact error text from the SQL Editor or the red
+  message on the page.
+
+✻ Brewed for 21s · done Thursday 8:42 PM
+
+> remove "Follow the capture rule: one lane in frame, camera pointed down the   
+  road."                                                                        
+  "Capture now, report later                                                    
+                                                                                
+  Take a photo of the distress while you are on the road. It is saved with the  
+  location it was taken at, so you can file the report later from anywhere."    
+
+● Bash(python - <<'EOF'
+      import pathlib…)
+  ⎿  ok
+  ⎿  1 file changed (binary, mode only or too large to show)
+
+● I removed both texts from the Captured Distress page
+  (app/captured-distress/page.tsx); type check and lint pass.
+
+  - Page heading: "Capture now, report later" and the paragraph under it are
+    gone. "Captured Distress" was a small label above that heading, and it is
+    now the page heading itself.
+  - New capture panel: the capture-rule line is gone, so the panel shows just
+    "New capture" and the "Take a photo" button.
+
+✻ Worked for 32s · done Thursday 8:45 PM
+
+> my reports section is not working                                             
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+● The /my-reports page link was 404ing because it was never built—it's part of
+  the still-pending Step 2. I'm building it now, and since your existing RLS
+  policy already allows users to read their own rows, no SQL changes are needed.
+
+● Write(app\my-reports\page.tsx)
+  ⎿  Wrote 190 lines to app\my-reports\page.tsx
+       1 'use client';
+       2 
+       3 import { useEffect, useState } from 'react';
+       5 import { supabase } from '@/utils/supabase';
+       6 import { SeverityBadge } from '@/components/Severity';
+       7 import LoginModal from '@/components/LoginModal';
+       8 
+         FileUpload
+      10 // ("edit or delete own upload") already limits a user to their 
+         own rows; the
+     … +219 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● My reports wasn't broken. The page had never been built (it's part of Step 2,
+  which isn't done yet), so the nav link opened a 404. I've built it now. Type
+  check and lint pass and /my-reports loads, but I haven't tried it signed in,
+  so I haven't seen it list real reports.
+
+  What it shows:
+  - Your reports, newest first: a count of reports filed and how many are still
+    awaiting action, with a Report distress button.
+  - Each report:
+    - the photo, the distress type and the severity badge;
+    - a status chip: amber for Needs Action, green for Resolved;
+    - "Full Address:", the DPWH repair activity with its response time, and the
+      date filed.
+  - City Engineer corrections: if the City Engineer corrected the grade, the
+    corrected type and severity are shown, with a "Reviewed by the City
+    Engineer" tag.
+  - Empty and signed-out states: with no reports yet it points you to Report
+    distress and Captured Distress. Signed out, it shows a Sign in button.
+
+  You don't need new SQL for the rows themselves. The existing "edit or delete
+  own upload" policy already limits each user to their own reports. One catch:
+  the page reads the recommendation column, which section F adds. If section F
+  hasn't been run, the page will show "column FileUpload.recommendation does not
+  exist", so run section F first.
+
+  The page is app/my-reports/page.tsx, and nothing is committed.
+
+✻ Crunched for 1m 10s · done Thursday 8:50 PM
+
+> whats step 2?                                                                 
+
+● Step 2 is role-based views, the second of the City Engineer's six changes. The
+  plan's idea is to keep the two database roles you already have (user and
+  admin) and add these on top:
+
+  1. Reporter type at sign-up. The sign-up form (components/LoginModal.tsx) gets
+     a picker: Civilian, Reporter or Inspector. It's saved in
+     UserDetail.user_type, which section F already adds, along with the sign-up
+     trigger that copies it across. Admins can change it on the Users page.
+  2. "admin" becomes "City Engineer" on screen. The nav, the console heading,
+     the users page role chip and its dialog all say City Engineer. The database
+     value stays admin, so nothing breaks.
+  3. A My reports page for users. This is done: it's what I built just now.
+  4. Who filed each report. In the City Engineer's report list, every report
+     shows the filer's username and reporter type.
+  5. Only the City Engineer can correct a grade. The Fix modal is already
+     admin-only, and section F's trigger blocks anyone else from changing
+     severity, state or corrections in the database. That leaves only a check
+     that this holds.
+
+  So the remaining work is items 1, 2 and 4, plus the check in item 5. Section F
+  must be run in Supabase before item 1 can work. Want me to do them now?
+
+✻ Cooked for 6s · done Thursday 8:54 PM
+
+> do step 2 but instead of in the sign up section that will chose which type of 
+  reporter, it should be in the admin side, the city enginer should be the one  
+  who will assign the role                                                      
+
+  Searched for 1 pattern, read 1 file, ran 5 shell commands (ctrl+o to expand)
+
+● Now the edits: wording, users page, filer on reports, and the sign-up trigger.
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Bash(python - <<'EOF'
+      import pathlib…)
+  ⎿  ok
+  ⎿  Updated app\admin\layout.tsx (+80 -80)
+       1 -'use client';                                                  
+       2 -                                                               
+       3 -import { useEffect, useState } from 'react';                   
+       4 -import { useRouter } from 'next/navigation';                   
+       5 -import { supabase } from '@/utils/supabase';                   
+       6 -                                                               
+       7 -type AuthState = 'checking' | 'authorized' | 'denied';         
+       8 -                                                               
+       9 -/**                                                            
+      10 - * Client-side admin gate.                                     
+      11 - *                                                             
+      12 - * This is a UX guard, not a security boundary. It stops a non-
+         -admin from seeing                                              
+      13 - * the console shell, but anyone can bypass it in a debugger. T
+         -he real boundaries                                             
+      14 - * are `proxy.ts` (signed-in check) and, decisively, Supabase R
+         -LS -- the anon key                                             
+      15 - * ships to every browser, so only a database policy actually p
+         -rotects the rows.                                              
+      16 - *                                                             
+      17 - * The previous version read `useRef().current` during render t
+         -o seed state and                                               
+      18 - * looped the effect on its own output. A plain state machine d
+         -oes the same job                                               
+      19 - * without either problem.                                     
+      20 - */                                                            
+      21 -export default function AdminLayout({ children }: { children: R
+         -eact.ReactNode }) {                                            
+      22 -  const [authState, setAuthState] = useState<AuthState>('checki
+         -ng');                                                          
+      23 -  const router = useRouter();                                  
+      24 -                                                               
+      25 -  useEffect(() => {                                            
+      26 -    let isMounted = true;                                      
+      27 -                                                               
+      28 -    const checkAdminStatus = async () => {                     
+      29 -      try {                                                    
+      30 -        const {                                                
+      31 -          data: { user },                                      
+      32 -          error: authError,                                    
+      33 -        } = await supabase.auth.getUser();                     
+      34 -                                                               
+      35 -        if (authError || !user) {                              
+      36 -          if (isMounted) setAuthState('denied');               
+      37 -          router.replace('/');                                 
+      38 -          return;                                              
+      39 -        }                                                      
+      40 -                                                               
+     … 120 more lines (ctrl+o to expand)
+  ⎿  Updated app\admin\page.tsx (+2 -2)
+      61    {
+      62      href: '/admin/users',
+      63      title: 'Users',
+      64 -    detail: 'View accounts and grant or revoke administrator ac
+         -cess.',                                                        
+      64 +    detail: 'View accounts, assign reporter types and grant Cit
+         +y Engineer access.',                                           
+      65      icon: (
+      66        <>
+      67          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+     ...
+      157        <header className="bg-header-gradient text-white rounded
+           -b-[50px] px-4 sm:px-10 pt-28 sm:pt-32 pb-20 shadow-[0_24px_70
+           px_-24px_rgba(59,130,246,0.30)]">
+      158          <div className="max-w-5xl mx-auto">
+      159            <p className="text-oasys-blue text-sm font-bold uppe
+           rcase tracking-widest mb-2">
+      160 -            Admin console                                     
+      160 +            City Engineer console                             
+      161            </p>
+      162            <h1 className="text-3xl sm:text-4xl lg:text-5xl font
+           -black tracking-tight mb-3">
+      163              {username ? `Welcome back, ${username}` : 'Welcome
+            back'}
+  ⎿  Updated app\admin\reports\page.tsx (+33 -0)
+      18  });
+      19  
+      20  interface Report extends MapReport {
+      21 +  userid: string | null;                                       
+      22    uploadtime: string | null;
+      23    image_url: string | null;
+      24    file_name: string | null;
+     ...
+      32    corrected_at: string | null;
+      33  }
+      34  
+      35 +interface Filer {                                              
+      36 +  username: string | null;                                     
+      37 +  user_type: string | null;                                    
+      38 +}                                                              
+      39 +                                                               
+      40  export default function AdminReports() {
+      41    const [reports, setReports] = useState<Report[]>([]);
+      42 +  // Who filed each report, keyed by auth uid (FileUpload.useri
+         +d ->                                                           
+      43 +  // UserDetail.userloginuuid). The City Engineer can read ever
+         +y profile.                                                     
+      44 +  const [filers, setFilers] = useState<Record<string, Filer>>({
+         +});                                                            
+      45    const [isLoading, setIsLoading] = useState(true);
+      46    const [loadError, setLoadError] = useState<string | null>(nul
+          l);
+      47  
+     ...
+      69  
+      70          if (error) throw error;
+      71          if (isMounted) setReports(data ?? []);
+      72 +                                                               
+      73 +        const ids = [...new Set((data ?? []).map((r) => r.useri
+         +d).filter(Boolean))];                                          
+      74 +        if (ids.length) {                                      
+      75 +          const { data: people } = await supabase              
+      76 +            .from('UserDetail')                                
+      77 +            .select('userloginuuid, username, user_type')      
+      78 +            .in('userloginuuid', ids);                         
+      79 +          if (isMounted && people) {                           
+      80 +            setFilers(                                         
+      81 +              Object.fromEntries(                              
+      82 +                people.map((p) => [p.userloginuuid, { username:
+         + p.username, user_type: p.user_type }])                        
+      83 +              )                                                
+      84 +            );                                                 
+      85 +          }                                                    
+     … 19 more lines (ctrl+o to expand)
+  ⎿  Updated components\AuthNotice.tsx (+79 -79)
+       1 -'use client';                                                  
+       2 -                                                               
+       3 -import { Suspense, useEffect, useState } from 'react';         
+       4 -import { useSearchParams } from 'next/navigation';             
+       5 -                                                               
+       6 -/**                                                            
+       7 - * Surfaces the messages the auth redirects carry.             
+       8 - *                                                             
+       9 - * `proxy.ts` sends anonymous visitors away from /admin with `?
+         -signIn=required`,                                              
+      10 - * and `/auth/callback` reports expired or already-used links w
+         -ith `?authError=`.                                             
+      11 - * Nothing rendered either, so both looked like the app had sil
+         -ently ignored the                                              
+      12 - * click — the worst possible feedback for an expired confirmat
+         -ion email.                                                     
+      13 - *                                                             
+      14 - * The message is DERIVED from the query string rather than cop
+         -ied into state in                                              
+      15 - * an effect. The effect that remains only cleans the URL, so a
+         - refresh cannot                                                
+      16 - * resurrect a stale message.                                  
+      17 - */                                                            
+      18 -function AuthNoticeInner() {                                   
+      19 -  const params = useSearchParams();                            
+      20 -  const [dismissed, setDismissed] = useState(false);           
+      21 -                                                               
+      22 -  const authError = params.get('authError');                   
+      23 -  const signInRequired = params.get('signIn') === 'required';  
+      24 -                                                               
+      25 -  const tone: 'error' | 'info' = authError ? 'error' : 'info'; 
+      26 -  const message = authError                                    
+      27 -    ? authError                                                
+      28 -    : signInRequired                                           
+      29 -      ? 'Sign in with an administrator account to open the cons
+         -ole.'                                                          
+      30 -      : null;                                                  
+      31 -                                                               
+      32 -  useEffect(() => {                                            
+      33 -    if (!message) return;                                      
+      34 -                                                               
+      35 -    const url = new URL(window.location.href);                 
+      36 -    url.searchParams.delete('authError');                      
+      37 -    url.searchParams.delete('signIn');                         
+      38 -    window.history.replaceState({}, '', url.toString());       
+      39 -  }, [message]);                                               
+      40 -                                                               
+     … 118 more lines (ctrl+o to expand)
+  ⎿  Updated components\Navigation.tsx (+1 -1)
+      155            <Link
+      156              href={isAdmin ? '/admin' : '/'}
+      157              className="flex items-center gap-2.5 shrink-0"
+      158 -            aria-label={isAdmin ? 'OASYS admin console' : 'OAS
+          -YS home'}                                                     
+      158 +            aria-label={isAdmin ? 'OASYS City Engineer console
+          +' : 'OASYS home'}                                             
+      159            >
+      160              <Image
+      161                src="/oasys-logo-small.png"
+  ⎿  … 2 more files changed
+
+● Now the Users page: City Engineer labels and the reporter-type picker.
+
+● Bash(python - <<'EOF'
+      import pathlib…)
+  ⎿  ok
+     76:      setActionError('You cannot change your own admin status.');
+  ⎿  1 file changed (binary, mode only or too large to show)
+
+● Bash(sed -i "s/'You cannot change your own admin status.'/'You cannot change
+      your own City Engineer access.'/" app/admin/users/page.tsx && grep -n
+      "user_type\|userTy…)
+  ⎿  ✓ Compiled successfully in 15.3s
+     ├ ○ /my-reports
+  ⎿  1 file changed (binary, mode only or too large to show)
+
+● Bash(cat >> update-log.md <<'EOF'…)
+  ⎿  Updated update-log.md (+8 -0)
+      936  - `utils/captures.ts` holds the storage/table calls; `downscal
+           eToDataUrl` in `utils/pendingScan.ts` is now exported and reus
+           ed.
+      937  - `migration.sql` section G: bucket, owner-folder storage poli
+           cies, table with RLS (owner CRUD, City Engineer read) and an e
+           xplicit GRANT to `authenticated`. Not yet run.
+      938  - Wording: "damage" in the UI is now "distress" (titles, headi
+           ngs, report button, admin labels). Routes and DB columns keep 
+           their names.
+      939 +                                                              
+      940 +## Step 2: role views — 2026-10-22                            
+      941 +                                                              
+      942 +- Reporter type (Civilian / Reporter / Inspector) is assigned 
+          +by the City Engineer on `/admin/users`, not picked at sign-up.
+          + Every new account starts as Civilian: section F's `handle_new
+          +_user` no longer reads `user_type` from sign-up metadata.     
+      943 +- On screen the admin role is "City Engineer" (console heading
+          +, users page chip, buttons and dialog, sign-in notice, submit 
+          +messages). The DB value stays `admin`.                        
+      944 +- `/my-reports`: the reporter's own reports with severity, sta
+          +tus, address and repair activity.                             
+      945 +- `/admin/reports`: each report shows who filed it and their r
+          +eporter type.                                                 
+      946 +- Only the City Engineer changes grades, status, roles or repo
+          +rter types: enforced by section F's guard triggers.           
+
+● I've done Step 2 with your change: there's no picker at sign-up, and the City
+  Engineer assigns each user's reporter type. Type check, lint and npm run build
+  all pass. I haven't clicked through it in the browser, because the admin
+  pages need your City Engineer login.
+
+  What changed
+  - Users page (/admin/users): each regular user has a Type dropdown (Civilian,
+    Reporter or Inspector) that saves as soon as you pick one. City Engineer
+    accounts don't get the dropdown.
+  - New accounts: every sign-up starts as Civilian. I changed section F of
+    migration.sql so sign-up always sets Civilian and ignores anything the
+    browser sends. If you've already run section F, run it again so the database
+    gets this version.
+  - "admin" now reads "City Engineer" on screen. This covers:
+    - the console heading ("City Engineer console");
+    - the role chip, now "City Engineer" or "User";
+    - the role buttons, now "Make City Engineer" or "Remove City Engineer", and
+      their confirm dialog;
+    - the sign-in notice;
+    - the messages after a report is submitted.
+
+    The database still stores admin, so nothing else breaks.
+  - Reports page (/admin/reports): every report shows "Filed by username ·
+    reporter type".
+  - My reports: the /my-reports page from earlier is part of this step.
+  - Only the City Engineer can change grades, status, roles or reporter types.
+    Section F's guard triggers enforce this in the database, so a user can't get
+    around it from their browser.
+
+  Before it works
+  1. Run section F in Supabase, or run it again if you already have. Until then
+     the type dropdown will show an error when you change it, because the
+     user_type column doesn't exist yet.
+  2. Sign in as the City Engineer, open Users, change someone's type, then
+     reload the page to check it saved. Then open Reports and check the "Filed
+     by" line.
+
+  The Step 2 entry is in update-log.md, and nothing is committed. The only part
+  of the plan left is Step 4: DPWH severity sorting, filter chips, the days-open
+  badge and coloured map pins.
+✻ Cogitated for 2m 26s · done Thursday 9:03 PM
+
+> im trying to run it Could not reach the analysis backend. Make sure the       
+  Python server is running (uvicorn api:app) and that API_BASE_URL points at it 
+  (currently http://127.0.0.1:8000).                                            
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The Python backend isn't running: nothing is listening on port 8000. I'll
+  start it.
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+● The error happened because the Python analysis server wasn't running. I've
+  started it, and it's answering at http://127.0.0.1:8000. Ollama, which writes
+  the bulletin, is running too. Go back to the report page and click Analyze and
+  review again; the first analysis can take a while.
+
+  The server is tied to this Claude session, so it stops when the session ends.
+  Next time, start it yourself in a separate terminal and keep that window open:
+
+  cd C:\Users\Gab\Documents\GitHub\NeuroSymbolic\backend
+  ..\deps\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8000
+
+  It's ready once you see "Application startup complete".
+
+✻ Crunched for 45s · done Thursday 9:17 PM
+
+> in the reports and result of the analysis, make sure the lng and long of the  
+  images where it is taken is recorded and shown in the admin side and report   
+  side                                                                          
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● I noticed coordinates are already stored with each report but only shown when
+  address lookup fails, so I'll build a shared coordinates display component and
+  add it everywhere reports appear.
+
+● Write(components\Coordinates.tsx)
+  ⎿  Wrote 43 lines to components\Coordinates.tsx
+       1 // Latitude and longitude of where the photo was taken, shown be
+       2 // address everywhere a report appears. The address is a lookup 
+         and can be
+       3 // vague or missing; the coordinates are what was actually recor
+       4 
+       5 interface Props {
+       7   lng: number | null | undefined;
+       8   /** Surface the text sits on. Controls contrast, not meaning. 
+         */
+      10   className?: string;
+     … +41 lines (ctrl+o to expand)
+
+● Bash(python - <<'EOF'
+      import pathlib…)
+  ⎿  ok
+     45:  lat: number | null;
+     46:  lng: number | null;
+     … +7 lines (ctrl+o to expand)
+  ⎿  Updated app\admin\reports\page.tsx (+2 -0)
+       7  import { SeverityBadge } from '@/components/Severity';
+       8  import type { MapReport } from '@/components/ReportsMap';
+       9  import FixReportModal, { type FixableReport } from '@/component
+          s/FixReportModal';
+      10 +import Coordinates from '@/components/Coordinates';            
+      11  
+      12  const ReportsMap = dynamic(() => import('@/components/ReportsMa
+          p'), {
+      13    ssr: false,
+     ...
+      218                {report.address || 'Location unknown'}
+      219                {report.uploadtime && ` · ${new Date(report.uplo
+           adtime).toLocaleDateString('en-GB')}`}
+      220              </p>
+      221 +            <Coordinates lat={report.lat} lng={report.lng} ton
+          +e="light" className="mt-0.5" />                               
+      222              {report.userid && (
+      223                <p className="text-zinc-500 text-xs mt-0.5">
+      224                  Filed by{' '}
+  ⎿  Updated app\captured-distress\page.tsx (+3 -1)
+      18    type CapturedDistress,
+      19  } from '@/utils/captures';
+      20  import LoginModal from '@/components/LoginModal';
+      21 +import Coordinates from '@/components/Coordinates';            
+      22  import type { Position } from '../report-damage/Map';
+      23  
+      24  const MapComponent = dynamic(() => import('../report-damage/Map
+          '), {
+     ...
+      375                  </p>
+      376                  <p className="text-sm text-white leading-snug"
+           >
+      377                    <span className="font-bold">Full Address: </
+           span>
+      377 -                  {c.address ?? `${c.lat.toFixed(5)}, ${c.lng.
+          -toFixed(5)}`}                                                 
+      378 +                  {c.address ?? 'Not found'}                  
+      379                  </p>
+      380 +                <Coordinates lat={c.lat} lng={c.lng} />       
+      381                  <p className="text-xs text-gray-400">
+      382                    {[
+      383                      SOURCE_LABEL[c.location_source],
+  ⎿  Updated app\my-reports\page.tsx (+194 -190)
+        1 -'use client';                                                 
+        2 -                                                              
+        3 -import { useEffect, useState } from 'react';                  
+        4 -import Link from 'next/link';                                 
+        5 -import { supabase } from '@/utils/supabase';                  
+        6 -import { SeverityBadge } from '@/components/Severity';        
+        7 -import LoginModal from '@/components/LoginModal';             
+        8 -                                                              
+        9 -// The reporter's own reports and where each one stands. RLS o
+          -n FileUpload                                                  
+       10 -// ("edit or delete own upload") already limits a user to thei
+          -r own rows; the                                               
+       11 -// userid filter only says so explicitly.                     
+       12 -                                                              
+       13 -interface MyReport {                                          
+       14 -  id: string | number;                                        
+       15 -  uploadtime: string | null;                                  
+       16 -  damage_type: string | null;                                 
+       17 -  severity: string | null;                                    
+       18 -  corrected_damage_type: string | null;                       
+       19 -  corrected_severity: string | null;                          
+       20 -  state: string | null;                                       
+       21 -  address: string | null;                                     
+       22 -  barangay: string | null;                                    
+       23 -  image_url: string | null;                                   
+       24 -  recommendation: { activity?: string; response?: string } | n
+          -ull;                                                          
+       25 -}                                                             
+       26 -                                                              
+       27 -const dateFormat = new Intl.DateTimeFormat('en-PH', { dateStyl
+          -e: 'medium', timeStyle: 'short' });                           
+       28 -                                                              
+       29 -export default function MyReportsPage() {                     
+       30 -  const [userId, setUserId] = useState<string | null>(null);  
+       31 -  const [isLoadingAuth, setIsLoadingAuth] = useState(true);   
+       32 -  const [showLogin, setShowLogin] = useState(false);          
+       33 -                                                              
+       34 -  const [reports, setReports] = useState<MyReport[]>([]);     
+       35 -  const [isLoading, setIsLoading] = useState(false);          
+       36 -  const [loadError, setLoadError] = useState<string | null>(nu
+          -ll);                                                          
+       37 -                                                              
+       38 -  // No awaited auth call: the subscription reports the sessio
+          -n on subscribe.                                               
+       39 -  useEffect(() => {                                           
+       40 -    const { data: listener } = supabase.auth.onAuthStateChange
+          -((_event, session) => {                                       
+     … 344 more lines (ctrl+o to expand)
+  ⎿  Updated app\report-damage\page.tsx (+2 -0)
+      19  } from '@/utils/reportLocation';
+      20  import type { GeocodeResult } from '@/app/api/geocode/route';
+      21  import CaptureGuidelines from '@/components/CaptureGuidelines';
+      22 +import Coordinates from '@/components/Coordinates';            
+      23  
+      24  const MapComponent = dynamic(() => import('./Map'), {
+      25    ssr: false,
+     ...
+      287                    : isFetchingAddress
+      288                      ? 'Looking up address…'
+      289                      : place.address ?? 'Address not found. The
+            pin location is still recorded.'}
+      290 +                {fix && <Coordinates lat={fix.lat} lng={fix.ln
+          +g} className="mt-1" />}                                       
+      291                  {fix && (place.barangay || place.road_name) &&
+            !isFetchingAddress && (
+      292                    <span className="block text-xs text-gray-400
+            mt-1">
+      293                      {[place.road_name, place.road_class && `${
+           place.road_class} road`, place.barangay]
+  ⎿  Updated components\UploadResultUi.tsx (+2 -0)
+       5  import { useRouter } from 'next/navigation';
+       6  import { supabase } from '@/utils/supabase';
+       7  import LoginModal from './LoginModal';
+       8 +import Coordinates from '@/components/Coordinates';            
+       9  import { readPendingScan, clearPendingScan } from '@/utils/pend
+          ingScan';
+      10  import {
+      11    saveLastResult,
+     ...
+      494                    ? context.address ?? `${context.lat.toFixed(
+           5)}, ${context.lng.toFixed(5)}`
+      495                    : 'No location set'}
+      496                </p>
+      497 +              {context && <Coordinates lat={context.lat} lng={
+          +context.lng} className="mt-2" />}                             
+      498                {context && (
+      499                  <p className="text-xs text-gray-500 mt-2 leadi
+           ng-snug">
+      500                    {[
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Bash(python - <<'EOF'
+      import pathlib…)
+  ⎿  ok
+     ✓ Compiled successfully in 11.4s
+  ⎿  Updated components\ReportsMap.tsx (+120 -117)
+        1 -'use client';                                                 
+        2 -                                                              
+        3 -import { MapContainer, TileLayer, Marker, Popup } from 'react-
+          -leaflet';                                                     
+        4 -import 'leaflet/dist/leaflet.css';                            
+        5 -import L from 'leaflet';                                      
+        6 -import { toSeverity } from './Severity';                      
+        7 -                                                              
+        8 -export interface MapReport {                                  
+        9 -  id: number | string;                                        
+       10 -  lat: number | null;                                         
+       11 -  lng: number | null;                                         
+       12 -  damage_type: string | null;                                 
+       13 -  severity: string | null;                                    
+       14 -  state: string | null;                                       
+       15 -  address: string | null;                                     
+       16 -}                                                             
+       17 -                                                              
+       18 -/** Caloocan City — the study area, used when no report has co
+          -ordinates yet. */                                             
+       19 -const DEFAULT_CENTRE: [number, number] = [14.6566, 120.9796]; 
+       20 -                                                              
+       21 -const PIN_COLOUR: Record<string, string> = {                  
+       22 -  Low: '#16a34a',                                             
+       23 -  Medium: '#fbbf24',                                          
+       24 -  High: '#dc2626',                                            
+       25 -};                                                            
+       26 -                                                              
+       27 -/**                                                           
+       28 - * Pins carry a glyph as well as a colour, matching the severi
+          -ty vocabulary used                                            
+       29 - * everywhere else: a map read at a glance is exactly where co
+          -lour-only encoding                                            
+       30 - * fails hardest.                                             
+       31 - */                                                           
+       32 -const PIN_GLYPH: Record<string, string> = {                   
+       33 -  Low: '&#9679;', // circle                                   
+       34 -  Medium: '&#9650;', // triangle                              
+       35 -  High: '&#9632;', // square                                  
+       36 -};                                                            
+       37 -                                                              
+       38 -function pinFor(severity: string | null) {                    
+       39 -  const key = toSeverity(severity) ?? 'Low';                  
+       40 -  const colour = PIN_COLOUR[key];                             
+     … 197 more lines (ctrl+o to expand)
+
+● Latitude and longitude were already being saved with every report, in the lat
+  and lng columns, along with how the location was found (photo GPS, device GPS
+  or a pin you placed). They just weren't shown anywhere unless the address
+  lookup failed. Now they're shown alongside the address wherever a report
+  appears.
+
+  Each place shows Latitude and Longitude to 6 decimals (about 10 cm), plus an
+  Open map link to that exact spot on OpenStreetMap:
+  - Report page: under "Full Address:", updating as the pin moves.
+  - Analysis result page: in the Location card, next to the location source.
+  - My reports: on every report.
+  - Captured Distress: on every capture.
+  - City Engineer's Reports page: on every report card, and the coordinates also
+    appear when you click a pin on the map.
+
+  The display is one shared component, components/Coordinates.tsx. Type check,
+  lint and the build pass, but I haven't looked at the pages in the browser yet,
+  so check that it sits well under the address. Nothing is committed.
+
+✻ Crunched for 1m 28s · done Thursday 9:28 PM
+
+> in the admin section, make a "track report" button it will go to where it is  
+  located, in need action and resolved part and in the long and lng, indicate   
+  it in the shown map                                                           
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● I'll add focus support to the map component, then the button on each card.
+
+● Bash(python - <<'EOF'
+      import pathlib…)
+  ⎿  ok
+               </label>
+               <input
+     … +29 lines (ctrl+o to expand)
+  ⎿  Updated components\ReportsMap.tsx (+70 -16)
+      1  'use client';
+      2  
+      3 -import { MapContainer, TileLayer, Marker, Popup } from 'react-le
+        -aflet';                                                         
+      3 +import { useEffect, useRef } from 'react';                      
+      4 +import { MapContainer, TileLayer, Marker, Popup, useMap } from '
+        +react-leaflet';                                                 
+      5  import 'leaflet/dist/leaflet.css';
+      6  import L from 'leaflet';
+      7  import { toSeverity } from './Severity';
+     ...
+       36    High: '&#9632;', // square
+       37  };
+       38  
+       38 -function pinFor(severity: string | null) {                    
+       39 +function pinFor(severity: string | null, tracked = false) {   
+       40    const key = toSeverity(severity) ?? 'Low';
+       41    const colour = PIN_COLOUR[key];
+       42    const glyph = PIN_GLYPH[key];
+       43    const ink = key === 'Medium' ? '#000' : '#fff';
+       44 +  // The tracked report is bigger and ringed in OASYS blue, so
+          + it stands out                                                
+       45 +  // from neighbours of the same severity.                    
+       46 +  const size = tracked ? 36 : 26;                             
+       47 +  const ring = tracked                                        
+       48 +    ? 'box-shadow:0 0 0 4px #3b82f6,0 0 0 9px rgba(59,130,246,
+          +.35),0 2px 6px rgba(0,0,0,.5);'                               
+       49 +    : 'box-shadow:0 2px 6px rgba(0,0,0,.5);';                 
+       50  
+       51    return L.divIcon({
+       52      className: 'oasys-pin',
+       53      html:
+       47 -      `<div style="background:${colour};color:${ink};width:26p
+          -x;height:26px;` +                                             
+       48 -      `border-radius:999px;border:3px solid #fff;box-shadow:0 
+          -2px 6px rgba(0,0,0,.5);` +                                    
+       49 -      `display:flex;align-items:center;justify-content:center;
+          -font-size:11px;` +                                            
+       54 +      `<div style="background:${colour};color:${ink};width:${s
+          +ize}px;height:${size}px;` +                                   
+       55 +      `border-radius:999px;border:3px solid #fff;${ring}` +   
+       56 +      `display:flex;align-items:center;justify-content:center;
+          +font-size:${tracked ? 14 : 11}px;` +                          
+       57        `line-height:1;font-weight:700">${glyph}</div>`,
+       51 -    iconSize: [26, 26],                                       
+       52 -    iconAnchor: [13, 13],                                     
+       58 +    iconSize: [size, size],                                   
+       59 +    iconAnchor: [size / 2, size / 2],                         
+       60    });
+       61  }
+     … 88 more lines (ctrl+o to expand)
+
+● Bash(python - <<'EOF'
+      import pathlib…)
+  ⎿  ok
+     hasprettier
+     ✓ Compiled successfully in 9.5s
+  ⎿  Updated app\admin\reports\page.tsx (+39 -3)
+      1  'use client';
+      2  
+      3 -import { useState, useEffect, useMemo } from 'react';           
+      3 +import { useState, useEffect, useMemo, useRef } from 'react';   
+      4  import Link from 'next/link';
+      5  import dynamic from 'next/dynamic';
+      6  import { supabase } from '@/utils/supabase';
+     ...
+      49    const [expandedId, setExpandedId] = useState<string | null>(n
+          ull);
+      50    const [searchQuery, setSearchQuery] = useState('');
+      51    const [showMap, setShowMap] = useState(true);
+      52 +  // "Track report": which report the map is following. The non
+         +ce lets the                                                    
+      53 +  // same button fly back to the same report after the map was 
+         +panned away.                                                   
+      54 +  const [tracked, setTracked] = useState<{ id: string; nonce: n
+         +umber } | null>(null);                                         
+      55 +  const mapRef = useRef<HTMLElement>(null);                    
+      56 +                                                               
+      57 +  const trackReport = (report: Report) => {                    
+      58 +    setShowMap(true);                                          
+      59 +    setTracked((prev) => ({ id: String(report.id), nonce: (prev
+         +?.nonce ?? 0) + 1 }));                                         
+      60 +    // After the map section has rendered (it may have been hid
+         +den).                                                          
+      61 +    requestAnimationFrame(() =>                                
+      62 +      mapRef.current?.scrollIntoView({ behavior: 'smooth', bloc
+         +k: 'start' })                                                  
+      63 +    );                                                         
+      64 +  };                                                           
+      65  
+      66    const [pendingAction, setPendingAction] = useState<{
+      67      id: string;
+     ...
+      243              )}
+      244            </div>
+      245  
+      246 +          <div className="flex gap-2 shrink-0">               
+      247 +          <button                                             
+      248 +            onClick={() => trackReport(report)}               
+      249 +            disabled={report.lat == null || report.lng == null
+          +}                                                             
+      250 +            title={report.lat == null || report.lng == null ? 
+          +'This report has no coordinates' : undefined}                 
+      251 +            className={`px-5 py-2 rounded-full font-bold text-
+          +xs transition-all border shrink-0 disabled:opacity-40 disabled
+          +:cursor-not-allowed ${                                        
+      252 +              tracked?.id === String(report.id)               
+      253 +                ? 'bg-blue-50 border-oasys-blue text-blue-700'
+      254 +                : 'border-zinc-300 text-zinc-700 hover:bg-zinc
+          +-100'                                                         
+      255 +            }`}                                               
+      256 +          >                                                   
+     … 37 more lines (ctrl+o to expand)
+
+● Bash(python - <<'EOF'
+      import pathlib…)
+  ⎿  245 269
+  ⎿  Updated app\admin\reports\page.tsx (+23 -23)
+      244            </div>
+      245  
+      246            <div className="flex gap-2 shrink-0">
+      247 -          <button                                             
+      248 -            onClick={() => trackReport(report)}               
+      249 -            disabled={report.lat == null || report.lng == null
+          -}                                                             
+      250 -            title={report.lat == null || report.lng == null ? 
+          -'This report has no coordinates' : undefined}                 
+      251 -            className={`px-5 py-2 rounded-full font-bold text-
+          -xs transition-all border shrink-0 disabled:opacity-40 disabled
+          -:cursor-not-allowed ${                                        
+      252 -              tracked?.id === String(report.id)               
+      253 -                ? 'bg-blue-50 border-oasys-blue text-blue-700'
+      254 -                : 'border-zinc-300 text-zinc-700 hover:bg-zinc
+          --100'                                                         
+      255 -            }`}                                               
+      256 -          >                                                   
+      257 -            Track report                                      
+      258 -          </button>                                           
+      259 -          <button                                             
+      260 -            onClick={() => setExpandedId(isOpen ? null : Strin
+          -g(report.id))}                                                
+      261 -            aria-expanded={isOpen}                            
+      262 -            className={`px-6 py-2 rounded-full font-bold text-
+          -xs transition-all shadow shrink-0 ${                          
+      263 -              isOpen                                          
+      264 -                ? 'bg-zinc-200 text-zinc-700 hover:bg-zinc-300
+          -'                                                             
+      265 -                : 'bg-oasys-blue text-white hover:bg-blue-600'
+      266 -            }`}                                               
+      267 -          >                                                   
+      268 -            {isOpen ? 'Close' : 'Review'}                     
+      269 -          </button>                                           
+      247 +            <button                                           
+      248 +              onClick={() => trackReport(report)}             
+      249 +              disabled={report.lat == null || report.lng == nu
+          +ll}                                                           
+      250 +              title={report.lat == null || report.lng == null 
+          +? 'This report has no coordinates' : undefined}               
+      251 +              className={`px-5 py-2 rounded-full font-bold tex
+          +t-xs transition-all border shrink-0 disabled:opacity-40 disabl
+          +ed:cursor-not-allowed ${                                      
+      252 +                tracked?.id === String(report.id)             
+      253 +                  ? 'bg-blue-50 border-oasys-blue text-blue-70
+          +0'                                                            
+      254 +                  : 'border-zinc-300 text-zinc-700 hover:bg-zi
+          +nc-100'                                                       
+      255 +              }`}                                             
+      256 +            >                                                 
+      257 +              Track report                                    
+      258 +            </button>                                         
+      259 +            <button                                           
+      260 +              onClick={() => setExpandedId(isOpen ? null : Str
+          +ing(report.id))}                                              
+     … 12 more lines (ctrl+o to expand)
+
+● Every report card on the City Engineer's Reports page now has a Track report
+  button. It's there on cards in both the Needs Action and Resolved columns.
+  Type check, lint and the build pass, but I haven't clicked it in the browser
+  because the Reports page needs your City Engineer login.
+
+  What clicking it does:
+  1. Scrolls up to the map, and opens the map first if it was hidden.
+  2. Zooms in on that report's latitude and longitude.
+  3. Marks its pin: the pin gets bigger, gets a blue ring and sits on top of
+     nearby pins.
+  4. Opens the pin's popup, showing the report ID (RPT-…), distress type,
+     severity, status, address and coordinates.
+  5. Shows a blue banner across the top of the map, for example: Tracking 
+     RPT-1A2B3C4D · 14.656600, 120.979600.
+
+  Clicking it again flies back to the report even after you've moved the map.
+  The button is greyed out on any report saved without coordinates.
+
+  Try it: sign in as the City Engineer, open Reports, click Track report on any
+  card, and check that the map lands on that report's pin.
+
+  The changes are in components/ReportsMap.tsx and app/admin/reports/page.tsx,
+  and nothing is committed.
+
+✻ Baked for 1m 45s · done Thursday 9:35 PM
+
+> Instead of City Engineer make it admin                                        
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Bash(python - <<'EOF'
+      import pathlib…)
+  ⎿  ok
+     app/about/page.tsx:121:          Road Condition Assessment Manual and
+     the City Engineer&apos;s validated bands —
+  ⎿  Updated app\admin\layout.tsx (+1 -1)
+      70          aria-live="polite"
+      71        >
+      72          <p className="font-bold tracking-widest uppercase text-
+          sm text-center">
+      73 -          {authState === 'checking' ? 'Verifying City Engineer 
+         -access…' : 'Access denied. Redirecting…'}                      
+      73 +          {authState === 'checking' ? 'Verifying admin access…'
+         + : 'Access denied. Redirecting…'}                              
+      74          </p>
+      75        </div>
+      76      );
+  ⎿  Updated app\admin\page.tsx (+2 -2)
+      61    {
+      62      href: '/admin/users',
+      63      title: 'Users',
+      64 -    detail: 'View accounts, assign reporter types and grant Cit
+         -y Engineer access.',                                           
+      64 +    detail: 'View accounts, assign reporter types and grant adm
+         +in access.',                                                   
+      65      icon: (
+      66        <>
+      67          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+     ...
+      157        <header className="bg-header-gradient text-white rounded
+           -b-[50px] px-4 sm:px-10 pt-28 sm:pt-32 pb-20 shadow-[0_24px_70
+           px_-24px_rgba(59,130,246,0.30)]">
+      158          <div className="max-w-5xl mx-auto">
+      159            <p className="text-oasys-blue text-sm font-bold uppe
+           rcase tracking-widest mb-2">
+      160 -            City Engineer console                             
+      160 +            Admin console                                     
+      161            </p>
+      162            <h1 className="text-3xl sm:text-4xl lg:text-5xl font
+           -black tracking-tight mb-3">
+      163              {username ? `Welcome back, ${username}` : 'Welcome
+            back'}
+  ⎿  Updated app\admin\reports\page.tsx (+1 -1)
+      41  export default function AdminReports() {
+      42    const [reports, setReports] = useState<Report[]>([]);
+      43    // Who filed each report, keyed by auth uid (FileUpload.useri
+          d ->
+      44 -  // UserDetail.userloginuuid). The City Engineer can read ever
+         -y profile.                                                     
+      44 +  // UserDetail.userloginuuid). Admins can read every profile. 
+      45    const [filers, setFilers] = useState<Record<string, Filer>>({
+          });
+      46    const [isLoading, setIsLoading] = useState(true);
+      47    const [loadError, setLoadError] = useState<string | null>(nul
+          l);
+  ⎿  Updated app\my-reports\page.tsx (+1 -1)
+      162                        </span>
+      163                        {r.corrected_severity && (
+      164                          <span className="text-[10px] font-bold
+            text-gray-400 uppercase tracking-wide">
+      165 -                          Reviewed by the City Engineer       
+      165 +                          Reviewed by an admin                
+      166                          </span>
+      167                        )}
+      168                      </div>
+  ⎿  Updated components\AuthNotice.tsx (+1 -1)
+      26    const message = authError
+      27      ? authError
+      28      : signInRequired
+      29 -      ? 'Sign in with a City Engineer account to open the conso
+         -le.'                                                           
+      29 +      ? 'Sign in with an admin account to open the console.'   
+      30        : null;
+      31  
+      32    useEffect(() => {
+  ⎿  … 5 more files changed
+
+● Bash(sed -i 's/^- On screen the admin role is "City Engineer" (console
+      heading, users page chip, buttons and dialog, sign-in notice, submit
+      messages). The DB value s…)
+  ⎿  943:- The admin role is labelled "Admin" on screen (an earlier pass ca
+     lled it "City Engineer"; reverted at Gab's request).
+  ⎿  1 file changed (binary, mode only or too large to show)
+● Everything that said "City Engineer" as a role name now says admin. Type check
+  and lint pass.
+
+  - Console: the heading is "Admin console", and the loading text reads
+    "Verifying admin access…".
+  - Users page: the role chip shows "Admin" or "User", the buttons are Make 
+    admin and Remove admin, and the confirm dialog and messages say admin
+    access.
+  - Elsewhere: the sign-in notice, the messages after submitting a report
+    ("admin review queue"), and the "Reviewed by an admin" tag on My reports.
+  - Database error messages: the guard triggers in migration.sql now say "Only
+    an admin can…". If you've already run section F, run it again to get the new
+    wording.
+
+  I left one mention unchanged on purpose. The About page says the severity
+  bands were validated by the City Engineer. That's the real person who signed
+  off on them, not the role, so it stays. Tell me if you want that changed too.
+
+✻ Cogitated for 43s · done Thursday 9:36 PM
+
+> dont make it really zoomed in track report, its just showing grey if really   
+  zoomed                                                                        
+
+● Bash(python - <<'EOF'
+      import pathlib…)
+  ⎿  ok
+  ⎿  Updated components\ReportsMap.tsx (+4 -1)
+      79    const map = useMap();
+      80    useEffect(() => {
+      81      if (!report || !hasCoords(report)) return;
+      82 -    map.flyTo([report.lat as number, report.lng as number], 19,
+         - { duration: 0.8 });                                           
+      82 +    // Street level, kept below where tile coverage thins out a
+         +nd the map                                                     
+      83 +    // turns grey.                                             
+      84 +    map.flyTo([report.lat as number, report.lng as number], 17,
+         + { duration: 0.8 });                                           
+      85      map.once('moveend', () => markers.current[String(report.id)
+          ]?.openPopup());
+      86    }, [map, report, nonce, markers]);
+      87    return null;
+     ...
+      119          <TileLayer
+      120            attribution='&copy; <a href="https://www.openstreetm
+           ap.org/copyright">OpenStreetMap</a> contributors'
+      121            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.
+           png"
+      122 +          maxZoom={19}                                        
+      123          />
+      124  
+      125          <FollowTracked report={tracked} nonce={trackNonce} mar
+           kers={markers} />
+
+● Track report now zooms to level 17 instead of 19, which is street level with
+  the surrounding roads still visible. The map was going grey because it was
+  zoomed in past where map images load for that area. I haven't checked the new
+  zoom in the browser.
+
+  I also capped manual zoom at 19, the furthest the map images go. Even at 19, a
+  few blocks may still show grey where the map service has no images that
+  close.
+
+  Type check and lint pass. The change is in components/ReportsMap.tsx. If 17 is
+  too far out or too close, tell me a number between 15 (neighbourhood) and 18
+  (closer) and I'll set it.
+
+✻ Sautéed for 19s · done Thursday 9:38 PM
+
+● Background command "Start the FastAPI analysis backend" was stopped because
+the system is running low on memory
+
+● The Python analysis server I started earlier has been stopped. Claude Code
+  shut it down because your computer was running low on memory, not because
+  anything was wrong with it. Until it runs again, analysing a photo will show
+  the "Could not reach the analysis backend" error.
+
+  I haven't restarted it, because memory may still be short. When you want it
+  back, start it yourself in a separate terminal and keep that window open:
+
+  cd C:\Users\Gab\Documents\GitHub\NeuroSymbolic\backend
+  ..\deps\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8000
+
+  It's ready once it prints "Application startup complete". If memory stays
+  tight, closing other heavy programs first will help: the analysis loads YOLOv8
+  and SAM, and Ollama is running too.
+
+✻ Brewed for 7s · done Thursday 10:12 PM
+
+> update readme.md on how to run it                                             
+
+  Searched for 1 pattern, ran 1 shell command (ctrl+o to expand)
+
+● Now I'll rewrite the run section and fix the out-of-date routes and
+  limitations.
+
+● Bash(cat > "$TEMP/claude/readme_run.md" <<'EOF'
+      ## How to run…)
+  ⎿  ok
+     13:## What it does
+     34:## Pipeline
+     … +10 lines (ctrl+o to expand)
+  ⎿  1 file changed (binary, mode only or too large to show)
+
+● I've rewritten the run instructions in README.md. They replace the old
+  "Getting started" section, and they're written for Windows. Nothing is
+  committed.
+
+  The new How to run section covers:
+  - The three programs: a table of what has to be running (Ollama, the Python
+    backend, the website), their ports, and what breaks without each one.
+  - First-time setup:
+    a. Install the tools and pull llama3.2.
+    b. Create the deps Python environment.
+    c. Get the model files, with sizes and the download link.
+    d. Create .env.local, with where to find each Supabase value.
+    e. Run all of migration.sql, including sections F and G.
+    f. Make your first admin account with a one-line SQL command.
+  - Every time: which commands to run in each of the three terminals, how to
+    tell the backend is ready, and the reminder to restart next start after
+    every build.
+  - Using it: Report, Captured Distress, My reports, and the admin console
+    (including Track report). It also explains why GPS won't work from a phone
+    on your Wi-Fi address and you have to pin by hand there.
+  - Tests: the backend tests and the width check, plus tsc, lint and build for
+    the website.
+  - Troubleshooting: the errors you've run into, including "Could not reach the
+    analysis backend", missing columns, saving a capture failing, and "Only an
+    admin can…", each with its fix.
+
+  I also corrected three things that were out of date:
+  - Routes table: the removed Scan page is gone, and /captured-distress and
+    /my-reports are added.
+  - Account note: it now says which features need an account.
+  - Scale limitation: it now mentions the reference card.
+
+  The separate How_to_run.txt file in the repo is now covered by the README. I
+  left it alone; you can delete it if you no longer need it.
+
+✻ Sautéed for 1m 5s · done 8:48 PM
+
+※ recap: I'm working through the City Engineer's revisions to OASYS, and the README now explains how to run it. Your next step is to run all of migration.sql in Supabase, then start the backend and test reporting and Captured Distress. (disable recaps in /config)

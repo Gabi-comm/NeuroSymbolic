@@ -8,6 +8,7 @@ import { SeverityBadge } from '@/components/Severity';
 import type { MapReport } from '@/components/ReportsMap';
 import FixReportModal, { type FixableReport } from '@/components/FixReportModal';
 import Coordinates from '@/components/Coordinates';
+import Pagination, { PAGE_SIZE, lastPage } from '@/components/Pagination';
 
 const ReportsMap = dynamic(() => import('@/components/ReportsMap'), {
   ssr: false,
@@ -18,20 +19,34 @@ const ReportsMap = dynamic(() => import('@/components/ReportsMap'), {
   ),
 });
 
-interface Report extends MapReport {
+// Every report, without its photo or bulletin. A row is a few hundred bytes,
+// so the map can still show every defect and search still covers everything.
+// image_url is a base64 data URL; selecting it for every row was what made
+// this page slow.
+const INDEX_COLUMNS =
+  'id, lat, lng, damage_type, severity, state, address, uploadtime, userid, corrected_damage_type, corrected_severity, correction_note';
+// The rest of a card, fetched only for the cards on the current pages.
+const DETAIL_COLUMNS =
+  'id, file_name, confidence, detection_details, observation_details, crack_density_pct, corrected_at';
+
+interface IndexRow extends MapReport {
   userid: string | null;
   uploadtime: string | null;
-  image_url: string | null;
+  corrected_damage_type: string | null;
+  corrected_severity: string | null;
+  correction_note: string | null;
+}
+
+interface Detail {
   file_name: string | null;
   confidence: number | null;
   detection_details: string | null;
   observation_details: unknown;
   crack_density_pct: number | null;
-  corrected_damage_type: string | null;
-  corrected_severity: string | null;
-  correction_note: string | null;
   corrected_at: string | null;
 }
+
+type Report = IndexRow & Partial<Detail>;
 
 interface Filer {
   username: string | null;
@@ -39,7 +54,12 @@ interface Filer {
 }
 
 export default function AdminReports() {
-  const [reports, setReports] = useState<Report[]>([]);
+  const [reports, setReports] = useState<IndexRow[]>([]);
+  const [details, setDetails] = useState<Record<string, Detail>>({});
+  // Photos, fetched one at a time when a card is opened. undefined = not yet.
+  const [images, setImages] = useState<Record<string, string | null>>({});
+  const [needsPage, setNeedsPage] = useState(1);
+  const [resolvedPage, setResolvedPage] = useState(1);
   // Who filed each report, keyed by auth uid (FileUpload.userid ->
   // UserDetail.userloginuuid). Admins can read every profile.
   const [filers, setFilers] = useState<Record<string, Filer>>({});
@@ -78,25 +98,27 @@ export default function AdminReports() {
         setIsLoading(true);
         const { data, error } = await supabase
           .from('FileUpload')
-          .select('*')
+          .select(INDEX_COLUMNS)
           .order('uploadtime', { ascending: false });
 
         if (error) throw error;
-        if (isMounted) setReports(data ?? []);
+        const rows = (data ?? []) as IndexRow[];
+        if (!isMounted) return;
+        setReports(rows);
 
-        const ids = [...new Set((data ?? []).map((r) => r.userid).filter(Boolean))];
-        if (ids.length) {
-          const { data: people } = await supabase
-            .from('UserDetail')
-            .select('userloginuuid, username, user_type')
-            .in('userloginuuid', ids);
-          if (isMounted && people) {
-            setFilers(
-              Object.fromEntries(
-                people.map((p) => [p.userloginuuid, { username: p.username, user_type: p.user_type }])
-              )
-            );
+        // Deep link from the dashboard's Review button: /admin/reports?report=<id>.
+        // Open the page of the column the report is in, so the card is on screen.
+        const target = new URLSearchParams(window.location.search).get('report');
+        if (target) {
+          const hit = rows.find((r) => String(r.id) === target);
+          if (hit) {
+            const isResolved = hit.state === 'Resolved';
+            const column = rows.filter((r) => (r.state === 'Resolved') === isResolved);
+            const page = Math.floor(column.indexOf(hit) / PAGE_SIZE) + 1;
+            if (isResolved) setResolvedPage(page);
+            else setNeedsPage(page);
           }
+          setExpandedId(target);
         }
       } catch (err) {
         if (isMounted) {
@@ -108,10 +130,6 @@ export default function AdminReports() {
     };
 
     fetchReports();
-
-    // Deep link from the dashboard's Review button: /admin/reports?report=<id>
-    const target = new URLSearchParams(window.location.search).get('report');
-    if (target) setExpandedId(target);
 
     return () => {
       isMounted = false;
@@ -188,11 +206,86 @@ export default function AdminReports() {
     );
   }, [reports, searchQuery]);
 
-  const unresolved = filtered.filter((r) => r.state !== 'Resolved');
-  const resolved = filtered.filter((r) => r.state === 'Resolved');
+  const unresolved = useMemo(() => filtered.filter((r) => r.state !== 'Resolved'), [filtered]);
+  const resolved = useMemo(() => filtered.filter((r) => r.state === 'Resolved'), [filtered]);
 
-  const renderCard = (report: Report, isResolvedColumn: boolean) => {
+  // A resolve, reopen or search can shrink a column below the page it is on.
+  const needsPageShown = Math.min(needsPage, lastPage(unresolved.length));
+  const resolvedPageShown = Math.min(resolvedPage, lastPage(resolved.length));
+  const needsVisible = unresolved.slice((needsPageShown - 1) * PAGE_SIZE, needsPageShown * PAGE_SIZE);
+  const resolvedVisible = resolved.slice(
+    (resolvedPageShown - 1) * PAGE_SIZE,
+    resolvedPageShown * PAGE_SIZE
+  );
+  // A stable key, so the detail fetch runs when the cards change, not every render.
+  const visibleKey = [...needsVisible, ...resolvedVisible].map((r) => String(r.id)).join(',');
+
+  // Details and filers for the cards on screen only, at most 10 rows.
+  useEffect(() => {
+    const ids = visibleKey ? visibleKey.split(',') : [];
+    const missing = ids.filter((id) => !(id in details));
+    const people = [
+      ...new Set(
+        reports
+          .filter((r) => ids.includes(String(r.id)) && r.userid && !(r.userid in filers))
+          .map((r) => r.userid as string)
+      ),
+    ];
+    if (!missing.length && !people.length) return;
+    let cancelled = false;
+    (async () => {
+      if (missing.length) {
+        const { data } = await supabase.from('FileUpload').select(DETAIL_COLUMNS).in('id', missing);
+        if (!cancelled && data) {
+          setDetails((prev) => ({
+            ...prev,
+            ...Object.fromEntries(data.map(({ id, ...rest }) => [String(id), rest as Detail])),
+          }));
+        }
+      }
+      if (people.length) {
+        const { data } = await supabase
+          .from('UserDetail')
+          .select('userloginuuid, username, user_type')
+          .in('userloginuuid', people);
+        if (!cancelled && data) {
+          setFilers((prev) => ({
+            ...prev,
+            ...Object.fromEntries(
+              data.map((p) => [p.userloginuuid, { username: p.username, user_type: p.user_type }])
+            ),
+          }));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // details and filers are caches read only to skip what is already loaded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleKey, reports]);
+
+  // The photo of the open card, fetched once.
+  useEffect(() => {
+    if (!expandedId || expandedId in images) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('FileUpload')
+        .select('image_url')
+        .eq('id', expandedId)
+        .maybeSingle();
+      if (!cancelled) setImages((prev) => ({ ...prev, [expandedId]: data?.image_url ?? null }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [expandedId, images]);
+
+  const renderCard = (row: IndexRow, isResolvedColumn: boolean) => {
+    const report: Report = { ...details[String(row.id)], ...row };
     const isOpen = expandedId === String(report.id);
+    const image = images[String(report.id)];
     const observations = parseObservations(report.observation_details);
 
     return (
@@ -274,10 +367,14 @@ export default function AdminReports() {
           <div className="border-t border-gray-200 pt-5 mt-5 flex flex-col lg:flex-row gap-5">
             <div className="w-full lg:w-1/2 flex flex-col gap-2">
               <div className="w-full aspect-video bg-black rounded-xl overflow-hidden">
-                {report.image_url ? (
+                {image === undefined ? (
+                  <p className="w-full h-full flex items-center justify-center text-gray-500 text-sm font-bold animate-pulse">
+                    Loading image…
+                  </p>
+                ) : image ? (
                   // eslint-disable-next-line @next/next/no-img-element -- base64 data URL from the API
                   <img
-                    src={report.image_url}
+                    src={image}
                     alt={`Analysed road image for report ${report.id}`}
                     className="w-full h-full object-contain"
                   />
@@ -294,7 +391,7 @@ export default function AdminReports() {
                 <span className="whitespace-nowrap shrink-0">
                   <span className="font-bold text-zinc-500">Confidence </span>
                   <span className="text-blue-700 font-black">
-                    {formatConfidence(report.confidence)}
+                    {formatConfidence(report.confidence ?? null)}
                   </span>
                 </span>
               </div>
@@ -414,7 +511,11 @@ export default function AdminReports() {
             id="search"
             type="search"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setNeedsPage(1);
+              setResolvedPage(1);
+            }}
             placeholder="Search by location, severity, distress type or ID…"
             className="grow bg-white rounded-full px-6 py-3.5 text-black font-bold shadow-lg focus:outline-none focus:ring-4 focus:ring-oasys-blue/50 placeholder-gray-400"
           />
@@ -477,8 +578,14 @@ export default function AdminReports() {
                   All caught up — nothing pending.
                 </p>
               ) : (
-                unresolved.map((report) => renderCard(report, false))
+                needsVisible.map((report) => renderCard(report, false))
               )}
+              <Pagination
+                page={needsPageShown}
+                total={unresolved.length}
+                onChange={setNeedsPage}
+                label="Needs action"
+              />
             </section>
 
             <section className="flex flex-col gap-5">
@@ -489,8 +596,14 @@ export default function AdminReports() {
               {resolved.length === 0 ? (
                 <p className="text-zinc-300 font-medium px-1 italic">No resolved reports.</p>
               ) : (
-                resolved.map((report) => renderCard(report, true))
+                resolvedVisible.map((report) => renderCard(report, true))
               )}
+              <Pagination
+                page={resolvedPageShown}
+                total={resolved.length}
+                onChange={setResolvedPage}
+                label="Resolved"
+              />
             </section>
           </div>
         )}

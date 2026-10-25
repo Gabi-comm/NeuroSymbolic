@@ -944,3 +944,11 @@ backend as concrete and as asphalt, `npx tsc --noEmit`, eslint, `npm run build`.
 - `/my-reports`: the reporter's own reports with severity, status, address and repair activity.
 - `/admin/reports`: each report shows who filed it and their reporter type.
 - Only the City Engineer changes grades, status, roles or reporter types: enforced by section F's guard triggers.
+
+## Paging: lighter list loads — 2026-10-25
+
+- `components/Pagination.tsx` (new): Prev/Next controls, "Showing x–y of n", `PAGE_SIZE = 5`, `pageRange()` / `lastPage()` helpers.
+- `/my-reports`: 5 reports per page via `.range()` + `count: 'exact'`; "awaiting action" is a head-only count.
+- `/captured-distress`: "Waiting to be reported" and "Already reported" page separately, 5 each; `listCaptures(userId, { reported, page })` returns `{ rows, total }`. Only the thumbnails on screen are signed.
+- `/admin/reports`: loads a light index of every report (no `image_url`, no bulletin) for the map, search and counts, so Defect locations still shows every defect. Needs action and Resolved page 5 at a time; card details load only for visible cards, and the photo only when a card is opened (Review). `?report=<id>` opens on the right page.
+- `/admin/users`: filter chips All / Civilian / Reporter / Inspector / Admin with counts (null type counts as Civilian), 5 accounts per page from the server.

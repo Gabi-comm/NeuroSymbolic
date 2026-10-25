@@ -10,6 +10,7 @@
 
 import { supabase } from '@/utils/supabase';
 import { downscaleToDataUrl } from '@/utils/pendingScan';
+import { pageRange } from '@/components/Pagination';
 import type { LocationFix, LocationSource, PavementType } from '@/utils/reportLocation';
 import type { GeocodeResult } from '@/app/api/geocode/route';
 
@@ -88,15 +89,26 @@ export async function saveCapture(
   return data as CapturedDistress;
 }
 
-/** The signed-in reporter's captures, newest first (RLS scopes the rows). */
-export async function listCaptures(userId: string): Promise<CapturedDistress[]> {
-  const { data, error } = await supabase
+/**
+ * One page of the signed-in reporter's captures, newest first (RLS scopes the
+ * rows). Waiting and already-reported captures are paged separately, so each
+ * section loads only its own few thumbnails.
+ */
+export async function listCaptures(
+  userId: string,
+  { reported, page }: { reported: boolean; page: number }
+): Promise<{ rows: CapturedDistress[]; total: number }> {
+  const [from, to] = pageRange(page);
+  let query = supabase
     .from(TABLE)
-    .select('*')
-    .eq('user_id', userId)
-    .order('captured_at', { ascending: false });
+    .select('*', { count: 'exact' })
+    .eq('user_id', userId);
+  query = reported ? query.not('reported_at', 'is', null) : query.is('reported_at', null);
+  const { data, error, count } = await query
+    .order('captured_at', { ascending: false })
+    .range(from, to);
   if (error) throw new Error(error.message);
-  return (data ?? []) as CapturedDistress[];
+  return { rows: (data ?? []) as CapturedDistress[], total: count ?? 0 };
 }
 
 /** Short-lived links for the thumbnails, keyed by storage path. */

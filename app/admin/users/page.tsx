@@ -2,9 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/utils/supabase';
+import Pagination, { pageRange } from '@/components/Pagination';
 
 interface UserProfile {
-  userloginuuid: string;
+  // The primary key. userloginuuid is null on older accounts, so it cannot
+  // key the list or target an update.
+  id: number;
+  userloginuuid: string | null;
   username: string | null;
   email: string | null;
   role: string | null;
@@ -17,6 +21,23 @@ const USER_TYPES = ['Civilian', 'Reporter', 'Inspector'] as const;
 
 const roleLabel = (role: string) => (role === 'admin' ? 'Admin' : 'User');
 
+const FILTERS = ['All', ...USER_TYPES, 'Admin'] as const;
+type Filter = (typeof FILTERS)[number];
+
+/**
+ * Narrow a UserDetail query to one filter. Reporter types only describe
+ * non-admin accounts, and a null type is shown (and counted) as Civilian.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- the builder's generic type is unwieldy
+function applyFilter<Q extends { eq: any; or: any }>(query: Q, filter: Filter): Q {
+  if (filter === 'All') return query;
+  if (filter === 'Admin') return query.eq('role', 'admin');
+  const nonAdmin = query.or('role.is.null,role.neq.admin');
+  return filter === 'Civilian'
+    ? nonAdmin.or('user_type.is.null,user_type.eq.Civilian')
+    : nonAdmin.eq('user_type', filter);
+}
+
 export default function UserManagementPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,29 +48,65 @@ export default function UserManagementPage() {
   // dismissed with a click outside, and reads poorly to screen readers.
   const [pending, setPending] = useState<{ user: UserProfile; newRole: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [savingType, setSavingType] = useState<string | null>(null);
+  const [savingType, setSavingType] = useState<number | null>(null);
 
-  const adminCount = users.filter((u) => (u.role || '').toLowerCase() === 'admin').length;
+  // 5 accounts per page, fetched per filter; the chips carry the counts.
+  const [filter, setFilter] = useState<Filter>('All');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [counts, setCounts] = useState<Partial<Record<Filter, number>>>({});
+  // Bumped after a role or type change: the account may now belong to
+  // another filter, so the page and the counts are fetched again.
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const adminCount = counts.Admin ?? 0;
+  const accountCount = counts.All ?? 0;
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setCurrentAdminId(user.id);
+    });
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
+    (async () => {
+      const results = await Promise.all(
+        FILTERS.map((f) =>
+          applyFilter(supabase.from('UserDetail').select('id', { count: 'exact', head: true }), f)
+        )
+      );
+      if (isMounted) setCounts(Object.fromEntries(FILTERS.map((f, i) => [f, results[i].count ?? 0])));
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [reloadKey]);
 
-    const fetchInitialData = async () => {
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
       try {
         setIsLoading(true);
-
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (user && isMounted) setCurrentAdminId(user.id);
-
-        const { data, error } = await supabase
-          .from('UserDetail')
-          .select('*')
-          .order('username', { ascending: true });
+        setLoadError(null);
+        const [from, to] = pageRange(page);
+        const { data, error, count } = await applyFilter(
+          supabase.from('UserDetail').select('*', { count: 'exact' }),
+          filter
+        )
+          .order('username', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to);
 
         if (error) throw error;
-        if (isMounted) setUsers(data ?? []);
+        if (!isMounted) return;
+        // A change can empty the last page; step back to the one before it.
+        if ((data ?? []).length === 0 && page > 1) {
+          setPage(page - 1);
+          return;
+        }
+        setUsers(data ?? []);
+        setTotal(count ?? 0);
       } catch (err) {
         if (isMounted) {
           setLoadError(err instanceof Error ? err.message : 'Could not load users.');
@@ -57,13 +114,13 @@ export default function UserManagementPage() {
       } finally {
         if (isMounted) setIsLoading(false);
       }
-    };
-
-    fetchInitialData();
+    })();
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [filter, page, reloadKey]);
+
+  const reload = () => setReloadKey((k) => k + 1);
 
   const applyRoleChange = async () => {
     if (!pending) return;
@@ -80,35 +137,32 @@ export default function UserManagementPage() {
     const { error } = await supabase
       .from('UserDetail')
       .update({ role: newRole })
-      .eq('userloginuuid', user.userloginuuid);
+      .eq('id', user.id);
 
     if (error) {
       setActionError(`Could not update the role: ${error.message}`);
     } else {
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.userloginuuid === user.userloginuuid ? { ...u, role: newRole } : u
-        )
-      );
+      reload();
     }
     setPending(null);
   };
 
   const applyUserType = async (user: UserProfile, userType: string) => {
     setActionError(null);
-    setSavingType(user.userloginuuid);
+    setSavingType(user.id);
     const { error } = await supabase
       .from('UserDetail')
       .update({ user_type: userType })
-      .eq('userloginuuid', user.userloginuuid);
+      .eq('id', user.id);
     if (error) {
       setActionError(`Could not update the reporter type: ${error.message}`);
     } else {
       setUsers((prev) =>
         prev.map((u) =>
-          u.userloginuuid === user.userloginuuid ? { ...u, user_type: userType } : u
+          u.id === user.id ? { ...u, user_type: userType } : u
         )
       );
+      reload();
     }
     setSavingType(null);
   };
@@ -131,12 +185,12 @@ export default function UserManagementPage() {
             Users
           </h1>
           <p className="text-lg text-gray-300 max-w-2xl">
-            {isLoading ? (
+            {counts.All === undefined ? (
               <span className="text-gray-500">Loading accounts…</span>
             ) : (
               <>
                 <strong className="text-white">
-                  {users.length} account{users.length === 1 ? '' : 's'}
+                  {accountCount} account{accountCount === 1 ? '' : 's'}
                 </strong>
                 {adminCount > 0 && (
                   <>
@@ -163,19 +217,49 @@ export default function UserManagementPage() {
             </div>
           )}
 
-          {isLoading ? (
+          <div role="group" aria-label="Filter accounts" className="flex flex-wrap gap-2 mb-4">
+            {FILTERS.map((f) => (
+              <button
+                key={f}
+                type="button"
+                aria-pressed={filter === f}
+                onClick={() => {
+                  setFilter(f);
+                  setPage(1);
+                }}
+                className={`px-4 py-2 rounded-full text-xs font-bold border transition-colors ${
+                  filter === f
+                    ? 'bg-oasys-blue text-white border-oasys-blue'
+                    : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10'
+                }`}
+              >
+                {f}
+                {counts[f] !== undefined && (
+                  <span className={filter === f ? 'text-blue-100' : 'text-gray-500'}> {counts[f]}</span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {isLoading && users.length === 0 ? (
             <p className="text-center text-gray-500 font-bold py-10">Loading users…</p>
           ) : users.length === 0 ? (
-            <p className="text-center text-gray-400 font-bold py-10">No users found.</p>
+            <p className="text-center text-gray-400 font-bold py-10">
+              {filter === 'All' ? 'No users found.' : `No ${filter.toLowerCase()} accounts.`}
+            </p>
           ) : (
-            <ul className="flex flex-col divide-y divide-white/5">
+            <ul
+              className={`flex flex-col divide-y divide-white/5 transition-opacity ${
+                isLoading ? 'opacity-50' : ''
+              }`}
+            >
               {users.map((user) => {
                 const role = (user.role || 'user').toLowerCase();
-                const isSelf = user.userloginuuid === currentAdminId;
+                const isSelf = user.userloginuuid != null && user.userloginuuid === currentAdminId;
 
                 return (
                   <li
-                    key={user.userloginuuid}
+                    key={user.id}
                     className="flex flex-col sm:flex-row sm:items-center gap-3 py-4"
                   >
                     <div className="grow min-w-0">
@@ -191,7 +275,7 @@ export default function UserManagementPage() {
                         <span className="sr-only sm:not-sr-only">Type</span>
                         <select
                           value={user.user_type ?? 'Civilian'}
-                          disabled={savingType === user.userloginuuid}
+                          disabled={savingType === user.id}
                           onChange={(e) => applyUserType(user, e.target.value)}
                           aria-label={`Reporter type for ${user.username || user.email || 'this user'}`}
                           className="bg-zinc-800 text-white border border-white/15 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-60"
@@ -234,6 +318,10 @@ export default function UserManagementPage() {
               })}
             </ul>
           )}
+
+          <div className="mt-4">
+            <Pagination page={page} total={total} onChange={setPage} label="Accounts" />
+          </div>
         </div>
       </div>
 

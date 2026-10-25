@@ -19,6 +19,7 @@ import {
 } from '@/utils/captures';
 import LoginModal from '@/components/LoginModal';
 import Coordinates from '@/components/Coordinates';
+import Pagination, { lastPage } from '@/components/Pagination';
 import type { Position } from '../report-damage/Map';
 
 const MapComponent = dynamic(() => import('../report-damage/Map'), {
@@ -35,6 +36,13 @@ interface Draft {
   preview: string;
 }
 
+interface Section {
+  rows: CapturedDistress[];
+  total: number;
+}
+
+const EMPTY: Section = { rows: [], total: 0 };
+
 const dateFormat = new Intl.DateTimeFormat('en-PH', {
   dateStyle: 'medium',
   timeStyle: 'short',
@@ -45,7 +53,13 @@ export default function CapturedDistressPage() {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
 
-  const [captures, setCaptures] = useState<CapturedDistress[]>([]);
+  // Waiting and already-reported captures page independently, 5 at a time,
+  // so only the thumbnails on screen are signed and downloaded.
+  const [pending, setPending] = useState<Section>(EMPTY);
+  const [reported, setReported] = useState<Section>(EMPTY);
+  const [pendingPage, setPendingPage] = useState(1);
+  const [reportedPage, setReportedPage] = useState(1);
+  const [reloadKey, setReloadKey] = useState(0);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
@@ -74,23 +88,46 @@ export default function CapturedDistressPage() {
     };
   }, []);
 
-  const refresh = useCallback(async (uid: string) => {
-    setIsLoadingList(true);
-    setListError(null);
-    try {
-      const rows = await listCaptures(uid);
-      setCaptures(rows);
-      setThumbs(await signedUrls(rows.map((r) => r.image_path)));
-    } catch (err) {
-      setListError(err instanceof Error ? err.message : 'Could not load your captures.');
-    } finally {
-      setIsLoadingList(false);
-    }
-  }, []);
-
   useEffect(() => {
-    if (userId) refresh(userId);
-  }, [userId, refresh]);
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      setIsLoadingList(true);
+      setListError(null);
+      try {
+        const [p, r] = await Promise.all([
+          listCaptures(userId, { reported: false, page: pendingPage }),
+          listCaptures(userId, { reported: true, page: reportedPage }),
+        ]);
+        if (cancelled) return;
+        // A delete can empty the last page; step back to the one before it.
+        if (p.rows.length === 0 && pendingPage > lastPage(p.total)) {
+          setPendingPage(lastPage(p.total));
+          return;
+        }
+        if (r.rows.length === 0 && reportedPage > lastPage(r.total)) {
+          setReportedPage(lastPage(r.total));
+          return;
+        }
+        const urls = await signedUrls([...p.rows, ...r.rows].map((c) => c.image_path));
+        if (cancelled) return;
+        setPending(p);
+        setReported(r);
+        setThumbs(urls);
+      } catch (err) {
+        if (!cancelled) {
+          setListError(err instanceof Error ? err.message : 'Could not load your captures.');
+        }
+      } finally {
+        if (!cancelled) setIsLoadingList(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, pendingPage, reportedPage, reloadKey]);
+
+  const reload = () => setReloadKey((k) => k + 1);
 
   const locateDevice = useCallback(async () => {
     setIsLocating(true);
@@ -145,7 +182,9 @@ export default function CapturedDistressPage() {
     try {
       await saveCapture(draft.file, fix, userId);
       discardDraft();
-      await refresh(userId);
+      // The new capture is the newest, so it is on the first page.
+      setPendingPage(1);
+      reload();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not save the capture.');
     } finally {
@@ -161,14 +200,11 @@ export default function CapturedDistressPage() {
     setConfirmingDelete(null);
     try {
       await deleteCapture(capture);
-      setCaptures((prev) => prev.filter((c) => c.id !== capture.id));
+      reload();
     } catch (err) {
       setListError(err instanceof Error ? err.message : 'Could not delete the capture.');
     }
   };
-
-  const pending = captures.filter((c) => !c.reported_at);
-  const reported = captures.filter((c) => c.reported_at);
 
   return (
     <div className="pt-28 sm:pt-32 px-4 sm:px-10 pb-16 min-h-screen">
@@ -305,16 +341,22 @@ export default function CapturedDistressPage() {
             <CaptureList
               title="Waiting to be reported"
               empty={isLoadingList ? 'Loading…' : 'Nothing captured yet.'}
-              captures={pending}
+              section={pending}
+              page={pendingPage}
+              onPageChange={setPendingPage}
+              isLoading={isLoadingList}
               thumbs={thumbs}
               confirmingDelete={confirmingDelete}
               onDelete={remove}
             />
-            {reported.length > 0 && (
+            {reported.total > 0 && (
               <CaptureList
                 title="Already reported"
                 empty=""
-                captures={reported}
+                section={reported}
+                page={reportedPage}
+                onPageChange={setReportedPage}
+                isLoading={isLoadingList}
                 thumbs={thumbs}
                 confirmingDelete={confirmingDelete}
                 onDelete={remove}
@@ -332,28 +374,39 @@ export default function CapturedDistressPage() {
 function CaptureList({
   title,
   empty,
-  captures,
+  section,
+  page,
+  onPageChange,
+  isLoading,
   thumbs,
   confirmingDelete,
   onDelete,
 }: {
   title: string;
   empty: string;
-  captures: CapturedDistress[];
+  section: Section;
+  page: number;
+  onPageChange: (page: number) => void;
+  isLoading: boolean;
   thumbs: Record<string, string>;
   confirmingDelete: string | null;
   onDelete: (capture: CapturedDistress) => void;
 }) {
+  const captures = section.rows;
   return (
-    <section>
-      <h2 className="font-black text-white mb-3">
+    <section className="flex flex-col gap-3">
+      <h2 className="font-black text-white">
         {title}
-        {captures.length > 0 && <span className="text-gray-500"> ({captures.length})</span>}
+        {section.total > 0 && <span className="text-gray-500"> ({section.total})</span>}
       </h2>
       {captures.length === 0 ? (
         <p className="text-gray-500 italic">{empty}</p>
       ) : (
-        <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <ul
+          className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 transition-opacity ${
+            isLoading ? 'opacity-50' : ''
+          }`}
+        >
           {captures.map((c) => (
             <li
               key={c.id}
@@ -416,6 +469,7 @@ function CaptureList({
           ))}
         </ul>
       )}
+      <Pagination page={page} total={section.total} onChange={onPageChange} label={title} />
     </section>
   );
 }
