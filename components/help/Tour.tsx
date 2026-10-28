@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/shell/AuthProvider';
 import { SHELL_EVENTS } from '@/components/shell/nav';
 import { INTRO_DONE_EVENT, introPlaying } from './IntroSplash';
+import { HelpDemoArt, type HelpTopic } from './demos';
 
 export const TOUR_KEY = 'oasys.tourDone';
 
@@ -13,14 +14,40 @@ interface Step {
   targets?: string[];
   title: string;
   body: string;
+  /** Looping how-to animation shown in the card. */
+  demo: HelpTopic;
 }
 
 const STEPS: Step[] = [
-  { title: 'Welcome to OASYS', body: 'A one-minute look at where everything is. You can replay this from Guide any time.' },
-  { targets: ['stats'], title: 'Your numbers at a glance', body: 'Reports filed, waiting, resolved and photos you still have to report. Tap one to filter the map.' },
-  { targets: ['map'], title: 'Every report, on the map', body: 'Pins carry severity as colour, shape and word. Use the tabs to switch what is shown.' },
-  { targets: ['nav-report', 'fab'], title: 'Report a distress', body: 'Pin the place, upload one photo and OASYS grades it against DPWH standards.' },
-  { targets: ['captures', 'nav-captured'], title: 'Capture now, report later', body: 'Photos taken on the road wait here with their location until you file them.' },
+  {
+    title: 'Welcome to OASYS',
+    body: 'Pin the place, add one photo, and OASYS grades the distress. Here is where everything lives.',
+    demo: 'flow',
+  },
+  {
+    targets: ['stats'],
+    title: 'Your numbers at a glance',
+    body: 'Reports filed, waiting, resolved and photos you still have to report. Tap one to filter the map.',
+    demo: 'stats',
+  },
+  {
+    targets: ['map'],
+    title: 'Every report, on the map',
+    body: 'Pins carry severity as colour, shape and word. Use the tabs to switch what is shown.',
+    demo: 'map',
+  },
+  {
+    targets: ['nav-report', 'fab'],
+    title: 'Report a distress',
+    body: 'Drop a pin where the distress is, then upload one clear photo of it.',
+    demo: 'pin',
+  },
+  {
+    targets: ['captures', 'nav-captured'],
+    title: 'Capture now, report later',
+    body: 'Photos taken on the road wait here with their location until you file them.',
+    demo: 'capture',
+  },
 ];
 
 const PAD = 8;
@@ -100,7 +127,12 @@ export default function Tour() {
         return;
       }
       const b = el.getBoundingClientRect();
-      setRect({ top: b.top - PAD, left: b.left - PAD, width: b.width + PAD * 2, height: b.height + PAD * 2 });
+      setRect({
+        top: b.top - PAD,
+        left: b.left - PAD,
+        width: b.width + PAD * 2,
+        height: b.height + PAD * 2,
+      });
     };
 
     if (current.targets) {
@@ -137,24 +169,52 @@ export default function Tour() {
     return () => window.removeEventListener('keydown', onKey);
   }, [step, finish]);
 
+  // Place the card once its real size is known: beside a narrow target (the
+  // sidebar links), else below it, else above it, always kept on screen.
+  // Phones use a sheet above the tab bar instead.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [place, setPlace] = useState<{ top: number; left: number } | null>(null);
+  useLayoutEffect(() => {
+    const card = cardRef.current;
+    if (step === null || !card || !rect || window.innerWidth < 768) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPlace(null);
+      return;
+    }
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const w = card.offsetWidth;
+    const h = card.offsetHeight;
+    const gap = 14;
+    const margin = 16;
+    const clampTop = (t: number) => Math.min(Math.max(t, margin), vh - h - margin);
+    const clampLeft = (l: number) => Math.min(Math.max(l, margin), vw - w - margin);
+
+    if (rect.width < vw / 3 && rect.left + rect.width + gap + w + margin <= vw) {
+      setPlace({
+        left: rect.left + rect.width + gap,
+        top: clampTop(rect.top + rect.height / 2 - h / 2),
+      });
+    } else if (rect.top + rect.height + gap + h + margin <= vh) {
+      setPlace({
+        left: clampLeft(rect.left),
+        top: rect.top + rect.height + gap,
+      });
+    } else if (rect.top - gap - h >= margin) {
+      setPlace({ left: clampLeft(rect.left), top: rect.top - gap - h });
+    } else {
+      // Target fills the screen (a tall map): float inside it, bottom right.
+      setPlace({
+        left: clampLeft(rect.left + rect.width - w - gap),
+        top: clampTop(rect.top + rect.height - h - gap),
+      });
+    }
+  }, [rect, step]);
+
   if (step === null) return null;
   const current = STEPS[step];
   const last = step === STEPS.length - 1;
-
-  // Tooltip below the target when there is room, otherwise above; centred when
-  // there is no target. Phones get a sheet above the tab bar instead.
-  const vw = typeof window === 'undefined' ? 1024 : window.innerWidth;
-  const vh = typeof window === 'undefined' ? 768 : window.innerHeight;
-  const narrow = vw < 768;
-  const cardStyle: React.CSSProperties =
-    !rect || narrow
-      ? {}
-      : {
-          left: Math.min(Math.max(rect.left, 16), vw - 336),
-          ...(rect.top + rect.height + 220 < vh
-            ? { top: rect.top + rect.height + 14 }
-            : { top: Math.max(rect.top - 14, 16), transform: 'translateY(-100%)' }),
-        };
+  const floating = !!rect && !!place;
 
   return (
     <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label="Guided tour">
@@ -167,21 +227,23 @@ export default function Tour() {
       <div className="absolute inset-0" />
 
       <div
+        ref={cardRef}
         key={step}
-        className={`pop-in off-brand fixed w-[320px] max-w-[calc(100vw-32px)] rounded-2xl bg-surface border border-line shadow-2xl p-5 ${
-          !rect
-            ? 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'
-            : narrow
-              ? 'left-4 right-4 bottom-[calc(88px+env(safe-area-inset-bottom))] w-auto max-w-none'
-              : ''
+        className={`pop-in off-brand fixed w-[340px] max-w-[calc(100vw-32px)] rounded-2xl bg-surface border border-line shadow-2xl p-4 transition-[top,left] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          floating
+            ? ''
+            : rect
+              ? 'left-4 right-4 w-auto max-w-none bottom-[calc(88px+env(safe-area-inset-bottom))] md:left-1/2 md:right-auto md:w-[340px] md:-translate-x-1/2 md:bottom-6'
+              : 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'
         }`}
-        style={cardStyle}
+        style={floating ? place! : undefined}
       >
-        <p className="font-stat text-sm text-accent">
+        <HelpDemoArt topic={current.demo} />
+        <p className="mt-3 font-stat text-sm text-accent">
           {step + 1} / {STEPS.length}
         </p>
-        <h2 className="mt-1 text-lg font-semibold text-fg">{current.title}</h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">{current.body}</p>
+        <h2 className="mt-0.5 text-lg font-semibold text-fg">{current.title}</h2>
+        <p className="mt-1 text-sm leading-relaxed text-fg-muted">{current.body}</p>
 
         <div className="mt-4 flex items-center gap-2">
           <span className="flex gap-1.5 mr-auto" aria-hidden="true">

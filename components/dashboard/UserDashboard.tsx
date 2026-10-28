@@ -27,8 +27,15 @@ const FILTER_TABS: { key: Filter; label: string }[] = [
   { key: 'captures', label: 'Captures' },
 ];
 
-const dateLong = new Intl.DateTimeFormat('en-PH', { weekday: 'long', month: 'long', day: 'numeric' });
-const dateShort = new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric' });
+const dateLong = new Intl.DateTimeFormat('en-PH', {
+  weekday: 'long',
+  month: 'long',
+  day: 'numeric',
+});
+const dateShort = new Intl.DateTimeFormat('en-PH', {
+  month: 'short',
+  day: 'numeric',
+});
 
 function greeting(now = new Date()) {
   const h = now.getHours();
@@ -78,9 +85,7 @@ export default function UserDashboard({ userId, name }: { userId: string; name: 
       }));
     }
     return reports
-      .filter((r) =>
-        filter === 'all' ? true : filter === 'resolved' ? isResolvedState(r.state) : !isResolvedState(r.state)
-      )
+      .filter((r) => (filter === 'all' ? true : filter === 'resolved' ? isResolvedState(r.state) : !isResolvedState(r.state)))
       .map((r) => ({
         id: r.id,
         lat: r.lat,
@@ -93,7 +98,12 @@ export default function UserDashboard({ userId, name }: { userId: string; name: 
   }, [reports, captures, filter]);
 
   const activity = useMemo(() => {
-    const events: { at: string; label: string; detail: string; tone: 'accent' | 'ok' | 'warn' | 'muted' }[] = [];
+    const events: {
+      at: string;
+      label: string;
+      detail: string;
+      tone: 'accent' | 'ok' | 'warn' | 'muted';
+    }[] = [];
     for (const r of reports) {
       if (r.uploadtime)
         events.push({
@@ -103,22 +113,63 @@ export default function UserDashboard({ userId, name }: { userId: string; name: 
           tone: isResolvedState(r.state) ? 'ok' : 'accent',
         });
       if (r.corrected_at)
-        events.push({ at: r.corrected_at, label: 'Reviewed by an admin', detail: typeOf(r), tone: 'warn' });
+        events.push({
+          at: r.corrected_at,
+          label: 'Reviewed by an admin',
+          detail: typeOf(r),
+          tone: 'warn',
+        });
     }
     for (const c of captures)
-      events.push({ at: c.captured_at, label: 'Captured a photo', detail: c.address || 'Waiting to be reported', tone: 'muted' });
+      events.push({
+        at: c.captured_at,
+        label: 'Captured a photo',
+        detail: c.address || 'Waiting to be reported',
+        tone: 'muted',
+      });
     return events.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 6);
   }, [reports, captures]);
 
   const loading = !data && !error;
   const isEmpty = !!data && reports.length === 0 && captures.length === 0;
   const maxSeverity = Math.max(1, ...Object.values(severityCounts));
+  const severityTotal = severityCounts.High + severityCounts.Medium + severityCounts.Low;
 
-  const tiles: { key: Filter; label: string; value: number; icon: typeof IconList; tone: string }[] = [
-    { key: 'all', label: 'Reports filed', value: stats.filed, icon: IconList, tone: 'text-accent' },
-    { key: 'open', label: 'Needs action', value: stats.open, icon: IconReport, tone: 'text-warn' },
-    { key: 'resolved', label: 'Resolved', value: stats.resolved, icon: IconCompass, tone: 'text-ok' },
-    { key: 'captures', label: 'Captures waiting', value: stats.captures, icon: IconCamera, tone: 'text-fg-muted' },
+  const tiles: {
+    key: Filter;
+    label: string;
+    value: number;
+    icon: typeof IconList;
+    tone: string;
+  }[] = [
+    {
+      key: 'all',
+      label: 'Reports filed',
+      value: stats.filed,
+      icon: IconList,
+      tone: 'text-accent',
+    },
+    {
+      key: 'open',
+      label: 'Needs action',
+      value: stats.open,
+      icon: IconReport,
+      tone: 'text-warn',
+    },
+    {
+      key: 'resolved',
+      label: 'Resolved',
+      value: stats.resolved,
+      icon: IconCompass,
+      tone: 'text-ok',
+    },
+    {
+      key: 'captures',
+      label: 'Captures waiting',
+      value: stats.captures,
+      icon: IconCamera,
+      tone: 'text-fg-muted',
+    },
   ];
 
   return (
@@ -131,9 +182,7 @@ export default function UserDashboard({ userId, name }: { userId: string; name: 
           <h1 className="mt-1 text-3xl sm:text-[44px] leading-tight font-semibold tracking-tight text-fg">
             {greeting()}, {name}
           </h1>
-          <p className="mt-2 text-lg sm:text-xl font-semibold text-fg-soft">
-            Report and analyze distresses around you
-          </p>
+          <p className="mt-2 text-lg sm:text-xl font-semibold text-fg-soft">Report and analyze distresses around you</p>
         </div>
         <div className="relative flex flex-wrap gap-3">
           <Link
@@ -160,7 +209,11 @@ export default function UserDashboard({ userId, name }: { userId: string; name: 
       )}
 
       {/* Stat tiles: each one filters the map below. */}
-      <section data-tour="stats" aria-label="Your numbers" className="stagger mt-5 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <section
+        data-tour="stats"
+        aria-label="Your numbers"
+        className="stagger mt-5 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
+      >
         {tiles.map((tile) => {
           const active = filter === tile.key;
           return (
@@ -177,7 +230,11 @@ export default function UserDashboard({ userId, name }: { userId: string; name: 
                 <tile.icon className={`w-[18px] h-[18px] ${tile.tone}`} />
               </span>
               <span className="mt-3 block font-stat text-4xl sm:text-5xl leading-none text-fg">
-                {loading ? <span className="skeleton inline-block w-12 h-10 rounded-md align-bottom" /> : <CountUp value={tile.value} />}
+                {loading ? (
+                  <span className="skeleton inline-block w-12 h-10 rounded-md align-bottom" />
+                ) : (
+                  <CountUp value={tile.value} />
+                )}
               </span>
             </button>
           );
@@ -188,102 +245,116 @@ export default function UserDashboard({ userId, name }: { userId: string; name: 
         <EmptyState />
       ) : (
         <>
-          <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Live map */}
-            <section data-tour="map" className="page-enter lg:col-span-2 rounded-2xl bg-surface border border-line p-4 sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <h2 className="flex items-center gap-2 text-lg font-semibold text-fg">
-                  Your map
-                  <HelpButton topic="map" />
-                </h2>
-                <div role="tablist" aria-label="Show" className="flex gap-4 text-sm">
-                  {FILTER_TABS.map((tab) => (
-                    <button
-                      key={tab.key}
-                      role="tab"
-                      aria-selected={filter === tab.key}
-                      onClick={() => setFilter(tab.key)}
-                      className={`relative pb-1 transition-colors ${
-                        filter === tab.key ? 'font-semibold text-fg' : 'text-fg-muted hover:text-fg'
+          {/* Live map, full width so the pins have room. */}
+          <section data-tour="map" className="page-enter mt-4 rounded-2xl bg-surface border border-line p-3 sm:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3 px-1">
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-fg">
+                Your map
+                <HelpButton topic="map" />
+              </h2>
+              <div role="tablist" aria-label="Show" className="flex gap-4 text-sm">
+                {FILTER_TABS.map((tab) => (
+                  <button
+                    key={tab.key}
+                    role="tab"
+                    aria-selected={filter === tab.key}
+                    onClick={() => setFilter(tab.key)}
+                    className={`relative pb-1 transition-colors ${
+                      filter === tab.key ? 'font-semibold text-fg' : 'text-fg-muted hover:text-fg'
+                    }`}
+                  >
+                    {tab.label}
+                    <span
+                      aria-hidden="true"
+                      className={`absolute left-0 right-0 -bottom-0.5 h-0.5 rounded-full bg-accent origin-left transition-transform duration-300 ${
+                        filter === tab.key ? 'scale-x-100' : 'scale-x-0'
                       }`}
-                    >
-                      {tab.label}
-                      <span
-                        aria-hidden="true"
-                        className={`absolute left-0 right-0 -bottom-0.5 h-0.5 rounded-full bg-accent origin-left transition-transform duration-300 ${
-                          filter === tab.key ? 'scale-x-100' : 'scale-x-0'
-                        }`}
-                      />
-                    </button>
-                  ))}
-                </div>
+                    />
+                  </button>
+                ))}
               </div>
-              {/* Keyed by filter so the pins drop in again on every switch. */}
-              <ReportsMap key={filter} reports={mapPoints} heightClass="h-[20rem] lg:h-[26rem]" />
-            </section>
+            </div>
+            {/* Keyed by filter so the pins drop in again on every switch. */}
+            <ReportsMap key={filter} reports={mapPoints} heightClass="h-[26rem] sm:h-[30rem] lg:h-[38rem]" />
+          </section>
 
-            <div className="flex flex-col gap-4">
-              {/* Severity breakdown */}
-              <section className="page-enter rounded-2xl bg-surface border border-line p-5">
-                <h2 className="text-lg font-semibold text-fg mb-4">Severity breakdown</h2>
-                <ul className="flex flex-col gap-3.5">
-                  {(['High', 'Medium', 'Low'] as Severity[]).map((key, i) => (
-                    <li key={key}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <SeverityBadge severity={key} size="md" />
-                        <span className="font-stat text-xl text-fg">
+          <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Severity breakdown: fills the row beside Activity, rows spread to fit. */}
+            <section className="page-enter flex flex-col rounded-2xl bg-surface border border-line p-5 sm:p-6">
+              <div className="flex items-baseline justify-between gap-3 mb-5">
+                <h2 className="text-lg font-semibold text-fg">Severity breakdown</h2>
+                <span className="text-sm text-fg-muted">
+                  <span className="font-stat text-lg text-fg">
+                    <CountUp value={severityTotal} />
+                  </span>{' '}
+                  graded
+                </span>
+              </div>
+              <ul className="flex flex-1 flex-col justify-around gap-6">
+                {(['High', 'Medium', 'Low'] as Severity[]).map((key, i) => (
+                  <li key={key}>
+                    <div className="flex items-end justify-between gap-3 mb-2">
+                      <SeverityBadge severity={key} size="md" />
+                      <span className="flex items-baseline gap-2">
+                        <span className="text-sm text-fg-muted">
+                          {severityTotal ? Math.round((severityCounts[key] / severityTotal) * 100) : 0}%
+                        </span>
+                        <span className="font-stat text-3xl leading-none text-fg">
                           <CountUp value={severityCounts[key]} />
                         </span>
+                      </span>
+                    </div>
+                    {/* A cut scored along a dashed guide, ending at the count. */}
+                    <div className={`cut-track cut-track-lg ${SEVERITY[key].text}`}>
+                      <div
+                        className="cut-line"
+                        style={{
+                          ['--w' as string]: `${(severityCounts[key] / maxSeverity) * 100}%`,
+                          ['--i' as string]: i,
+                        }}
+                      >
+                        {severityCounts[key] > 0 && <span className="cut-tip" />}
                       </div>
-                      {/* A cut scored along a dashed guide, ending at the count. */}
-                      <div className={`cut-track ${SEVERITY[key].text}`}>
-                        <div
-                          className="cut-line"
-                          style={{ ['--w' as string]: `${(severityCounts[key] / maxSeverity) * 100}%`, ['--i' as string]: i }}
-                        >
-                          {severityCounts[key] > 0 && <span className="cut-tip" />}
-                        </div>
-                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            {/* Activity */}
+            <section className="page-enter rounded-2xl bg-surface border border-line p-5">
+              <h2 className="text-lg font-semibold text-fg mb-4">Activity</h2>
+              {loading ? (
+                <div className="flex flex-col gap-3">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="skeleton h-10 rounded-xl" />
+                  ))}
+                </div>
+              ) : (
+                <ol className="stagger relative flex flex-col gap-4 before:absolute before:left-[5px] before:top-2 before:bottom-2 before:w-px before:bg-line">
+                  {activity.map((event, i) => (
+                    <li key={`${event.at}-${i}`} className="relative pl-6">
+                      <span
+                        aria-hidden="true"
+                        className={`absolute left-0 top-1.5 w-[11px] h-[11px] rounded-full border-2 border-surface ${
+                          event.tone === 'ok'
+                            ? 'bg-ok'
+                            : event.tone === 'warn'
+                              ? 'bg-warn'
+                              : event.tone === 'accent'
+                                ? 'bg-accent'
+                                : 'bg-fg-faint'
+                        } ${i === 0 ? 'ping text-accent' : ''}`}
+                      />
+                      <p className="text-sm font-semibold text-fg leading-snug">{event.label}</p>
+                      <p className="text-xs text-fg-muted truncate">
+                        {dateShort.format(new Date(event.at))} · {event.detail}
+                      </p>
                     </li>
                   ))}
-                </ul>
-              </section>
-
-              {/* Activity */}
-              <section className="page-enter rounded-2xl bg-surface border border-line p-5 grow">
-                <h2 className="text-lg font-semibold text-fg mb-4">Activity</h2>
-                {loading ? (
-                  <div className="flex flex-col gap-3">
-                    {[0, 1, 2].map((i) => (
-                      <div key={i} className="skeleton h-10 rounded-xl" />
-                    ))}
-                  </div>
-                ) : (
-                  <ol className="stagger relative flex flex-col gap-4 before:absolute before:left-[5px] before:top-2 before:bottom-2 before:w-px before:bg-line">
-                    {activity.map((event, i) => (
-                      <li key={`${event.at}-${i}`} className="relative pl-6">
-                        <span
-                          aria-hidden="true"
-                          className={`absolute left-0 top-1.5 w-[11px] h-[11px] rounded-full border-2 border-surface ${
-                            event.tone === 'ok'
-                              ? 'bg-ok'
-                              : event.tone === 'warn'
-                                ? 'bg-warn'
-                                : event.tone === 'accent'
-                                  ? 'bg-accent'
-                                  : 'bg-fg-faint'
-                          } ${i === 0 ? 'ping text-accent' : ''}`}
-                        />
-                        <p className="text-sm font-semibold text-fg leading-snug">{event.label}</p>
-                        <p className="text-xs text-fg-muted truncate">
-                          {dateShort.format(new Date(event.at))} · {event.detail}
-                        </p>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </section>
-            </div>
+                </ol>
+              )}
+            </section>
           </div>
 
           {/* Recent reports + captures waiting */}
@@ -291,7 +362,10 @@ export default function UserDashboard({ userId, name }: { userId: string; name: 
             <section className="page-enter rounded-2xl bg-surface border border-line p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-fg">Recent reports</h2>
-                <Link href="/my-reports" className="group inline-flex items-center gap-1 text-sm font-semibold text-accent hover:text-accent-hover">
+                <Link
+                  href="/my-reports"
+                  className="group inline-flex items-center gap-1 text-sm font-semibold text-accent hover:text-accent-hover"
+                >
                   View all
                   <IconArrow className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                 </Link>
@@ -303,7 +377,11 @@ export default function UserDashboard({ userId, name }: { userId: string; name: 
                       <span className="block aspect-[4/3] bg-inset overflow-hidden">
                         {data?.images[String(r.id)] ? (
                           // eslint-disable-next-line @next/next/no-img-element -- base64 data URL
-                          <img src={data.images[String(r.id)]} alt="" className="w-full h-full object-cover transition-transform duration-500 hover:scale-105" />
+                          <img
+                            src={data.images[String(r.id)]}
+                            alt=""
+                            className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                          />
                         ) : (
                           <span className="grid place-items-center h-full text-fg-faint">
                             <IconReport className="w-6 h-6" />
@@ -332,7 +410,10 @@ export default function UserDashboard({ userId, name }: { userId: string; name: 
                   Captures waiting
                   <HelpButton topic="capture" />
                 </h2>
-                <Link href="/captured-distress" className="group inline-flex items-center gap-1 text-sm font-semibold text-accent hover:text-accent-hover">
+                <Link
+                  href="/captured-distress"
+                  className="group inline-flex items-center gap-1 text-sm font-semibold text-accent hover:text-accent-hover"
+                >
                   Open
                   <IconArrow className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                 </Link>
@@ -346,7 +427,11 @@ export default function UserDashboard({ userId, name }: { userId: string; name: 
                     >
                       {data?.thumbs[c.image_path] ? (
                         // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL
-                        <img src={data.thumbs[c.image_path]} alt={c.address ?? 'Captured photo'} className="w-full h-full object-cover" />
+                        <img
+                          src={data.thumbs[c.image_path]}
+                          alt={c.address ?? 'Captured photo'}
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <span className="grid place-items-center h-full text-fg-faint">
                           <IconCamera className="w-6 h-6" />
@@ -355,9 +440,7 @@ export default function UserDashboard({ userId, name }: { userId: string; name: 
                     </Link>
                   </li>
                 ))}
-                {captures.length === 0 && (
-                  <li className="col-span-3 py-6 text-center text-sm text-fg-muted">Nothing waiting</li>
-                )}
+                {captures.length === 0 && <li className="col-span-3 py-6 text-center text-sm text-fg-muted">Nothing waiting</li>}
               </ul>
             </section>
           </div>
@@ -375,7 +458,10 @@ function EmptyState() {
       </span>
       <h2 className="mt-4 text-2xl font-semibold text-fg">File your first report</h2>
       <div className="mt-6 flex flex-col sm:flex-row justify-center gap-3">
-        <Link href="/report-damage" className="btn-blue inline-flex items-center justify-center gap-2 h-11 px-5 rounded-xl font-semibold">
+        <Link
+          href="/report-damage"
+          className="btn-blue inline-flex items-center justify-center gap-2 h-11 px-5 rounded-xl font-semibold"
+        >
           <IconPlus className="w-5 h-5" />
           Report a distress
         </Link>

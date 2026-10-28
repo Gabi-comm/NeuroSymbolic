@@ -956,6 +956,17 @@ html[data-intro] body::after {
   background: repeating-linear-gradient(90deg, var(--line-strong) 0 6px, transparent 6px 11px) center / 100% 1px
     no-repeat;
 }
+/* Taller track for the dashboard card: thicker cut, same dashed guide. */
+.cut-track-lg {
+  height: 14px;
+}
+.cut-track-lg .cut-line {
+  height: 4px;
+  margin-top: -2px;
+}
+.cut-track-lg .cut-tip {
+  width: 3px;
+}
 @keyframes cut {
   from {
     width: 0;
@@ -1095,4 +1106,93 @@ html[data-intro] body::after {
 }
 .street-west {
   animation-direction: reverse;
+}
+
+/* Tour-only demos: the reporting flow and the stat-tile filter. */
+@keyframes demo-step {
+  0%,
+  5% {
+    opacity: 0.25;
+    transform: translateY(6px);
+  }
+  20%,
+  90% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0.25;
+  }
+}
+.demo-step {
+  animation: demo-step 3.2s cubic-bezier(0.22, 1, 0.36, 1) infinite backwards;
+}
+@keyframes demo-arrow {
+  0%,
+  10% {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  25%,
+  90% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.demo-arrow {
+  animation: demo-arrow 3.2s ease infinite backwards;
+}
+@keyframes demo-tap {
+  0%,
+  20% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  30% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  45%,
+  100% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+.demo-tap {
+  animation: demo-tap 3.2s ease-out infinite;
+}
+@keyframes demo-tile {
+  0%,
+  28% {
+    stroke: var(--line);
+  }
+  34%,
+  92% {
+    stroke: var(--accent);
+  }
+  100% {
+    stroke: var(--line);
+  }
+}
+.demo-tile {
+  animation: demo-tile 3.2s ease infinite;
+}
+@keyframes demo-hide {
+  0%,
+  32% {
+    opacity: 1;
+  }
+  42%,
+  92% {
+    opacity: 0.12;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+.demo-hide {
+  animation: demo-hide 3.2s ease infinite;
 }

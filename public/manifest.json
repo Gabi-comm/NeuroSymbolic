@@ -1,0 +1,24 @@
+{
+  "id": "/",
+  "name": "OASYS — Road Distress Assessment",
+  "short_name": "OASYS",
+  "description": "Report road distress with a pin and a photo; OASYS measures it and grades the severity against DPWH standards.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f2150",
+  "theme_color": "#14295a",
+  "lang": "en",
+  "categories": ["utilities", "productivity"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Report a distress", "short_name": "Report", "url": "/report-damage", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Captured Distress", "short_name": "Captured", "url": "/captured-distress", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "My reports", "short_name": "Reports", "url": "/my-reports", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

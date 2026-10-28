@@ -5,6 +5,7 @@ import AppShell from '@/components/shell/AppShell';
 import PageTransition from '@/components/PageTransition';
 import AuthNotice from '@/components/AuthNotice';
 import { THEME_BOOT_SCRIPT } from '@/components/shell/themeBoot';
+import ServiceWorker from '@/components/shell/ServiceWorker';
 
 // This file was "use client", which opted the entire app out of Server
 // Components and made a `metadata` export impossible -- the site had no title,
@@ -33,6 +34,10 @@ export const metadata: Metadata = {
   applicationName: 'OASYS',
   keywords: ['road assessment', 'pavement distress', 'DPWH', 'pothole detection'],
   robots: { index: false, follow: false }, // localised research tool, not for search
+  // Installable PWA: public/manifest.json + public/sw.js (registered by ServiceWorker).
+  manifest: '/manifest.json',
+  appleWebApp: { capable: true, title: 'OASYS', statusBarStyle: 'black-translucent' },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
@@ -60,6 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#content" className="skip-link">
           Skip to content
         </a>
+        <ServiceWorker />
         <AppShell>
           <AuthNotice />
           {/* Clears the 264px sidebar on desktop and the tab bar on phones. */}

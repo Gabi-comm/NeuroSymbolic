@@ -57,6 +57,7 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Run on /admin to gate it, and on everything else to keep the session fresh,
-  // while skipping static assets and image files that never need either.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  // while skipping static assets, image files and the PWA files (manifest,
+  // service worker, offline page) that never need either.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|offline.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };
