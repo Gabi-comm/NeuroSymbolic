@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 import { ADMIN_LINKS, INFO_LINKS, USER_LINKS, SHELL_EVENTS } from './nav';
-import { IconArrow, IconCompass, IconSearch } from './icons';
+import { IconArrow, IconSearch } from './icons';
 
 interface Command {
   id: string;
@@ -14,7 +14,7 @@ interface Command {
   run: () => void;
 }
 
-/** Ctrl/⌘ K: jump to a page or start the tour. */
+/** Ctrl/⌘ K: jump to a page. */
 export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -54,23 +54,7 @@ export default function CommandPalette() {
         else router.push(link.href);
       },
     }));
-    return [
-      ...pages,
-      ...(isAdmin
-        ? []
-        : [
-            {
-              id: 'tour',
-              label: 'Take the tour',
-              hint: 'Guide',
-              icon: IconCompass,
-              run: () => {
-                close();
-                window.dispatchEvent(new Event(SHELL_EVENTS.tour));
-              },
-            },
-          ]),
-    ];
+    return pages;
   }, [isAdmin, authUser, openLogin, router]);
 
   const results = commands.filter((c) => c.label.toLowerCase().includes(query.trim().toLowerCase()));

@@ -4,7 +4,7 @@
 
 import type { ReactNode } from 'react';
 
-export type HelpTopic = 'map' | 'capture' | 'pin' | 'upload' | 'result' | 'track' | 'flow' | 'stats';
+export type HelpTopic = 'map' | 'capture' | 'pin' | 'upload' | 'result' | 'track';
 
 const Stage = ({ children }: { children: ReactNode }) => (
   <svg viewBox="0 0 240 140" className="w-full h-auto rounded-xl bg-inset" aria-hidden="true">
@@ -26,62 +26,6 @@ const Pin = ({ x, y, fill, cls, delay = 0 }: { x: number; y: number; fill: strin
 );
 
 const DEMOS: Record<HelpTopic, { title: string; body: string; art: ReactNode }> = {
-  flow: {
-    title: 'How OASYS works',
-    body: 'Pin where the distress is, add one photo, and OASYS measures and grades it.',
-    art: (
-      <Stage>
-        {/* Three steps light up in turn: pin, photo, graded result. */}
-        <g className="demo-step" style={{ animationDelay: '0s' }}>
-          <rect x="16" y="38" width="56" height="64" rx="10" fill="var(--surface)" stroke="var(--line)" />
-          <path d="M44 84 C36 74 36 64 44 60 C52 64 52 74 44 84Z" fill="var(--accent)" />
-          <circle cx="44" cy="68" r="3" fill="var(--surface)" />
-        </g>
-        <path className="demo-arrow" d="M78 70 h16 m-5 -5 l5 5 l-5 5" stroke="var(--fg-faint)" strokeWidth="2" fill="none" strokeLinecap="round" style={{ animationDelay: '0.5s' }} />
-        <g className="demo-step" style={{ animationDelay: '0.8s' }}>
-          <rect x="100" y="38" width="56" height="64" rx="10" fill="var(--surface)" stroke="var(--line)" />
-          <path d="M108 92 L122 74 L132 84 L140 78 L150 92Z" fill="var(--accent-soft)" stroke="var(--accent)" strokeWidth="1" />
-          <circle cx="140" cy="54" r="5" fill="var(--warn)" opacity=".7" />
-        </g>
-        <path className="demo-arrow" d="M162 70 h16 m-5 -5 l5 5 l-5 5" stroke="var(--fg-faint)" strokeWidth="2" fill="none" strokeLinecap="round" style={{ animationDelay: '1.3s' }} />
-        <g className="demo-step" style={{ animationDelay: '1.6s' }}>
-          <rect x="184" y="38" width="44" height="64" rx="10" fill="var(--surface)" stroke="var(--line)" />
-          <path d="M202 54h8l5 5v8l-5 5h-8l-5-5v-8Z" fill="var(--sev-high)" />
-          <rect x="194" y="82" width="24" height="5" rx="2.5" fill="var(--sev-high)" opacity=".5" />
-        </g>
-      </Stage>
-    ),
-  },
-  stats: {
-    title: 'Your numbers',
-    body: 'Each tile counts your reports. Tap one and the map shows only those.',
-    art: (
-      <Stage>
-        {[0, 1, 2, 3].map((i) => (
-          <g key={i}>
-            <rect
-              className={i === 1 ? 'demo-tile' : undefined}
-              x={14 + i * 54}
-              y="22"
-              width="48"
-              height="40"
-              rx="8"
-              fill="var(--surface)"
-              stroke="var(--line)"
-              strokeWidth="1.5"
-            />
-            <rect x={22 + i * 54} y="30" width="20" height="4" rx="2" fill="var(--line-strong)" />
-            <rect x={22 + i * 54} y="42" width={i === 1 ? 14 : 22} height="12" rx="3" fill="var(--fg-faint)" opacity=".55" />
-          </g>
-        ))}
-        <circle className="demo-tap" cx="92" cy="48" r="9" fill="var(--accent)" opacity=".35" style={{ transformOrigin: '92px 48px' }} />
-        <rect x="14" y="74" width="210" height="52" rx="8" fill="var(--surface)" stroke="var(--line)" />
-        <Pin x={60} y={100} fill="var(--sev-low)" cls="demo-hide" />
-        <Pin x={120} y={96} fill="var(--sev-medium)" cls="demo-keep" />
-        <Pin x={180} y={104} fill="var(--sev-high)" cls="demo-keep" />
-      </Stage>
-    ),
-  },
   map: {
     title: 'Your map',
     body: 'Every report you filed, pinned where you took it. Tap a number above or a tab to filter the pins.',
@@ -101,7 +45,16 @@ const DEMOS: Record<HelpTopic, { title: string; body: string; art: ReactNode }> 
     art: (
       <Stage>
         <MapBackdrop />
-        <circle className="demo-ring" cx="120" cy="72" r="10" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ transformOrigin: '120px 72px' }} />
+        <circle
+          className="demo-ring"
+          cx="120"
+          cy="72"
+          r="10"
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth="2"
+          style={{ transformOrigin: '120px 72px' }}
+        />
         <g className="demo-drop" style={{ transformOrigin: '120px 72px' }}>
           <path d="M120 80 C108 66 108 52 120 48 C132 52 132 66 120 80Z" fill="var(--accent)" />
           <circle cx="120" cy="59" r="4" fill="var(--surface)" />
@@ -115,13 +68,32 @@ const DEMOS: Record<HelpTopic, { title: string; body: string; art: ReactNode }> 
     body: 'One clear photo of the road surface is enough. Location data inside the photo is read automatically.',
     art: (
       <Stage>
-        <rect x="70" y="30" width="100" height="80" rx="12" fill="none" stroke="var(--line-strong)" strokeDasharray="6 5" strokeWidth="1.5" />
+        <rect
+          x="70"
+          y="30"
+          width="100"
+          height="80"
+          rx="12"
+          fill="none"
+          stroke="var(--line-strong)"
+          strokeDasharray="6 5"
+          strokeWidth="1.5"
+        />
         <g className="demo-slide">
           <rect x="88" y="44" width="64" height="48" rx="6" fill="var(--surface)" stroke="var(--line)" />
           <path d="M92 86 L110 66 L122 78 L132 70 L148 86Z" fill="var(--accent-soft)" stroke="var(--accent)" strokeWidth="1" />
         </g>
         <rect x="70" y="120" width="100" height="4" rx="2" fill="var(--line)" />
-        <rect className="demo-progress" x="70" y="120" width="100" height="4" rx="2" fill="var(--accent)" style={{ transformOrigin: '70px 122px' }} />
+        <rect
+          className="demo-progress"
+          x="70"
+          y="120"
+          width="100"
+          height="4"
+          rx="2"
+          fill="var(--accent)"
+          style={{ transformOrigin: '70px 122px' }}
+        />
       </Stage>
     ),
   },
@@ -132,7 +104,19 @@ const DEMOS: Record<HelpTopic, { title: string; body: string; art: ReactNode }> 
       <Stage>
         <rect x="30" y="20" width="180" height="100" rx="10" fill="var(--surface)" stroke="var(--line)" />
         <ellipse cx="110" cy="76" rx="34" ry="14" fill="var(--line-strong)" />
-        <rect className="demo-box" x="70" y="56" width="80" height="40" rx="3" fill="none" stroke="#22c55e" strokeWidth="2" pathLength="100" strokeDasharray="100" />
+        <rect
+          className="demo-box"
+          x="70"
+          y="56"
+          width="80"
+          height="40"
+          rx="3"
+          fill="none"
+          stroke="#22c55e"
+          strokeWidth="2"
+          pathLength="100"
+          strokeDasharray="100"
+        />
         <g className="demo-pop" style={{ transformOrigin: '170px 40px' }}>
           <path d="M166 31h8l6 6v8l-6 6h-8l-6-6v-8Z" fill="var(--sev-high)" />
           <rect x="150" y="54" width="44" height="6" rx="3" fill="var(--sev-high)" opacity=".5" />
@@ -164,18 +148,19 @@ const DEMOS: Record<HelpTopic, { title: string; body: string; art: ReactNode }> 
           <g key={y}>
             <rect x="30" y={y} width="180" height="24" rx="6" fill="var(--surface)" stroke="var(--line)" />
             <rect x="40" y={y + 9} width="70" height="6" rx="3" fill="var(--line-strong)" />
-            <circle cx="186" cy={y + 12} r="4" fill={i === 0 ? undefined : 'var(--warn)'} className={i === 0 ? 'demo-status' : undefined} />
+            <circle
+              cx="186"
+              cy={y + 12}
+              r="4"
+              fill={i === 0 ? undefined : 'var(--warn)'}
+              className={i === 0 ? 'demo-status' : undefined}
+            />
           </g>
         ))}
       </Stage>
     ),
   },
 };
-
-/** The looping animation alone, for the guided tour cards. */
-export function HelpDemoArt({ topic }: { topic: HelpTopic }) {
-  return <>{DEMOS[topic].art}</>;
-}
 
 export default function HelpDemo({ topic }: { topic: HelpTopic }) {
   const demo = DEMOS[topic];

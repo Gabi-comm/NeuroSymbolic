@@ -115,8 +115,3 @@ export function useUserSummary(userId: string | null): {
   }
   return { data: state.data, error: state.error };
 }
-
-// TEMP (tour screenshots) -- remove.
-export function __primeUserSummary(userId: string, data: UserSummary) {
-  cache.set(userId, { data, at: Date.now() + 1e9 });
-}

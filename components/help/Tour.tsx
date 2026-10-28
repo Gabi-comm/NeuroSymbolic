@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/shell/AuthProvider';
 import { SHELL_EVENTS } from '@/components/shell/nav';
 import { INTRO_DONE_EVENT, introPlaying } from './IntroSplash';
-import { HelpDemoArt, type HelpTopic } from './demos';
+import TourScene, { type TourSceneKey } from './TourScene';
 
 export const TOUR_KEY = 'oasys.tourDone';
 
@@ -14,15 +14,15 @@ interface Step {
   targets?: string[];
   title: string;
   body: string;
-  /** Looping how-to animation shown in the card. */
-  demo: HelpTopic;
+  /** Screenshot of the app with a hand tapping through it. */
+  demo: TourSceneKey;
 }
 
 const STEPS: Step[] = [
   {
     title: 'Welcome to OASYS',
     body: 'Pin the place, add one photo, and OASYS grades the distress. Here is where everything lives.',
-    demo: 'flow',
+    demo: 'overview',
   },
   {
     targets: ['stats'],
@@ -40,13 +40,13 @@ const STEPS: Step[] = [
     targets: ['nav-report', 'fab'],
     title: 'Report a distress',
     body: 'Drop a pin where the distress is, then upload one clear photo of it.',
-    demo: 'pin',
+    demo: 'report',
   },
   {
     targets: ['captures', 'nav-captured'],
     title: 'Capture now, report later',
     body: 'Photos taken on the road wait here with their location until you file them.',
-    demo: 'capture',
+    demo: 'captures',
   },
 ];
 
@@ -238,7 +238,7 @@ export default function Tour() {
         }`}
         style={floating ? place! : undefined}
       >
-        <HelpDemoArt topic={current.demo} />
+        <TourScene name={current.demo} />
         <p className="mt-3 font-stat text-sm text-accent">
           {step + 1} / {STEPS.length}
         </p>
