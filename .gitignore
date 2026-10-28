@@ -53,6 +53,12 @@ __pycache__/
 # Model weights: distribute via GitHub Release assets or Git LFS, not the repo.
 *.pt
 *.pth
+# Exception for the Vercel backend build (backend/Dockerfile): our two trained
+# weights are under GitHub's 100 MB limit and must be in the build. Delete these
+# two lines and set WEIGHTS_BASE_URL instead to keep them out of the repo.
+# SAM and yolov8n are downloaded at build time (backend/fetch_weights.sh).
+!backend/best.pt
+!backend/ultrabestroad.pt
 
 # Training artifacts and datasets
 runs/

@@ -6,7 +6,13 @@ import { NextResponse } from 'next/server';
 // http://localhost:8000 works only on the developer's machine and breaks the
 // moment the app is deployed. Everything goes through this route, which reads
 // the backend location from the environment.
-const API_BASE_URL = process.env.API_BASE_URL ?? 'http://127.0.0.1:8000';
+//
+// On Vercel the backend is the private `backend` service (vercel.json), and the
+// binding injects its URL as BACKEND_URL. Elsewhere API_BASE_URL points at it.
+const API_BASE_URL = (process.env.BACKEND_URL ?? process.env.API_BASE_URL ?? 'http://127.0.0.1:8000').replace(/\/+$/, '');
+
+// SAM + YOLO on a CPU can take a while, especially on a cold start.
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   try {

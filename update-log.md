@@ -996,3 +996,65 @@ Approved in Figma (`x8yXuIT9Xazyb5VKOnfR28`) before any code changed.
 - Follow-up 4: each tour card now opens with a looping how-to animation (`HelpDemoArt` from `demos.tsx`): welcome shows the whole flow (pin → photo → graded result, new `flow` demo), the numbers step shows a tile being tapped and the map filtering (new `stats` demo), then map, pin and capture. The card is measured after render and placed beside narrow targets (sidebar links) so it no longer covers them, else below or above the target, always kept 16px inside the screen; over a full-height target it floats in the target's corner; phones keep the bottom sheet. Dashboard map is now full width and taller (26 / 30 / 38rem), with Severity breakdown and Activity side by side below it.
 - Follow-up 5 (PWA, for the Vercel deploy): installable on phones. `public/manifest.json` (standalone, navy theme/background, 192/512 icons plus a maskable 512, shortcuts to Report / Captured / My reports) linked from `app/layout.tsx` metadata, with `appleWebApp` for iOS and `app/apple-icon.png` (180, file convention, because `app/icon.png` overrides config icons). Icons in `public/icons/` are the real logo on the brand navy gradient. `public/sw.js` is deliberately minimal: pages, Supabase and `/api/analyze` always go to the network (no stale reports or auth); it only serves `public/offline.html` when a page can't load, plus that page's icon. Registered by `components/shell/ServiceWorker.tsx` in production only. `next.config.ts` serves `sw.js` with `no-cache` so a fix reaches installed phones on the next visit; `proxy.ts` skips the manifest, worker and offline page. Dashboard severity breakdown fills its row beside Activity: total graded in the header, rows spread to the card height, bigger counts with a % share, a thicker cut line (`.cut-track-lg`). Verified: `tsc`, `eslint`, `next build`; on `next start` the worker activates, the manifest parses, an updated worker takes over by itself, and with the server down a page load shows the offline page with its icon.
 - Follow-up 6: the tour cards show the real app instead of drawn diagrams. `components/help/TourScene.tsx` plays a 5.6 s loop over a screenshot (`public/tour/<scene>-light|dark.webp`, 720×450, ~20–90 KB each; the theme picks the matching shot): the view eases in, a cursor taps twice with a ripple, and each tap's result appears — rings on the Report button and a number tile (welcome), Needs action then Reports filed (numbers), the Needs action tab and a pin popup (map), a pin dropping on the Report map and a photo filling the upload box (report), a capture and the Open link (captures). Shots were taken at 1280 px from the dashboard rendered with sample data and from /report-damage; tap points are percentages of each shot, read from the images. Under reduced motion there is no cursor and the tap results show still. The tour-only `flow`/`stats` SVG demos and their CSS are removed. Search no longer lists "Take the tour" (Guide in the sidebar and the mobile "?" still start it).
+- Follow-up 7 (model slot + admin redesign):
+  - **Bulletin model is swappable** (for the planned VPS + Hugging Face API).
+    - `backend/llm.py` (new) holds the whole bulletin-model call, chosen by `LLM_PROVIDER`:
+      - `ollama` (default; the old code, moved here unchanged).
+      - `remote`: `POST {LLM_API_URL}/generate` with `Authorization: Bearer {LLM_API_KEY}` and body `{prompt, max_new_tokens, temperature}`, returning `{text, model}`; `GET /health` returns `{status, model}`.
+      - `generate()` never raises; on failure the bulletin keeps its template text as before.
+    - `backend/api.py` calls `llm.generate(...)` and adds `GET /llm/status`.
+    - `backend/llm_server/` (new) is a placeholder FastAPI server for the VPS (`app.py`, `requirements.txt`):
+      - It lazily loads a transformers pipeline (`HF_MODEL_ID`, default `Qwen/Qwen2.5-1.5B-Instruct`).
+      - The bearer key is checked with `secrets.compare_digest`.
+      - `generate_text` is marked `TODO(Gab)`.
+    - New variables in `backend/.env.example`: `LLM_PROVIDER`, `LLM_API_URL`, `LLM_API_KEY`, `LLM_MODEL_LABEL`, `LLM_TIMEOUT_S`.
+    - Privacy (RA 10173): only the prompt text (detections, metrics, address) leaves the server; no photos and no user identity.
+    - `app/api/llm-status/route.ts` proxies the status and never sends the endpoint URL to the browser.
+    - Switching over takes only an env change plus a backend restart.
+  - **Admin redesign.**
+    - Shared pieces in `components/admin/ui.tsx`: `AdminHeader`, `Panel`, `StatTile` (count-up, change vs previous period, sparkline), `UnderlineTabs`, `ConfirmDialog`, `Toast`.
+    - Pure stats helpers in `utils/adminStats.ts`.
+    - `components/Charts.tsx` was rewritten:
+      - `LineChart`: measured, smoothed (monotone cubic), with crosshair + tooltip, a legend for 2+ series, x labels that thin out by width, and an sr-only table.
+      - `ProgressList`, `StackedBar`, `RingProgress` and `Sparkline`.
+      - `BarTally` and `TrendLine` were removed.
+    - Console: resolved ring + stacked bar, four tiles with 14-day sparklines, a "Next up" queue (severity, then oldest), Waiting time bars, and the "Bulletin model" card (`components/admin/LlmStatusCard.tsx`: live Ollama status plus a "Hugging Face API — Not connected" slot that becomes the live row once `LLM_PROVIDER=remote`).
+    - Dashboard: 7 days / 30 days / 12 months range, a submissions line chart (Total / By severity / Corrections), severity and distress-type progress bars, resolution ring, waiting time, latest filings, CSV export.
+    - Reports: cards with a severity edge; the expanded view has confidence and crack-density meters; confirm dialogs for resolve/reopen.
+    - Users: an Accounts composition panel and a list with glyph + word roles.
+    - Data logic and queries are unchanged.
+  - **Verified:**
+    - `tsc` and `eslint` are clean.
+    - All four admin pages were checked in the browser with mocked data, at 1440 (light) and 390 (dark), with no horizontal scroll.
+    - `next build` was not run (the dev server was using `.next`).
+- Follow-up 8:
+  - **Model card removed.**
+    - The "Bulletin model" card is removed from the Console (`components/admin/LlmStatusCard.tsx` and `app/api/llm-status/` deleted). The VPS/Hugging Face switch stays a backend-only placeholder: `backend/llm.py`, `backend/llm_server/`, `GET /llm/status`.
+  - **Console queue band.**
+    - It uses the new `components/admin/QueueHero.tsx` instead of the generic ring and stacked bar.
+    - `QueueDial`: a 48-tick dial whose ticks light up in turn while a blue→cyan arc sweeps round with a glowing, breathing head; the percentage counts up.
+    - `QueueBar`: resolved (gradient, with a passing glint) / waiting / high-severity waiting. The waiting segments carry slowly moving stripes.
+    - Colours come from the band's own glows (`--hero-a`/`--hero-b` on `.hero-theme`, per theme), replacing the green/amber that clashed. The only other colour is the validated `--sev-high`.
+    - CSS is under "Queue hero" in `globals.css`. Reduced motion shows the end state.
+  - **Vercel (Services, beta).**
+    - `vercel.json`:
+      - `app` (Next.js, repo root) is the only public service.
+      - `backend` (`backend/`, container runtime) is private, reached through a binding that injects `BACKEND_URL`.
+      - The suggested `/api/(.*)` → backend rewrite was not used: it would send `/api/analyze` and `/api/geocode` (Next routes) to FastAPI, which has neither.
+    - `app/api/analyze/route.ts` reads `BACKEND_URL`, then `API_BASE_URL`, then localhost, and sets `maxDuration = 300`.
+    - `backend/Dockerfile` (python:3.14-slim, CPU-only torch, libGL for opencv, writable caches in `/tmp`, uvicorn on `$PORT`). A container is used because torch + ultralytics + opencv + SAM exceed the 500 MB Python bundle limit.
+    - `backend/fetch_weights.sh` downloads the SAM checkpoint (358 MB, over GitHub's file limit) and `yolov8n.pt` at build time. `best.pt` / `ultrabestroad.pt` must be committed: `.gitignore` now un-ignores those two, or set `WEIGHTS_BASE_URL` and drop the exception.
+    - Also added `backend/.dockerignore` and `.vercelignore` (CLI deploys).
+    - Not deployed or built here (no Docker on this machine).
+    - Risks:
+      - Hobby functions cap at 2 GB / 1 vCPU, which is tight for SAM + two YOLO models; Pro allows 4 GB.
+      - A cold start loads every model.
+      - Request/response bodies are capped at 4.5 MB (uploads are 1600 px JPEGs, so fine).
+      - Ollama does not exist on Vercel, so bulletins use the template text until `LLM_PROVIDER=remote`.
+- Follow-up 9: the Console queue band was restyled after Gab's reference (`Downloads/loke.jpg`).
+  - **Dark card:** in Dark it is a flat charcoal card (`#202126`) instead of the navy gradient (`.hero-theme.queue-band`). Other hero bands are unchanged.
+  - **Donut:** separate thick rounded segments with 6px gaps (Resolved / Waiting / High severity). The resolved % sits in the centre in its segment's colour.
+  - **Bar:** the same three parts as separate rounded pieces.
+  - **Legend:** dot + label + bold count + %.
+  - **Colours:** sky `#4ea6e6` (Dark) / accent `#2347d6` (Light) for resolved, neutral grey for waiting, and the validated `--sev-high`. Sky and grey passed the dataviz validator's separation checks on the dark card. The grey reads as neutral on purpose, and the red's lightness is the fixed severity palette.
+  - **Motion:** the donut turns in while the segments draw one after another, the centre counts up, the bar segments grow in order, and a glint passes over the resolved piece. The ticks, stripes and travelling head from follow-up 8 are removed.

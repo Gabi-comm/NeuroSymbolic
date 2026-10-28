@@ -3,13 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/utils/supabase';
-import {
-  AdminSessionContext,
-  getVerifiedAdmin,
-  loadAdminSummary,
-  setVerifiedAdmin,
-  type AdminSession,
-} from '@/utils/adminData';
+import { AdminSessionContext, getVerifiedAdmin, loadAdminSummary, setVerifiedAdmin, type AdminSession } from '@/utils/adminData';
 
 type AuthState = 'checking' | 'authorized' | 'denied';
 
@@ -36,9 +30,7 @@ type AuthState = 'checking' | 'authorized' | 'denied';
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   // Already verified in this browser session (the layout remounts on every
   // admin page change): render now, re-check below.
-  const [authState, setAuthState] = useState<AuthState>(() =>
-    getVerifiedAdmin() ? 'authorized' : 'checking'
-  );
+  const [authState, setAuthState] = useState<AuthState>(() => (getVerifiedAdmin() ? 'authorized' : 'checking'));
   const [session, setSession] = useState<AdminSession | null>(() => getVerifiedAdmin());
   const router = useRouter();
 
@@ -97,10 +89,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (authState !== 'authorized') {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center text-fg px-4"
-        aria-live="polite"
-      >
+      <div className="min-h-screen flex items-center justify-center text-fg px-4" aria-live="polite">
         <p className="font-bold tracking-widest uppercase text-sm text-center">
           {authState === 'checking' ? 'Verifying admin access…' : 'Access denied. Redirecting…'}
         </p>

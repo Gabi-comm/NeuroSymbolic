@@ -1,0 +1,13 @@
+# CLI deploys only (Git deploys already skip untracked files).
+deps/
+runs/
+road-3/
+My-First-Project-1/
+Neuro/
+.next/
+node_modules/
+backend/sam_files/
+backend/__pycache__/
+*.pth
+.env*
+!.env.local.example

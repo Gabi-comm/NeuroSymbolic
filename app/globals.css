@@ -1351,3 +1351,112 @@ html[data-intro] body::after {
     transform: translate(-50%, -100%);
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Charts (components/Charts). Lines draw in, areas fade up, bars and rings
+   fill from empty. Reduced motion jumps straight to the end state.
+   --------------------------------------------------------------------------- */
+@keyframes chart-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.chart-draw {
+  stroke-dasharray: 1;
+  animation: chart-draw 1.1s cubic-bezier(0.45, 0, 0.2, 1) both;
+}
+@keyframes chart-fade {
+  from {
+    opacity: 0;
+  }
+}
+.chart-area {
+  animation: chart-fade 0.9s ease 0.4s both;
+}
+@keyframes bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+.bar-grow {
+  transform-origin: left;
+  animation: bar-grow 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes ring-fill {
+  from {
+    stroke-dasharray: 0 100;
+  }
+}
+.ring-fill {
+  animation: ring-fill 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+@keyframes spark-reveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.spark-reveal {
+  animation: spark-reveal 1s cubic-bezier(0.45, 0, 0.2, 1) 0.2s both;
+}
+
+/* ---------------------------------------------------------------------------
+   Queue hero (components/admin/QueueHero, Console). After Downloads/loke.jpg:
+   a flat charcoal card in Dark, a segmented donut and a dot legend. Colours checked
+   with the dataviz validator (dark surface #202126): sky and neutral grey are
+   far apart (ΔE ~22) and from the validated --sev-high, which is not re-picked.
+   --------------------------------------------------------------------------- */
+.queue-band {
+  --q-resolved: #2347d6;
+  --q-waiting: #9aa1b5;
+  --q-high: var(--sev-high);
+  --q-track: rgba(11, 26, 58, 0.08);
+}
+:root[data-theme='dark'] .hero-theme.queue-band {
+  --q-resolved: #4ea6e6;
+  --q-waiting: #6b6e78;
+  --q-track: rgba(255, 255, 255, 0.08);
+  --fg-muted: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #202126;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+@keyframes queue-turn {
+  from {
+    transform: rotate(-180deg) scale(0.9);
+    opacity: 0;
+  }
+}
+.queue-donut {
+  /* -rotate-90 from Tailwind puts 0% at twelve o'clock; this turns in to it. */
+  animation: queue-turn 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes queue-seg {
+  from {
+    stroke-dasharray: 0 100;
+  }
+}
+.queue-seg {
+  animation: queue-seg 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes queue-glint {
+  0% {
+    transform: translateX(-120%);
+  }
+  35%,
+  100% {
+    transform: translateX(320%);
+  }
+}
+.queue-glint {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: queue-glint 3.6s ease-in-out 1.4s infinite both;
+}

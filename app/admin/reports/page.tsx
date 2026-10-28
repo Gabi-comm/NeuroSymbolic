@@ -1,23 +1,20 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/utils/supabase';
-import { SeverityBadge } from '@/components/Severity';
+import { SEVERITY, SeverityBadge, StatusLabel, toSeverity, type Severity } from '@/components/Severity';
 import type { MapReport } from '@/components/ReportsMap';
 import FixReportModal, { type FixableReport } from '@/components/FixReportModal';
 import Coordinates from '@/components/Coordinates';
 import { invalidateAdminSummary } from '@/utils/adminData';
 import Pagination, { PAGE_SIZE, lastPage } from '@/components/Pagination';
+import { AdminHeader, ConfirmDialog, ErrorNote, PAGE, Toast, UnderlineTabs } from '@/components/admin/ui';
+import { IconSearch } from '@/components/shell/icons';
 
 const ReportsMap = dynamic(() => import('@/components/ReportsMap'), {
   ssr: false,
-  loading: () => (
-    <div className="w-full h-[22rem] sm:h-[30rem] rounded-2xl bg-inset flex items-center justify-center font-bold text-fg-muted">
-      Loading map…
-    </div>
-  ),
+  loading: () => <div className="skeleton w-full h-[24rem] sm:h-[32rem] rounded-2xl" />,
 });
 
 // Every report, without its photo or bulletin. A row is a few hundred bytes,
@@ -27,8 +24,7 @@ const ReportsMap = dynamic(() => import('@/components/ReportsMap'), {
 const INDEX_COLUMNS =
   'id, lat, lng, damage_type, severity, state, address, uploadtime, userid, corrected_damage_type, corrected_severity, correction_note';
 // The rest of a card, fetched only for the cards on the current pages.
-const DETAIL_COLUMNS =
-  'id, file_name, confidence, detection_details, observation_details, crack_density_pct, corrected_at';
+const DETAIL_COLUMNS = 'id, file_name, confidence, detection_details, observation_details, crack_density_pct, corrected_at';
 
 interface IndexRow extends MapReport {
   userid: string | null;
@@ -81,9 +77,7 @@ export default function AdminReports() {
     setShowMap(true);
     setTracked((prev) => ({ id: String(report.id), nonce: (prev?.nonce ?? 0) + 1 }));
     // After the map section has rendered (it may have been hidden).
-    requestAnimationFrame(() =>
-      mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    );
+    requestAnimationFrame(() => mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   };
 
   const [pendingAction, setPendingAction] = useState<{
@@ -99,10 +93,7 @@ export default function AdminReports() {
     const fetchReports = async () => {
       try {
         setIsLoading(true);
-        const { data, error } = await supabase
-          .from('FileUpload')
-          .select(INDEX_COLUMNS)
-          .order('uploadtime', { ascending: false });
+        const { data, error } = await supabase.from('FileUpload').select(INDEX_COLUMNS).order('uploadtime', { ascending: false });
 
         if (error) throw error;
         const rows = (data ?? []) as IndexRow[];
@@ -152,9 +143,7 @@ export default function AdminReports() {
     } else {
       // The Console and Dashboard counts are cached; make them refetch.
       invalidateAdminSummary();
-      setReports((prev) =>
-        prev.map((r) => (String(r.id) === String(id) ? { ...r, state: to } : r))
-      );
+      setReports((prev) => prev.map((r) => (String(r.id) === String(id) ? { ...r, state: to } : r)));
     }
     setPendingAction(null);
   };
@@ -179,8 +168,7 @@ export default function AdminReports() {
       if (item && typeof item === 'object') {
         const o = item as Record<string, unknown>;
         if (o.label) {
-          const metric =
-            o.metric_value != null ? ` — ${Number(o.metric_value).toFixed(3)} ${o.unit ?? ''}` : '';
+          const metric = o.metric_value != null ? ` — ${Number(o.metric_value).toFixed(3)} ${o.unit ?? ''}` : '';
           const width = o.width_mm != null ? `, ${Number(o.width_mm).toFixed(1)} mm wide` : '';
           return `${o.label} (${o.severity ?? 'Unknown'})${metric}${width}`;
         }
@@ -208,7 +196,7 @@ export default function AdminReports() {
     return reports.filter((report) =>
       [report.id, report.address, report.severity, report.damage_type, report.state]
         .map((field) => String(field ?? '').toLowerCase())
-        .some((field) => field.includes(query))
+        .some((field) => field.includes(query)),
     );
   }, [reports, searchQuery]);
 
@@ -219,10 +207,7 @@ export default function AdminReports() {
   const needsPageShown = Math.min(needsPage, lastPage(unresolved.length));
   const resolvedPageShown = Math.min(resolvedPage, lastPage(resolved.length));
   const needsVisible = unresolved.slice((needsPageShown - 1) * PAGE_SIZE, needsPageShown * PAGE_SIZE);
-  const resolvedVisible = resolved.slice(
-    (resolvedPageShown - 1) * PAGE_SIZE,
-    resolvedPageShown * PAGE_SIZE
-  );
+  const resolvedVisible = resolved.slice((resolvedPageShown - 1) * PAGE_SIZE, resolvedPageShown * PAGE_SIZE);
   const isResolvedView = view === 'resolved';
   const shown = isResolvedView ? resolvedVisible : needsVisible;
   // A stable key, so the detail fetch runs when the cards change, not every render.
@@ -234,9 +219,7 @@ export default function AdminReports() {
     const missing = ids.filter((id) => !(id in details));
     const people = [
       ...new Set(
-        reports
-          .filter((r) => ids.includes(String(r.id)) && r.userid && !(r.userid in filers))
-          .map((r) => r.userid as string)
+        reports.filter((r) => ids.includes(String(r.id)) && r.userid && !(r.userid in filers)).map((r) => r.userid as string),
       ),
     ];
     if (!missing.length && !people.length) return;
@@ -259,9 +242,7 @@ export default function AdminReports() {
         if (!cancelled && data) {
           setFilers((prev) => ({
             ...prev,
-            ...Object.fromEntries(
-              data.map((p) => [p.userloginuuid, { username: p.username, user_type: p.user_type }])
-            ),
+            ...Object.fromEntries(data.map((p) => [p.userloginuuid, { username: p.username, user_type: p.user_type }])),
           }));
         }
       }
@@ -278,11 +259,7 @@ export default function AdminReports() {
     if (!expandedId || expandedId in images) return;
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from('FileUpload')
-        .select('image_url')
-        .eq('id', expandedId)
-        .maybeSingle();
+      const { data } = await supabase.from('FileUpload').select('image_url').eq('id', expandedId).maybeSingle();
       if (!cancelled) setImages((prev) => ({ ...prev, [expandedId]: data?.image_url ?? null }));
     })();
     return () => {
@@ -295,75 +272,92 @@ export default function AdminReports() {
     const isOpen = expandedId === String(report.id);
     const image = images[String(report.id)];
     const observations = parseObservations(report.observation_details);
+    const sev = toSeverity(report.corrected_severity ?? report.severity);
+    const isTracked = tracked?.id === String(report.id);
+    const noCoords = report.lat == null || report.lng == null;
+    const confidencePct =
+      report.confidence == null || !Number.isFinite(report.confidence)
+        ? null
+        : Math.min(report.confidence > 1 ? report.confidence : report.confidence * 100, 100);
 
     return (
       <article
         key={report.id}
-        className="bg-surface border border-line rounded-panel p-5 sm:p-6 shadow-xl text-fg"
+        className={`relative overflow-hidden rounded-2xl border bg-surface transition-colors ${
+          isOpen ? 'border-line-strong shadow-lg' : 'border-line hover:border-line-strong'
+        }`}
       >
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 mb-1">
-              <h3 className="font-semibold text-lg truncate">
-                RPT-{String(report.id).slice(0, 8).toUpperCase()}
+        {/* Severity edge: colour beside the badge's shape and word, never colour alone. */}
+        <span
+          aria-hidden="true"
+          className="absolute inset-y-0 left-0 w-1"
+          style={{ background: sev ? SEV_COLOR[sev] : 'var(--line-strong)' }}
+        />
+
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 pl-5 sm:p-5 sm:pl-6">
+          <div className="min-w-0 grow">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h3 className="text-base font-semibold text-fg">
+                {report.corrected_damage_type ?? report.damage_type ?? 'Unclassified'}
               </h3>
               {/* The admin's verdict leads where one exists; the system's
-                  original is shown struck through beside it, never replaced. */}
-              <SeverityBadge
-                severity={report.corrected_severity ?? report.severity}
-                tone="light"
-              />
+                  original is shown beside it, never replaced. */}
+              <SeverityBadge severity={report.corrected_severity ?? report.severity} />
               {report.corrected_severity && (
-                <span className="text-[10px] font-bold text-fg-muted uppercase tracking-wide">
-                  corrected · was {report.severity}
-                </span>
+                <span className="text-[11px] font-medium text-accent">corrected · was {report.severity}</span>
+              )}
+              {report.corrected_damage_type && (
+                <span className="text-[11px] font-medium text-fg-muted">system: {report.damage_type}</span>
               )}
             </div>
-            <p className="font-bold text-sm text-fg">
-              {report.corrected_damage_type ?? report.damage_type ?? 'Unclassified'}
-              {report.corrected_damage_type && (
-                <span className="font-normal text-fg-muted">
-                  {' '}
-                  (system: {report.damage_type})
+            <p className="mt-1 text-sm text-fg-muted break-words">{report.address || 'Location unknown'}</p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg-faint">
+              <span className="font-mono">RPT-{String(report.id).slice(0, 8).toUpperCase()}</span>
+              {report.uploadtime && (
+                <span>
+                  {new Date(report.uploadtime).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </span>
               )}
-            </p>
-            <p className="text-fg-muted font-bold text-xs mt-0.5 break-words">
-              {report.address || 'Location unknown'}
-              {report.uploadtime && ` · ${new Date(report.uploadtime).toLocaleDateString('en-GB')}`}
-            </p>
-            <Coordinates lat={report.lat} lng={report.lng} tone="light" className="mt-0.5" />
-            {report.userid && (
-              <p className="text-fg-muted text-xs mt-0.5">
-                Filed by{' '}
-                <span className="font-bold text-fg">
-                  {filers[report.userid]?.username ?? 'Unknown user'}
+              {report.userid && (
+                <span>
+                  by <span className="font-semibold text-fg-muted">{filers[report.userid]?.username ?? 'Unknown user'}</span>
+                  {filers[report.userid]?.user_type && ` · ${filers[report.userid]?.user_type}`}
                 </span>
-                {filers[report.userid]?.user_type && ` · ${filers[report.userid]?.user_type}`}
-              </p>
-            )}
+              )}
+              <Coordinates lat={report.lat} lng={report.lng} />
+            </div>
           </div>
 
-          <div className="flex gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => trackReport(report)}
-              disabled={report.lat == null || report.lng == null}
-              title={report.lat == null || report.lng == null ? 'This report has no coordinates' : undefined}
-              className={`px-5 py-2 rounded-full font-bold text-xs transition-all border shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
-                tracked?.id === String(report.id)
-                  ? 'bg-blue-50 border-oasys-blue text-blue-700'
-                  : 'border-line text-fg hover:bg-inset'
+              disabled={noCoords}
+              title={noCoords ? 'This report has no coordinates' : 'Show on the map'}
+              aria-pressed={isTracked}
+              className={`inline-flex items-center gap-1.5 h-10 px-4 rounded-xl border text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                isTracked ? 'border-accent text-accent' : 'border-line text-fg hover:border-line-strong'
               }`}
             >
-              Track report
+              <svg
+                viewBox="0 0 24 24"
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 2v3m0 14v3M2 12h3m14 0h3" />
+              </svg>
+              Track
             </button>
             <button
               onClick={() => setExpandedId(isOpen ? null : String(report.id))}
               aria-expanded={isOpen}
-              className={`px-6 py-2 rounded-full font-bold text-xs transition-all shadow shrink-0 ${
-                isOpen
-                  ? 'bg-inset text-fg hover:bg-inset'
-                  : 'bg-oasys-blue text-accent-fg hover:bg-blue-600'
+              className={`h-10 px-5 rounded-xl text-sm font-semibold transition-colors ${
+                isOpen ? 'border border-line text-fg hover:border-line-strong' : 'btn-blue'
               }`}
             >
               {isOpen ? 'Close' : 'Review'}
@@ -372,91 +366,64 @@ export default function AdminReports() {
         </div>
 
         {isOpen && (
-          <div className="border-t border-line pt-5 mt-5 flex flex-col lg:flex-row gap-5">
-            <div className="w-full lg:w-1/2 flex flex-col gap-2">
-              <div className="w-full aspect-video bg-black rounded-xl overflow-hidden">
+          <div className="pop-in border-t border-line p-4 pl-5 sm:p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="flex flex-col gap-4">
+              <div className="w-full aspect-video rounded-xl overflow-hidden bg-inset border border-line">
                 {image === undefined ? (
-                  <p className="w-full h-full flex items-center justify-center text-fg-muted text-sm font-bold animate-pulse">
-                    Loading image…
-                  </p>
+                  <div className="skeleton w-full h-full" />
                 ) : image ? (
                   // eslint-disable-next-line @next/next/no-img-element -- base64 data URL from the API
-                  <img
-                    src={image}
-                    alt={`Analysed road image for report ${report.id}`}
-                    className="w-full h-full object-contain"
-                  />
+                  <img src={image} alt={`Analysed road image for report ${report.id}`} className="w-full h-full object-contain" />
                 ) : (
-                  <p className="w-full h-full flex items-center justify-center text-fg-muted text-sm font-bold">
-                    No image
-                  </p>
+                  <p className="w-full h-full grid place-items-center text-sm text-fg-muted">No image</p>
                 )}
               </div>
-              <div className="flex justify-between items-center text-xs gap-3">
-                <span className="font-semibold text-fg truncate" title={report.file_name ?? ''}>
-                  {report.file_name || 'unknown file'}
-                </span>
-                <span className="whitespace-nowrap shrink-0">
-                  <span className="font-bold text-fg-muted">Confidence </span>
-                  <span className="text-blue-700 font-semibold">
-                    {formatConfidence(report.confidence ?? null)}
-                  </span>
-                </span>
+              <p className="text-xs text-fg-faint truncate" title={report.file_name ?? ''}>
+                {report.file_name || 'unknown file'}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Meter label="Detector confidence" value={confidencePct} text={formatConfidence(report.confidence ?? null)} />
+                <Meter
+                  label="Crack density"
+                  // Densities run a few percent, so 10 % fills the bar.
+                  value={report.crack_density_pct == null ? null : Math.min(report.crack_density_pct * 10, 100)}
+                  text={report.crack_density_pct == null ? 'N/A' : `${report.crack_density_pct.toFixed(2)}%`}
+                  color={sev ? SEV_COLOR[sev] : undefined}
+                />
               </div>
-              {report.crack_density_pct != null && (
-                <p className="text-xs font-bold text-fg-muted">
-                  Distress density: {report.crack_density_pct.toFixed(2)}%
-                </p>
-              )}
             </div>
 
-            <div className="w-full lg:w-1/2 flex flex-col">
-              <h4 className="text-xs font-semibold mb-1 uppercase tracking-wider">
-                Maintenance bulletin
-              </h4>
-              <p className="text-xs leading-relaxed mb-4 text-fg-muted whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar">
-                {report.detection_details || 'No bulletin recorded.'}
-              </p>
-
-              <div className="bg-inset p-3 rounded-xl border border-line mb-4">
-                <h4 className="font-semibold text-[10px] mb-2 text-blue-700 uppercase tracking-widest">
-                  Detected distresses
-                </h4>
-                <ul className="text-[11px] space-y-1 list-disc list-inside font-medium text-fg">
+            <div className="flex flex-col gap-4 min-w-0">
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-fg-muted mb-2">Detected distresses</h4>
+                <ul className="flex flex-col divide-y divide-line rounded-xl border border-line">
                   {observations.map((line, idx) => (
-                    <li key={idx}>{line}</li>
+                    <li key={idx} className="px-3 py-2 text-sm text-fg">
+                      {line}
+                    </li>
                   ))}
                 </ul>
               </div>
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-fg-muted mb-2">Maintenance bulletin</h4>
+                <p className="rounded-xl bg-inset border border-line p-3 text-[13px] leading-relaxed text-fg-soft whitespace-pre-wrap max-h-56 overflow-y-auto custom-scrollbar">
+                  {report.detection_details || 'No bulletin recorded.'}
+                </p>
+              </div>
 
-              <div className="mt-auto flex flex-wrap justify-between items-end gap-3 pt-2 border-t border-line">
-                <div>
-                  <p className="text-[10px] font-bold uppercase text-fg-muted mb-1">
-                    Current state
-                  </p>
-                  <span
-                    className={`text-[10px] px-2 py-1 rounded font-semibold uppercase tracking-wider ${
-                      isResolvedColumn
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-amber-100 text-amber-900'
-                    }`}
-                  >
-                    {report.state || 'Needs Action'}
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2.5">
+              <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-line">
+                <StatusLabel state={report.state} />
+                <div className="flex flex-wrap gap-2">
                   {/* Resolving says the report was right and the work is done.
                       Fixing says something in it is wrong. They are different
                       judgements, so they are different buttons -- and the fix
-                      is the quieter of the two, because most reports need it. */}
+                      is the quieter of the two. */}
                   <button
                     onClick={() => setFixing(report)}
-                    className="px-5 py-2.5 rounded-xl font-bold text-xs transition-colors border border-line text-fg hover:bg-inset hover:border-line"
+                    className="h-10 px-4 rounded-xl border border-line text-sm font-semibold text-fg hover:border-line-strong"
                   >
                     Fix report
                   </button>
-
                   <button
                     onClick={() =>
                       setPendingAction({
@@ -464,13 +431,11 @@ export default function AdminReports() {
                         to: isResolvedColumn ? 'Needs Action' : 'Resolved',
                       })
                     }
-                    className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow ${
-                      isResolvedColumn
-                        ? 'bg-fg text-bg hover:bg-fg-soft'
-                        : 'bg-[#15803d] text-white hover:bg-[#166534]'
+                    className={`h-10 px-4 rounded-xl text-sm font-semibold transition ${
+                      isResolvedColumn ? 'bg-fg text-bg hover:opacity-90' : 'bg-ok text-white hover:brightness-110'
                     }`}
                   >
-                    {isResolvedColumn ? 'Reopen report' : 'Mark resolved'}
+                    {isResolvedColumn ? 'Reopen' : 'Mark resolved'}
                   </button>
                 </div>
               </div>
@@ -481,189 +446,146 @@ export default function AdminReports() {
     );
   };
 
+  const queueSev: Record<Severity, number> = { High: 0, Medium: 0, Low: 0 };
+  for (const r of isResolvedView ? resolved : unresolved) {
+    const s = toSeverity(r.corrected_severity ?? r.severity);
+    if (s) queueSev[s] += 1;
+  }
+  const mapped = filtered.filter((r) => r.lat != null).length;
+
   return (
-    <div className="min-h-screen">
-      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-12 pt-8 md:pt-12 pb-12 shadow-[0_24px_70px_-24px_rgba(59,130,246,0.30)]">
-        <div className="max-w-7xl mx-auto flex justify-between items-end gap-4">
-          <div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold mb-2">Reports</h1>
-            <p className="text-oasys-blue text-sm font-bold uppercase tracking-widest">
-              Master database
-            </p>
-          </div>
-          <Link
-            href="/admin/dashboard"
-            className="text-fg-muted hover:text-fg font-bold text-sm transition-colors shrink-0"
+    <main className={PAGE}>
+      <AdminHeader eyebrow="Admin" title="Reports">
+        <button
+          onClick={() => setShowMap((open) => !open)}
+          aria-expanded={showMap}
+          className="inline-flex items-center gap-2 h-11 px-4 rounded-xl border border-line bg-surface text-sm font-semibold text-fg hover:border-line-strong"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
           >
-            &larr; Dashboard
-          </Link>
-        </div>
-      </header>
+            <path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Z" />
+            <path d="M9 3v15m6-12v15" />
+          </svg>
+          {showMap ? 'Hide map' : 'Show map'}
+        </button>
+      </AdminHeader>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-12 mt-8 pb-20">
-        {loadError && (
-          <div
-            role="alert"
-            className="bg-danger/10 border border-danger/40 text-danger rounded-panel p-5 mb-6"
-          >
-            <p className="font-bold mb-1">Could not load reports</p>
-            <p className="text-sm">{loadError}</p>
-          </div>
-        )}
+      {loadError && <ErrorNote title="Could not load reports" message={loadError} />}
 
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <label className="sr-only" htmlFor="search">
-            Search reports
-          </label>
-          <input
-            id="search"
-            type="search"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setNeedsPage(1);
-              setResolvedPage(1);
-            }}
-            placeholder="Search by location, severity, distress type or ID…"
-            className="off-brand grow bg-surface rounded-full px-6 py-3.5 text-fg font-semibold shadow-lg focus:outline-none focus:ring-4 focus:ring-oasys-blue/50 placeholder:text-fg-faint"
-          />
-          <button
-            onClick={() => setShowMap((open) => !open)}
-            aria-expanded={showMap}
-            className="bg-fg/5 hover:bg-fg/10 text-fg border border-line-strong px-6 py-3.5 rounded-full font-bold text-sm transition-colors shrink-0"
-          >
-            {showMap ? 'Hide map' : 'Show map'}
-          </button>
-        </div>
-
-        {showMap && (
-          <section
-            ref={mapRef}
-            className="bg-panel-gradient rounded-panel p-4 sm:p-6 border border-line mb-6 scroll-mt-28"
-          >
-            <h2 className="font-bold text-sm text-fg-muted mb-4">
-              Defect locations{' '}
-              <span className="text-fg-muted">
-                ({filtered.filter((r) => r.lat != null).length} mapped)
-              </span>
-            </h2>
-            {!isLoading && (
-              <ReportsMap
-                reports={filtered}
-                trackedId={tracked?.id ?? null}
-                trackNonce={tracked?.nonce ?? 0}
-              />
-            )}
-          </section>
-        )}
-
-        {isLoading && (
-          <p className="text-center text-fg font-bold py-10 text-lg">
-            Loading database records…
-          </p>
-        )}
-
-        {!isLoading && filtered.length === 0 && (
-          <div className="bg-fg/10 rounded-panel p-10 text-center border border-line-strong">
-            <h2 className="text-fg text-xl font-semibold mb-2">No reports found</h2>
-            <p className="text-fg-muted font-bold">
-              {reports.length === 0
-                ? 'Nothing has been submitted yet.'
-                : 'Try adjusting your search terms.'}
-            </p>
-          </div>
-        )}
-
-        {!isLoading && filtered.length > 0 && (
-          <section className="flex flex-col gap-5">
-            <div
-              role="group"
-              aria-label="Report queue"
-              className="flex w-full sm:w-max gap-6 border-b border-line"
-            >
-              {(
-                [
-                  { key: 'needs', label: 'Needs action', count: unresolved.length, dot: 'bg-sev-medium' },
-                  { key: 'resolved', label: 'Resolved', count: resolved.length, dot: 'bg-sev-low' },
-                ] as const
-              ).map((tab) => {
-                const active = view === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setView(tab.key)}
-                    className={`relative flex-1 sm:flex-none flex items-center justify-center gap-2.5 pb-3 text-sm uppercase tracking-widest transition-colors after:absolute after:left-0 after:right-0 after:-bottom-px after:h-0.5 after:rounded-full after:bg-accent after:origin-left after:transition-transform after:duration-300 ${
-                      active ? 'font-bold text-fg after:scale-x-100' : 'font-semibold text-fg-muted hover:text-fg after:scale-x-0'
-                    }`}
-                  >
-                    <span aria-hidden="true" className={`w-2.5 h-2.5 rounded-full ${tab.dot}`} />
-                    {tab.label}
-                    <span className="tabular-nums text-fg-muted">
-                      {tab.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {shown.length === 0 ? (
-              <p className="text-fg-soft font-medium px-1 italic">
-                {isResolvedView ? 'No resolved reports.' : 'All caught up — nothing pending.'}
-              </p>
-            ) : (
-              <div className="flex flex-col gap-5">
-                {shown.map((report) => renderCard(report, isResolvedView))}
-              </div>
-            )}
-            <Pagination
-              key={view}
-              page={isResolvedView ? resolvedPageShown : needsPageShown}
-              total={isResolvedView ? resolved.length : unresolved.length}
-              onChange={isResolvedView ? setResolvedPage : setNeedsPage}
-              label={isResolvedView ? 'Resolved' : 'Needs action'}
-            />
-          </section>
-        )}
+      <div className="page-enter relative mb-4">
+        <label className="sr-only" htmlFor="search">
+          Search reports
+        </label>
+        <IconSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-fg-faint" />
+        <input
+          id="search"
+          type="search"
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setNeedsPage(1);
+            setResolvedPage(1);
+          }}
+          placeholder="Search location, severity, distress type or ID"
+          className="w-full h-12 rounded-xl border border-line bg-surface pl-11 pr-4 text-sm text-fg placeholder:text-fg-faint focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/15"
+        />
       </div>
 
-      {pendingAction && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="confirm-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-        >
-          <div className="bg-surface rounded-panel p-7 max-w-sm w-full shadow-2xl">
-            <h2 id="confirm-title" className="text-xl font-semibold text-fg mb-2">
-              {pendingAction.to === 'Resolved' ? 'Resolve report?' : 'Reopen report?'}
-            </h2>
-            <p className="text-fg-muted font-medium text-sm mb-7">
-              {pendingAction.to === 'Resolved'
-                ? 'This moves the report to the resolved queue.'
-                : 'This moves the report back to the Needs Action queue.'}
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setPendingAction(null)}
-                className="flex-1 bg-inset text-fg py-3 rounded-xl font-bold text-sm hover:bg-inset transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={applyStateChange}
-                className={`flex-1 py-3 rounded-xl font-bold text-sm transition-colors ${
-                  pendingAction.to === 'Resolved'
-                    ? 'bg-[#15803d] text-white hover:bg-[#166534]'
-                    : 'bg-fg text-bg hover:bg-fg-soft'
-                }`}
-              >
-                {pendingAction.to === 'Resolved' ? 'Resolve' : 'Reopen'}
-              </button>
-            </div>
-          </div>
+      {showMap && (
+        <section ref={mapRef} className="page-enter mb-4 scroll-mt-24 rounded-2xl bg-surface border border-line p-3 sm:p-4">
+          <h2 className="px-1 mb-3 text-base font-semibold text-fg">
+            Map <span className="ml-1 text-sm font-normal text-fg-muted">{mapped} mapped</span>
+          </h2>
+          {!isLoading && (
+            <ReportsMap
+              reports={filtered}
+              trackedId={tracked?.id ?? null}
+              trackNonce={tracked?.nonce ?? 0}
+              heightClass="h-[24rem] sm:h-[32rem]"
+            />
+          )}
+        </section>
+      )}
+
+      {isLoading && (
+        <div className="flex flex-col gap-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="skeleton h-24 rounded-2xl" />
+          ))}
         </div>
+      )}
+
+      {!isLoading && filtered.length === 0 && (
+        <div className="rounded-2xl border border-line bg-surface p-10 text-center">
+          <IconSearch className="mx-auto w-8 h-8 text-fg-faint" />
+          <h2 className="mt-3 text-lg font-semibold text-fg">No reports found</h2>
+          <p className="mt-1 text-sm text-fg-muted">
+            {reports.length === 0 ? 'Nothing has been submitted yet.' : 'Try another search.'}
+          </p>
+        </div>
+      )}
+
+      {!isLoading && filtered.length > 0 && (
+        <section className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+            <UnderlineTabs
+              label="Report queue"
+              value={view}
+              onChange={setView}
+              tabs={[
+                { key: 'needs', label: 'Needs action', count: unresolved.length },
+                { key: 'resolved', label: 'Resolved', count: resolved.length },
+              ]}
+            />
+            <ul className="flex gap-4 text-xs text-fg-muted" aria-label="Severity in this queue">
+              {(['High', 'Medium', 'Low'] as Severity[]).map((s) => (
+                <li key={s} className="flex items-center gap-1.5">
+                  <span className={SEVERITY[s].text}>{SEVERITY[s].icon}</span>
+                  {s}
+                  <span className="font-stat text-sm text-fg">{queueSev[s]}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {shown.length === 0 ? (
+            <p className="rounded-2xl border border-line bg-surface p-8 text-center text-sm text-fg-muted">
+              {isResolvedView ? 'No resolved reports.' : 'All caught up, nothing pending.'}
+            </p>
+          ) : (
+            <div className="stagger flex flex-col gap-3">{shown.map((report) => renderCard(report, isResolvedView))}</div>
+          )}
+          <Pagination
+            key={view}
+            page={isResolvedView ? resolvedPageShown : needsPageShown}
+            total={isResolvedView ? resolved.length : unresolved.length}
+            onChange={isResolvedView ? setResolvedPage : setNeedsPage}
+            label={isResolvedView ? 'Resolved' : 'Needs action'}
+          />
+        </section>
+      )}
+
+      {pendingAction && (
+        <ConfirmDialog
+          title={pendingAction.to === 'Resolved' ? 'Resolve report?' : 'Reopen report?'}
+          body={
+            pendingAction.to === 'Resolved'
+              ? 'This moves the report to the resolved queue.'
+              : 'This moves the report back to the Needs action queue.'
+          }
+          confirm={pendingAction.to === 'Resolved' ? 'Resolve' : 'Reopen'}
+          tone={pendingAction.to === 'Resolved' ? 'ok' : 'neutral'}
+          onCancel={() => setPendingAction(null)}
+          onConfirm={applyStateChange}
+        />
       )}
 
       {fixing && (
@@ -672,27 +594,45 @@ export default function AdminReports() {
           onClose={() => setFixing(null)}
           onSaved={(patch) => {
             invalidateAdminSummary();
-            setReports((prev) =>
-              prev.map((r) => (String(r.id) === String(fixing.id) ? { ...r, ...patch } : r))
-            );
+            setReports((prev) => prev.map((r) => (String(r.id) === String(fixing.id) ? { ...r, ...patch } : r)));
           }}
         />
       )}
 
-      {actionError && (
-        <div
-          role="alert"
-          className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-danger/10 border border-danger/40 text-danger px-5 py-3 rounded-xl shadow-2xl max-w-md"
-        >
-          <p className="text-sm font-bold">{actionError}</p>
-          <button
-            onClick={() => setActionError(null)}
-            className="text-xs underline mt-1 font-bold"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
+      {actionError && <Toast message={actionError} onDismiss={() => setActionError(null)} />}
+    </main>
+  );
+}
+
+const SEV_COLOR: Record<Severity, string> = {
+  High: 'var(--sev-high)',
+  Medium: 'var(--sev-medium)',
+  Low: 'var(--sev-low)',
+};
+
+/** A labelled 0-100 bar for one measurement. */
+function Meter({
+  label,
+  value,
+  text,
+  color = 'var(--accent)',
+}: {
+  label: string;
+  value: number | null;
+  text: string;
+  color?: string;
+}) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2 mb-1.5">
+        <span className="text-xs font-medium text-fg-muted">{label}</span>
+        <span className="font-stat text-lg leading-none text-fg">{text}</span>
+      </div>
+      <div className="h-2 rounded-full bg-fg/[0.07] overflow-hidden">
+        {value != null && (
+          <div className="bar-grow h-full rounded-full" style={{ width: `${Math.max(value, 2)}%`, background: color }} />
+        )}
+      </div>
     </div>
   );
 }

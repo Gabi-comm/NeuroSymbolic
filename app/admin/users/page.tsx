@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/utils/supabase';
 import Pagination, { pageRange } from '@/components/Pagination';
+import { ProgressList } from '@/components/Charts';
+import { AdminHeader, ConfirmDialog, ErrorNote, PAGE, Panel, Toast, UnderlineTabs } from '@/components/admin/ui';
 
 interface UserProfile {
   // The primary key. userloginuuid is null on older accounts, so it cannot
@@ -33,9 +35,7 @@ function applyFilter<Q extends { eq: any; or: any }>(query: Q, filter: Filter): 
   if (filter === 'All') return query;
   if (filter === 'Admin') return query.eq('role', 'admin');
   const nonAdmin = query.or('role.is.null,role.neq.admin');
-  return filter === 'Civilian'
-    ? nonAdmin.or('user_type.is.null,user_type.eq.Civilian')
-    : nonAdmin.eq('user_type', filter);
+  return filter === 'Civilian' ? nonAdmin.or('user_type.is.null,user_type.eq.Civilian') : nonAdmin.eq('user_type', filter);
 }
 
 export default function UserManagementPage() {
@@ -72,9 +72,7 @@ export default function UserManagementPage() {
     let isMounted = true;
     (async () => {
       const results = await Promise.all(
-        FILTERS.map((f) =>
-          applyFilter(supabase.from('UserDetail').select('id', { count: 'exact', head: true }), f)
-        )
+        FILTERS.map((f) => applyFilter(supabase.from('UserDetail').select('id', { count: 'exact', head: true }), f)),
       );
       if (isMounted) setCounts(Object.fromEntries(FILTERS.map((f, i) => [f, results[i].count ?? 0])));
     })();
@@ -90,10 +88,7 @@ export default function UserManagementPage() {
         setIsLoading(true);
         setLoadError(null);
         const [from, to] = pageRange(page);
-        const { data, error, count } = await applyFilter(
-          supabase.from('UserDetail').select('*', { count: 'exact' }),
-          filter
-        )
+        const { data, error, count } = await applyFilter(supabase.from('UserDetail').select('*', { count: 'exact' }), filter)
           .order('username', { ascending: true })
           .order('id', { ascending: true })
           .range(from, to);
@@ -134,10 +129,7 @@ export default function UserManagementPage() {
       return;
     }
 
-    const { error } = await supabase
-      .from('UserDetail')
-      .update({ role: newRole })
-      .eq('id', user.id);
+    const { error } = await supabase.from('UserDetail').update({ role: newRole }).eq('id', user.id);
 
     if (error) {
       setActionError(`Could not update the role: ${error.message}`);
@@ -150,169 +142,151 @@ export default function UserManagementPage() {
   const applyUserType = async (user: UserProfile, userType: string) => {
     setActionError(null);
     setSavingType(user.id);
-    const { error } = await supabase
-      .from('UserDetail')
-      .update({ user_type: userType })
-      .eq('id', user.id);
+    const { error } = await supabase.from('UserDetail').update({ user_type: userType }).eq('id', user.id);
     if (error) {
       setActionError(`Could not update the reporter type: ${error.message}`);
     } else {
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === user.id ? { ...u, user_type: userType } : u
-        )
-      );
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, user_type: userType } : u)));
       reload();
     }
     setSavingType(null);
   };
 
+  const composition = [...USER_TYPES, 'Admin' as const].map((t) => ({
+    label: t === 'Admin' ? 'Admins' : `${t}s`,
+    name: t,
+    value: counts[t] ?? 0,
+  }));
+
   return (
-    <div className="min-h-screen">
-      {/* Console, Dashboard and Reports all open with this band; Users was the
-          one tab that did not, and it used a flat zinc card while the others
-          used the panel gradient. Two of the four admin tabs looking like a
-          different product is a background problem, so it is fixed here.
+    <main className={PAGE}>
+      <AdminHeader eyebrow="Access control" title="Users" />
 
-          The "← Dashboard" button that lived in this header is gone: Dashboard
-          is a nav tab now, which is where a reader looks for it. */}
-      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-10 pt-8 md:pt-12 pb-20 shadow-[0_24px_70px_-24px_rgba(59,130,246,0.30)]">
-        <div className="max-w-4xl mx-auto">
-          <p className="text-oasys-blue text-sm font-bold uppercase tracking-widest mb-2">
-            Access control
+      {loadError && <ErrorNote title="Could not load users" message={loadError} />}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+        <Panel title="Accounts" className="lg:sticky lg:top-6">
+          <p className="font-stat text-5xl leading-none text-fg">
+            {counts.All === undefined ? <span className="skeleton inline-block h-10 w-16 rounded-lg" /> : accountCount}
           </p>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight mb-3">
-            Users
-          </h1>
-          <p className="text-lg text-fg-soft max-w-2xl">
+          <p className="mt-1 text-sm text-fg-muted">{adminCount} with admin access</p>
+          <div className="mt-6">
             {counts.All === undefined ? (
-              <span className="text-fg-muted">Loading accounts…</span>
+              <div className="skeleton h-40 rounded-xl" />
             ) : (
-              <>
-                <strong className="text-fg">
-                  {accountCount} account{accountCount === 1 ? '' : 's'}
-                </strong>
-                {adminCount > 0 && (
-                  <>
-                    , <strong className="text-fg">{adminCount}</strong> with
-                    admin access
-                  </>
-                )}
-                .
-              </>
+              <ProgressList items={composition} total={accountCount} emptyMessage="No accounts yet." />
             )}
-          </p>
-        </div>
-      </header>
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-10 -mt-12 relative z-10 pb-20">
-        <div className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-fg border border-line">
-          {loadError && (
-            <div
-              role="alert"
-              className="bg-danger/10 border border-danger/40 text-danger rounded-xl p-4 mb-6"
-            >
-              <p className="font-bold mb-1">Could not load users</p>
-              <p className="text-sm">{loadError}</p>
-            </div>
-          )}
-
-          <div role="group" aria-label="Filter accounts" className="flex flex-wrap gap-2 mb-4">
-            {FILTERS.map((f) => (
-              <button
-                key={f}
-                type="button"
-                aria-pressed={filter === f}
-                onClick={() => {
-                  setFilter(f);
-                  setPage(1);
-                }}
-                className={`px-4 py-2 rounded-full text-xs font-bold border transition-colors ${
-                  filter === f
-                    ? 'bg-oasys-blue text-accent-fg border-oasys-blue'
-                    : 'bg-fg/5 text-fg-soft border-line hover:bg-fg/10'
-                }`}
-              >
-                {f}
-                {counts[f] !== undefined && (
-                  <span className={filter === f ? 'text-accent' : 'text-fg-muted'}> {counts[f]}</span>
-                )}
-              </button>
-            ))}
           </div>
+        </Panel>
 
+        <Panel
+          className="lg:col-span-2"
+          title={
+            <UnderlineTabs
+              label="Filter accounts"
+              value={filter}
+              onChange={(f) => {
+                setFilter(f);
+                setPage(1);
+              }}
+              tabs={FILTERS.map((f) => ({ key: f, label: f, count: counts[f] }))}
+            />
+          }
+        >
           {isLoading && users.length === 0 ? (
-            <p className="text-center text-fg-muted font-bold py-10">Loading users…</p>
+            <div className="flex flex-col gap-3">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="skeleton h-14 rounded-xl" />
+              ))}
+            </div>
           ) : users.length === 0 ? (
-            <p className="text-center text-fg-muted font-bold py-10">
+            <p className="py-10 text-center text-sm text-fg-muted">
               {filter === 'All' ? 'No users found.' : `No ${filter.toLowerCase()} accounts.`}
             </p>
           ) : (
-            <ul
-              className={`flex flex-col divide-y divide-line transition-opacity ${
-                isLoading ? 'opacity-50' : ''
-              }`}
-            >
+            <ul className={`stagger -my-2 divide-y divide-line transition-opacity ${isLoading ? 'opacity-50' : ''}`}>
               {users.map((user) => {
                 const role = (user.role || 'user').toLowerCase();
                 const isSelf = user.userloginuuid != null && user.userloginuuid === currentAdminId;
+                const name = user.username || 'Unnamed user';
 
                 return (
-                  <li
-                    key={user.id}
-                    className="flex flex-col sm:flex-row sm:items-center gap-3 py-4"
-                  >
-                    <div className="grow min-w-0">
-                      <p className="font-bold truncate">
-                        {user.username || 'Unnamed user'}
-                        {isSelf && <span className="text-oasys-blue ml-2 text-sm">(you)</span>}
-                      </p>
-                      <p className="text-fg-muted text-sm truncate">{user.email || 'No email'}</p>
+                  <li key={user.id} className="flex flex-col sm:flex-row sm:items-center gap-3 py-3.5">
+                    <div className="flex items-center gap-3 grow min-w-0">
+                      <span
+                        aria-hidden="true"
+                        className="grid place-items-center w-10 h-10 rounded-full bg-accent-soft text-accent font-semibold shrink-0"
+                      >
+                        {name.charAt(0).toUpperCase()}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-fg truncate">
+                          {name}
+                          {isSelf && <span className="ml-2 text-xs font-medium text-accent">you</span>}
+                        </span>
+                        <span className="block text-xs text-fg-muted truncate">{user.email || 'No email'}</span>
+                      </span>
                     </div>
 
-                    {role !== 'admin' && (
-                      <label className="flex items-center gap-2 shrink-0 text-xs text-fg-muted font-bold">
-                        <span className="sr-only sm:not-sr-only">Type</span>
-                        <select
-                          value={user.user_type ?? 'Civilian'}
-                          disabled={savingType === user.id}
-                          onChange={(e) => applyUserType(user, e.target.value)}
-                          aria-label={`Reporter type for ${user.username || user.email || 'this user'}`}
-                          className="bg-surface text-fg border border-line-strong rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-60"
-                        >
-                          {USER_TYPES.map((t) => (
-                            <option key={t} value={t}>
-                              {t}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-bold uppercase shrink-0 w-max ${
-                        role === 'admin'
-                          ? 'bg-oasys-blue/20 text-accent border border-oasys-blue/40'
-                          : 'bg-fg/5 text-fg-muted border border-line'
-                      }`}
-                    >
-                      {roleLabel(role)}
-                    </span>
-
-                    {isSelf ? (
-                      <span className="text-xs text-fg-muted italic shrink-0 sm:w-44 sm:text-right">
-                        Protected
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() =>
-                          setPending({ user, newRole: role === 'admin' ? 'user' : 'admin' })
-                        }
-                        className="text-xs font-bold text-fg bg-fg/10 hover:bg-fg/15 px-4 py-2 rounded-lg transition-colors shrink-0 sm:w-44"
+                    <div className="flex items-center gap-3 sm:gap-4 shrink-0 pl-[52px] sm:pl-0">
+                      {/* Role: glyph + word, no chip behind it. */}
+                      <span
+                        className={`inline-flex items-center gap-1.5 w-16 text-[11px] font-semibold uppercase tracking-wide ${
+                          role === 'admin' ? 'text-accent' : 'text-fg-muted'
+                        }`}
                       >
-                        {role === 'admin' ? 'Remove admin' : 'Make admin'}
-                      </button>
-                    )}
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="w-3.5 h-3.5"
+                          fill={role === 'admin' ? 'currentColor' : 'none'}
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          {role === 'admin' ? (
+                            <path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6Z" />
+                          ) : (
+                            <>
+                              <circle cx="12" cy="8" r="4" />
+                              <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
+                            </>
+                          )}
+                        </svg>
+                        {roleLabel(role)}
+                      </span>
+
+                      {role !== 'admin' ? (
+                        <label className="shrink-0">
+                          <span className="sr-only">Reporter type for {user.username || user.email || 'this user'}</span>
+                          <select
+                            value={user.user_type ?? 'Civilian'}
+                            disabled={savingType === user.id}
+                            onChange={(e) => applyUserType(user, e.target.value)}
+                            className="h-9 rounded-lg border border-line bg-surface px-2.5 text-xs font-semibold text-fg hover:border-line-strong disabled:opacity-60"
+                          >
+                            {USER_TYPES.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      ) : (
+                        <span className="w-[6.4rem] hidden sm:block" />
+                      )}
+
+                      {isSelf ? (
+                        <span className="w-28 text-right text-xs text-fg-faint">Protected</span>
+                      ) : (
+                        <button
+                          onClick={() => setPending({ user, newRole: role === 'admin' ? 'user' : 'admin' })}
+                          className="w-28 h-9 rounded-lg border border-line text-xs font-semibold text-fg hover:border-line-strong transition-colors"
+                        >
+                          {role === 'admin' ? 'Remove admin' : 'Make admin'}
+                        </button>
+                      )}
+                    </div>
                   </li>
                 );
               })}
@@ -322,55 +296,28 @@ export default function UserManagementPage() {
           <div className="mt-4">
             <Pagination page={page} total={total} onChange={setPage} label="Accounts" />
           </div>
-        </div>
+        </Panel>
       </div>
 
       {pending && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="role-dialog-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-        >
-          <div className="pop-in bg-surface border border-line rounded-panel p-7 max-w-sm w-full shadow-2xl text-fg">
-            <h2 id="role-dialog-title" className="text-xl font-semibold mb-2">
-              {pending.newRole === 'admin' ? 'Make admin?' : 'Remove admin access?'}
-            </h2>
-            <p className="text-fg-muted font-medium text-sm mb-7">
+        <ConfirmDialog
+          title={pending.newRole === 'admin' ? 'Make admin?' : 'Remove admin access?'}
+          body={
+            <>
               {pending.user.username || pending.user.email || 'This account'} will
               {pending.newRole === 'admin'
                 ? ' gain full access to every report and user.'
                 : ' lose admin access and become a regular user.'}
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setPending(null)}
-                className="flex-1 bg-inset py-3 rounded-xl font-bold text-sm hover:bg-inset transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={applyRoleChange}
-                className="flex-1 bg-oasys-blue text-accent-fg py-3 rounded-xl font-bold text-sm hover:bg-blue-600 transition-colors"
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+          confirm={pending.newRole === 'admin' ? 'Make admin' : 'Remove access'}
+          tone={pending.newRole === 'admin' ? 'accent' : 'danger'}
+          onCancel={() => setPending(null)}
+          onConfirm={applyRoleChange}
+        />
       )}
 
-      {actionError && (
-        <div
-          role="alert"
-          className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-danger/10 border border-danger/40 text-danger px-5 py-3 rounded-xl shadow-2xl max-w-md"
-        >
-          <p className="text-sm font-bold">{actionError}</p>
-          <button onClick={() => setActionError(null)} className="text-xs underline mt-1 font-bold">
-            Dismiss
-          </button>
-        </div>
-      )}
-    </div>
+      {actionError && <Toast message={actionError} onDismiss={() => setActionError(null)} />}
+    </main>
   );
 }

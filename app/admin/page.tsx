@@ -2,8 +2,13 @@
 
 import { useMemo } from 'react';
 import Link from 'next/link';
-import { SeverityBadge } from '@/components/Severity';
+import { SEVERITY, SeverityBadge } from '@/components/Severity';
 import { useAdminSession, useAdminSummary } from '@/utils/adminData';
+import { ago, dailySeries, isResolved, severityOf, waitingAge } from '@/utils/adminStats';
+import { ProgressList } from '@/components/Charts';
+import { AdminHeader, ErrorNote, PAGE, Panel, StatTile } from '@/components/admin/ui';
+import { QueueBar, QueueDial } from '@/components/admin/QueueHero';
+import { IconArrow, IconList, IconUsers } from '@/components/shell/icons';
 
 /**
  * Front door for the admin side.
@@ -16,233 +21,247 @@ import { useAdminSession, useAdminSummary } from '@/utils/adminData';
  * this wants to know whether anything is waiting, not how many reports have ever
  * been filed.
  */
-interface Stats {
-  total: number;
-  pending: number;
-  high: number;
-  resolved: number;
-  users: number;
-  corrected: number;
+
+function greeting(now = new Date()) {
+  const h = now.getHours();
+  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
 
-const SECTIONS = [
-  {
-    href: '/admin/dashboard',
-    title: 'Dashboard',
-    detail: 'Submission trends, distress-type breakdown and resolution status.',
-    icon: (
-      <>
-        <path d="M3 3v18h18" />
-        <path d="m19 9-5 5-4-4-3 3" />
-      </>
-    ),
-  },
-  {
-    href: '/admin/reports',
-    title: 'Reports',
-    detail: 'Every submitted assessment, with a map, corrections and resolution.',
-    icon: (
-      <>
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-        <path d="M14 2v6h6" />
-        <path d="M8 13h8M8 17h5" />
-      </>
-    ),
-  },
-  {
-    href: '/admin/users',
-    title: 'Users',
-    detail: 'View accounts, assign reporter types and grant admin access.',
-    icon: (
-      <>
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      </>
-    ),
-  },
-];
+const IconClock = ({ className }: { className?: string }) => (
+  <svg
+    viewBox="0 0 24 24"
+    width="20"
+    height="20"
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.9"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </svg>
+);
+const IconCheck = ({ className }: { className?: string }) => (
+  <svg
+    viewBox="0 0 24 24"
+    width="20"
+    height="20"
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.9"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <circle cx="12" cy="12" r="9" />
+    <path d="m8.5 12.5 2.5 2.5 4.5-5" />
+  </svg>
+);
 
 export default function AdminHome() {
   const username = useAdminSession()?.username ?? null;
   const { data, error: loadError } = useAdminSummary();
+  const loading = !data && !loadError;
 
-  // Derived from the one summary instead of six count queries. A report with
-  // no state counts as waiting, as it does on the Reports page.
-  const { stats, recent } = useMemo(() => {
-    if (!data) return { stats: null as Stats | null, recent: [] };
-    const { reports } = data;
-    const waiting = reports.filter((r) => r.state !== 'Resolved');
+  const view = useMemo(() => {
+    const reports = data?.reports ?? [];
+    const waiting = reports.filter((r) => !isResolved(r));
+    const highWaiting = waiting.filter((r) => severityOf(r) === 'High');
+    // Highest severity first, then oldest first: what to look at next.
+    const rank = { High: 0, Medium: 1, Low: 2 } as const;
+    const queue = [...waiting]
+      .sort((a, b) => {
+        const sa = severityOf(a);
+        const sb = severityOf(b);
+        const d = (sa ? rank[sa] : 3) - (sb ? rank[sb] : 3);
+        return d || new Date(a.uploadtime ?? 0).getTime() - new Date(b.uploadtime ?? 0).getTime();
+      })
+      .slice(0, 6);
     return {
-      stats: {
-        total: reports.length,
-        pending: waiting.length,
-        high: reports.filter((r) => (r.severity ?? '').toLowerCase() === 'high').length,
-        resolved: reports.length - waiting.length,
-        users: data.userCount,
-        corrected: reports.filter((r) => r.corrected_at != null).length,
-      },
-      recent: waiting.slice(0, 4),
+      total: reports.length,
+      waiting: waiting.length,
+      high: highWaiting.length,
+      resolved: reports.length - waiting.length,
+      corrected: reports.filter((r) => r.corrected_at != null).length,
+      users: data?.userCount ?? 0,
+      queue,
+      age: waitingAge(reports),
+      sparkWaiting: dailySeries(reports, 14, (r) => !isResolved(r)),
+      sparkHigh: dailySeries(reports, 14, (r) => severityOf(r) === 'High'),
+      sparkResolved: dailySeries(reports, 14, isResolved),
     };
   }, [data]);
 
-  const nothingWaiting = stats !== null && stats.pending === 0;
-
   return (
-    <div className="min-h-screen">
-      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-10 pt-8 md:pt-12 pb-20 shadow-[0_24px_70px_-24px_rgba(59,130,246,0.30)]">
-        <div className="max-w-5xl mx-auto">
-          <p className="text-oasys-blue text-sm font-bold uppercase tracking-widest mb-2">
-            Admin console
-          </p>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight mb-3">
-            {username ? `Welcome back, ${username}` : 'Welcome back'}
-          </h1>
+    <main className={PAGE}>
+      <AdminHeader eyebrow="Admin console" title={`${greeting()}${username ? `, ${username}` : ''}`}>
+        <Link
+          href="/admin/reports"
+          className="btn-blue group inline-flex items-center gap-2 h-11 px-5 rounded-xl text-sm font-semibold"
+        >
+          Review queue
+          <IconArrow className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      </AdminHeader>
 
-          {/* Lead with the state of the queue, not a total. */}
-          <p className="text-lg text-fg-soft max-w-2xl">
-            {stats === null ? (
-              <span className="text-fg-muted">Loading the queue…</span>
-            ) : nothingWaiting ? (
-              <>
-                Nothing is waiting for review.{' '}
-                <span className="text-fg-muted">
-                  {stats.total} report{stats.total === 1 ? '' : 's'} filed in total.
-                </span>
-              </>
+      {loadError && <ErrorNote title="Could not load the overview" message={loadError} />}
+
+      {/* The queue at a glance: how much is done, how much is left. */}
+      <section className="page-enter rounded-[24px] hero-theme queue-band p-5 sm:p-7 flex flex-col md:flex-row md:items-center gap-6 md:gap-10">
+        {loading ? (
+          <div className="skeleton w-[176px] h-[176px] rounded-full shrink-0" />
+        ) : (
+          <QueueDial resolved={view.resolved} waiting={view.waiting} high={view.high} />
+        )}
+        <div className="grow min-w-0">
+          <p className="text-xl sm:text-2xl font-semibold text-fg leading-snug">
+            {loading ? (
+              <span className="skeleton inline-block h-7 w-64 rounded-lg" />
+            ) : view.waiting === 0 ? (
+              'Nothing is waiting for review.'
             ) : (
               <>
-                <strong className="text-fg">
-                  {stats.pending} report{stats.pending === 1 ? '' : 's'}
-                </strong>{' '}
-                {stats.pending === 1 ? 'needs' : 'need'} review
-                {stats.high > 0 && (
+                {view.waiting} report{view.waiting === 1 ? '' : 's'} {view.waiting === 1 ? 'needs' : 'need'} review
+                {view.high > 0 && (
                   <>
-                    , <strong className="text-sev-high">{stats.high} high severity</strong>
+                    , <span className="text-sev-high">{view.high} high severity</span>
                   </>
                 )}
                 .
               </>
             )}
           </p>
-        </div>
-      </header>
-
-      <div className="max-w-5xl mx-auto px-4 sm:px-10 -mt-12 relative z-10 pb-20">
-        {loadError && (
-          <div
-            role="alert"
-            className="bg-danger/10 border border-danger/40 text-danger rounded-panel p-5 mb-6"
-          >
-            <p className="font-bold mb-1">Could not load the overview</p>
-            <p className="text-sm">{loadError}</p>
+          <div className="mt-5 max-w-2xl">
+            {!loading && <QueueBar resolved={view.resolved} waiting={view.waiting} high={view.high} />}
           </div>
-        )}
+        </div>
+      </section>
 
-        {/* Sections first: this page exists to get you somewhere. */}
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          {SECTIONS.map((section) => (
-            <Link
-              key={section.href}
-              href={section.href}
-              className="bg-panel-gradient border border-line rounded-panel p-6 shadow-xl hover:border-oasys-blue/50 hover:-translate-y-1 transition-all group"
-            >
-              <span
-                aria-hidden="true"
-                className="w-11 h-11 rounded-xl bg-oasys-blue/15 text-oasys-blue flex items-center justify-center mb-4 group-hover:bg-oasys-blue group-hover:text-accent-fg transition-colors"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  {section.icon}
-                </svg>
-              </span>
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <h2 className="font-semibold text-fg text-lg">{section.title}</h2>
-                <span
-                  aria-hidden="true"
-                  className="text-oasys-blue group-hover:translate-x-1 transition-transform font-semibold"
-                >
-                  &rarr;
-                </span>
-              </div>
-              <p className="text-sm text-fg-muted leading-snug">{section.detail}</p>
-            </Link>
-          ))}
-        </section>
+      <div className="stagger mt-4 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <StatTile
+          label="Needs action"
+          value={view.waiting}
+          loading={loading}
+          icon={<IconClock />}
+          tone="text-fg"
+          spark={view.sparkWaiting}
+          href="/admin/reports"
+        />
+        <StatTile
+          label="High severity"
+          value={view.high}
+          loading={loading}
+          icon={<span className="text-sev-high">{SEVERITY.High.icon}</span>}
+          tone="text-sev-high"
+          spark={view.sparkHigh}
+          sparkColor="var(--sev-high)"
+          href="/admin/reports"
+        />
+        <StatTile
+          label="Resolved"
+          value={view.resolved}
+          loading={loading}
+          icon={<IconCheck />}
+          tone="text-ok"
+          spark={view.sparkResolved}
+          sparkColor="var(--ok)"
+          href="/admin/dashboard"
+        />
+        <StatTile label="Accounts" value={view.users} loading={loading} icon={<IconUsers />} href="/admin/users" />
+      </div>
 
-        {/* Waiting work, with a route straight into it. */}
-        <section className="bg-panel-gradient border border-line rounded-panel p-6 sm:p-7 shadow-xl mb-6">
-          <div className="flex items-center justify-between gap-4 mb-4">
-            <h2 className="font-semibold text-fg">Waiting for review</h2>
-            {stats !== null && stats.pending > 0 && (
+      <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Panel
+          className="lg:col-span-2"
+          title="Next up"
+          action={
+            view.waiting > 0 && (
               <Link
                 href="/admin/reports"
-                className="text-sm text-oasys-blue hover:text-accent-hover font-bold shrink-0"
+                className="group inline-flex items-center gap-1 text-sm font-semibold text-accent hover:text-accent-hover"
               >
-                Open reports &rarr;
+                All {view.waiting}
+                <IconArrow className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
-            )}
-          </div>
-
-          {stats === null ? (
-            <p className="text-sm text-fg-muted font-bold py-6 text-center">Loading…</p>
-          ) : recent.length === 0 ? (
-            <p className="text-sm text-fg-muted py-6 text-center">
-              The queue is empty. Submitted reports appear here.
-            </p>
+            )
+          }
+        >
+          {loading ? (
+            <div className="flex flex-col gap-3">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="skeleton h-14 rounded-xl" />
+              ))}
+            </div>
+          ) : view.queue.length === 0 ? (
+            <div className="py-10 text-center">
+              <IconCheck className="mx-auto w-8 h-8 text-ok" />
+              <p className="mt-3 font-semibold text-fg">The queue is empty</p>
+            </div>
           ) : (
-            <ul className="flex flex-col divide-y divide-line">
-              {recent.map((report) => (
-                <li key={report.id} className="flex flex-wrap items-center gap-3 py-3">
-                  <SeverityBadge severity={report.corrected_severity ?? report.severity} />
-                  <span className="font-bold text-fg grow min-w-0 truncate">
-                    {report.corrected_severity ? (
-                      <>
-                        {report.damage_type || 'Unclassified'}{' '}
-                        <span className="text-xs font-bold text-oasys-blue">· corrected</span>
-                      </>
-                    ) : (
-                      report.damage_type || 'Unclassified'
-                    )}
-                  </span>
-                  <span className="text-xs text-fg-muted truncate max-w-[16rem]">
-                    {report.address || 'No address'}
-                  </span>
-                  <span className="text-xs text-fg-muted shrink-0">
-                    {report.uploadtime
-                      ? new Date(report.uploadtime).toLocaleDateString('en-GB', {
-                          day: 'numeric',
-                          month: 'short',
-                        })
-                      : '—'}
-                  </span>
+            <ul className="stagger -my-2 divide-y divide-line">
+              {view.queue.map((r) => (
+                <li key={r.id}>
+                  <Link
+                    href={`/admin/reports?report=${r.id}`}
+                    className="group flex items-center gap-3 sm:gap-4 py-3 -mx-2 px-2 rounded-xl hover:bg-fg/[0.04] transition-colors"
+                  >
+                    <span className="w-24 shrink-0">
+                      <SeverityBadge severity={r.corrected_severity ?? r.severity} />
+                    </span>
+                    <span className="min-w-0 grow">
+                      <span className="block text-sm font-semibold text-fg truncate">
+                        {r.damage_type || 'Unclassified'}
+                        {r.corrected_severity && <span className="ml-2 text-xs font-medium text-accent">corrected</span>}
+                      </span>
+                      <span className="block text-xs text-fg-muted truncate">{r.address || 'No address'}</span>
+                    </span>
+                    <span className="text-xs text-fg-muted tabular-nums shrink-0" title="Waiting for">
+                      {ago(r.uploadtime)}
+                    </span>
+                    <IconArrow className="w-4 h-4 text-fg-faint group-hover:text-accent group-hover:translate-x-0.5 transition shrink-0" />
+                  </Link>
                 </li>
               ))}
             </ul>
           )}
-        </section>
+        </Panel>
 
-        {/* Totals last: context, not the headline. */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { label: 'Total reports', value: stats?.total },
-            { label: 'Resolved', value: stats?.resolved, accent: 'text-ok' },
-            { label: 'Corrected', value: stats?.corrected, accent: 'text-oasys-blue' },
-            { label: 'Users', value: stats?.users },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className="bg-inset border border-line rounded-2xl p-5"
-            >
-              <p className="text-xs text-fg-muted font-bold uppercase tracking-wide mb-1">
-                {item.label}
-              </p>
-              <p className={`text-3xl font-semibold tabular-nums ${item.accent ?? 'text-fg'}`}>
-                {item.value === undefined ? '—' : item.value}
-              </p>
-            </div>
-          ))}
-        </section>
+        <Panel title="Waiting time">
+          {loading ? (
+            <div className="skeleton h-40 rounded-xl" />
+          ) : (
+            <ProgressList
+              items={view.age.map((b, i) => ({ ...b, color: i >= 2 ? 'var(--warn)' : 'var(--accent)' }))}
+              total={view.waiting}
+              emptyMessage="Nothing is waiting."
+            />
+          )}
+        </Panel>
       </div>
-    </div>
+
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        {[
+          { label: 'Reports filed', value: view.total, href: '/admin/reports', icon: <IconList /> },
+          { label: 'Corrected by admins', value: view.corrected, href: '/admin/reports', icon: <IconCheck /> },
+          { label: 'Open the dashboard', value: null, href: '/admin/dashboard', icon: <IconArrow /> },
+        ].map((item) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            className="lift group flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-5 py-4 hover:border-line-strong"
+          >
+            <span className="text-sm font-medium text-fg-muted group-hover:text-fg transition-colors">{item.label}</span>
+            <span className="flex items-center gap-2 text-fg">
+              {item.value !== null && <span className="font-stat text-2xl">{loading ? '—' : item.value}</span>}
+              <span className="text-fg-faint group-hover:text-accent transition-colors">{item.icon}</span>
+            </span>
+          </Link>
+        ))}
+      </div>
+    </main>
   );
 }

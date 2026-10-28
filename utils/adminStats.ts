@@ -43,7 +43,7 @@ export function buckets(range: RangeKey, now = new Date()) {
   }
   const first = startOfDay(new Date(now.getTime() - (days - 1) * DAY));
   const labels = Array.from({ length: days }, (_, i) =>
-    new Date(first.getTime() + i * DAY).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    new Date(first.getTime() + i * DAY).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
   );
   const indexOf = (d: Date) => {
     const i = Math.floor((startOfDay(d).getTime() - first.getTime()) / DAY);
@@ -152,4 +152,10 @@ export function ago(iso: string | null, now = Date.now()) {
   if (mins < 60 * 24) return `${Math.round(mins / 60)}h`;
   if (mins < 60 * 24 * 14) return `${Math.round(mins / 1440)}d`;
   return `${Math.round(mins / 10080)}w`;
+}
+
+/** Reports filed within the last `days` days. */
+export function inLastDays(reports: ReportSummary[], days: number, now = Date.now()) {
+  const cutoff = now - days * DAY;
+  return reports.filter((r) => r.uploadtime && new Date(r.uploadtime).getTime() >= cutoff);
 }

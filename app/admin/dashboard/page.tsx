@@ -1,98 +1,85 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useAdminSummary, type ReportSummary } from '@/utils/adminData';
-import { SeverityBadge } from '@/components/Severity';
-import { BarTally, TrendLine, type TrendPoint } from '@/components/Charts';
+import { SEVERITY, SeverityBadge, type Severity } from '@/components/Severity';
+import { LineChart, ProgressList, RingProgress, StackedBar, type Series } from '@/components/Charts';
+import { AdminHeader, ErrorNote, PAGE, Panel, StatTile, UnderlineTabs, deltaOf } from '@/components/admin/ui';
+import {
+  RANGES,
+  averageDensity,
+  inLastDays,
+  isResolved,
+  periodCounts,
+  severityCounts,
+  severityOf,
+  shortDate,
+  submissions,
+  typeCounts,
+  waitingAge,
+  type RangeKey,
+} from '@/utils/adminStats';
+import { IconArrow } from '@/components/shell/icons';
 
-type Report = ReportSummary;
+type ChartView = 'total' | 'severity' | 'corrected';
 
-const RANGES = {
-  '7d': { label: 'Last 7 days', days: 7, bucket: 'day' as const },
-  '30d': { label: 'Last 30 days', days: 30, bucket: 'day' as const },
-  '12m': { label: 'Last 12 months', days: 365, bucket: 'month' as const },
-};
-type RangeKey = keyof typeof RANGES;
-
-const RESOLVED_STATES = ['resolved', 'done'];
+const SEVERITIES: Severity[] = ['High', 'Medium', 'Low'];
+const SEV_COLOR: Record<Severity, string> = { High: 'var(--sev-high)', Medium: 'var(--sev-medium)', Low: 'var(--sev-low)' };
 
 export default function AdminDashboard() {
   // Shared with the Console and usually already loaded by the admin layout;
   // see utils/adminData. Charts and CSV are computed from it here.
   const { data, error: loadError } = useAdminSummary();
   const reports = useMemo(() => data?.reports ?? [], [data]);
-  const isLoading = !data && !loadError;
-  const [range, setRange] = useState<RangeKey>('7d');
+  const loading = !data && !loadError;
+  const [range, setRange] = useState<RangeKey>('30d');
+  const [chart, setChart] = useState<ChartView>('total');
 
-  const stats = useMemo(() => {
-    const isResolved = (r: Report) =>
-      RESOLVED_STATES.includes((r.state ?? '').toLowerCase());
-
+  const v = useMemo(() => {
+    const { days, label } = RANGES[range];
+    const inRange = inLastDays(reports, days);
+    const filed = periodCounts(reports, days);
+    const high = periodCounts(
+      reports.filter((r) => severityOf(r) === 'High'),
+      days,
+    );
+    const waiting = reports.filter((r) => !isResolved(r)).length;
     return {
-      total: reports.length,
-      pending: reports.filter((r) => !isResolved(r)).length,
-      severe: reports.filter((r) => (r.severity ?? '').toLowerCase() === 'high').length,
-      resolved: reports.filter(isResolved).length,
+      period: `previous ${label}`,
+      inRange,
+      filed,
+      high,
+      waiting,
+      resolved: reports.length - waiting,
+      density: averageDensity(inRange),
+      series: submissions(reports, range),
+      sev: severityCounts(inRange),
+      types: typeCounts(inRange),
+      age: waitingAge(reports),
     };
-  }, [reports]);
-
-  /** Counts per damage type, highest first. Real data, unlike the previous placeholder. */
-  const damageTally = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const report of reports) {
-      const key = report.damage_type?.trim() || 'Unclassified';
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    return [...counts.entries()]
-      .map(([label, value]) => ({ label, value }))
-      .sort((a, b) => b.value - a.value);
-  }, [reports]);
-
-  /** Submissions bucketed across the selected window. */
-  const trend = useMemo<TrendPoint[]>(() => {
-    const { days, bucket } = RANGES[range];
-    const now = new Date();
-    const buckets = new Map<string, number>();
-
-    const keyFor = (date: Date) =>
-      bucket === 'month'
-        ? date.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })
-        : date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-
-    // Seed every bucket so gaps render as zero rather than being skipped, which
-    // would compress the x-axis and misrepresent the shape.
-    const steps = bucket === 'month' ? 12 : days;
-    for (let i = steps - 1; i >= 0; i--) {
-      const date = new Date(now);
-      if (bucket === 'month') date.setMonth(date.getMonth() - i);
-      else date.setDate(date.getDate() - i);
-      buckets.set(keyFor(date), 0);
-    }
-
-    const cutoff = new Date(now);
-    cutoff.setDate(cutoff.getDate() - days);
-
-    for (const report of reports) {
-      if (!report.uploadtime) continue;
-      const date = new Date(report.uploadtime);
-      if (Number.isNaN(date.getTime()) || date < cutoff) continue;
-
-      const key = keyFor(date);
-      if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + 1);
-    }
-
-    return [...buckets.entries()].map(([label, value]) => ({ label, value }));
   }, [reports, range]);
 
-  const recent = reports.slice(0, 5);
+  const lineSeries: Series[] =
+    chart === 'severity'
+      ? SEVERITIES.map((s) => ({
+          key: s,
+          label: s,
+          color: SEV_COLOR[s],
+          values: v.series.bySeverity[s],
+          glyph: SEVERITY[s].icon,
+        }))
+      : chart === 'corrected'
+        ? [{ key: 'corrected', label: 'Corrected', color: 'var(--accent)', values: v.series.corrected }]
+        : [{ key: 'total', label: 'Reports filed', color: 'var(--accent)', values: v.series.total }];
 
-  /** Export the full table as CSV. Previously this button did nothing. */
+  /** Export every report as CSV. */
   const exportCsv = () => {
-    const headers = [
+    const headers: (keyof ReportSummary)[] = [
       'id',
       'damage_type',
       'severity',
+      'corrected_severity',
       'state',
       'uploadtime',
       'address',
@@ -102,12 +89,7 @@ export default function AdminDashboard() {
       const text = value == null ? '' : String(value);
       return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
     };
-
-    const csv = [
-      headers.join(','),
-      ...reports.map((r) => headers.map((h) => escape(r[h as keyof Report])).join(',')),
-    ].join('\n');
-
+    const csv = [headers.join(','), ...reports.map((r) => headers.map((h) => escape(r[h])).join(','))].join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
     const link = document.createElement('a');
     link.href = url;
@@ -116,180 +98,196 @@ export default function AdminDashboard() {
     URL.revokeObjectURL(url);
   };
 
-  const statCard = 'rounded-panel p-5 sm:p-6 shadow-xl flex flex-col min-h-[9rem]';
+  const rangeLabel = RANGES[range].label;
 
   return (
-    <div className="min-h-screen">
-      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-10 pt-8 md:pt-12 pb-20 shadow-[0_24px_70px_-24px_rgba(59,130,246,0.30)]">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-5">
-          <div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold mb-2 tracking-tight">
-              Admin console
-            </h1>
-            <p className="text-oasys-blue text-sm font-bold uppercase tracking-widest">
-              Analytics overview
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={exportCsv}
-              disabled={isLoading || reports.length === 0}
-              className="bg-white text-[#14295a] px-5 py-2.5 rounded-full font-semibold text-xs hover:bg-[#e6edff] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Export CSV
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-6xl mx-auto px-4 sm:px-10 -mt-10 relative z-10 pb-20">
-        {loadError && (
-          <div
-            role="alert"
-            className="bg-danger/10 border border-danger/40 text-danger rounded-panel p-5 mb-6"
+    <main className={PAGE}>
+      <AdminHeader eyebrow="Analytics" title="Dashboard">
+        <button
+          onClick={exportCsv}
+          disabled={loading || reports.length === 0}
+          className="inline-flex items-center gap-2 h-11 px-4 rounded-xl border border-line bg-surface text-sm font-semibold text-fg hover:border-line-strong disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
           >
-            <p className="font-bold mb-1">Could not load reports</p>
-            <p className="text-sm">{loadError}</p>
-          </div>
-        )}
+            <path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14" />
+          </svg>
+          Export CSV
+        </button>
+      </AdminHeader>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-5">
-          <div className={`${statCard} bg-brand-gradient text-white border border-line`}>
-            <span className="font-bold text-sm text-fg-muted">Total reports</span>
-            <span className="mt-auto text-5xl font-semibold tabular-nums">
-              {isLoading ? '—' : stats.total}
-            </span>
-          </div>
+      {loadError && <ErrorNote title="Could not load reports" message={loadError} />}
 
-          <div className={`${statCard} bg-panel-gradient text-fg border border-line`}>
-            <span className="font-bold text-sm text-fg-muted">Pending review</span>
-            <span className="mt-auto text-5xl font-semibold tabular-nums">
-              {isLoading ? '—' : stats.pending}
-            </span>
-          </div>
+      <div className="page-enter mb-4 flex items-center justify-between gap-4">
+        <UnderlineTabs
+          label="Time range"
+          value={range}
+          onChange={setRange}
+          tabs={(Object.keys(RANGES) as RangeKey[]).map((k) => ({ key: k, label: RANGES[k].label }))}
+        />
+      </div>
 
-          <div className={`${statCard} bg-panel-gradient text-fg border border-line`}>
-            <span className="font-bold text-sm text-fg-muted">High severity</span>
-            <span className="mt-auto text-5xl font-semibold tabular-nums text-sev-high">
-              {isLoading ? '—' : stats.severe}
-            </span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-          <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-fg border border-line">
-            <h2 className="font-bold text-sm text-fg-muted mb-6">Resolution status</h2>
-            <div className="mt-auto">
-              <div className="flex justify-between text-xs font-bold mb-2">
-                <span className="text-ok">Resolved ({stats.resolved})</span>
-                <span className="text-warn">Unresolved ({stats.pending})</span>
-              </div>
-              <div
-                className="w-full h-4 bg-inset rounded-full overflow-hidden flex gap-[2px] ring-1 ring-inset ring-line"
-                role="img"
-                aria-label={`${stats.resolved} resolved, ${stats.pending} unresolved of ${stats.total}`}
-              >
-                <div
-                  className="bg-sev-low h-full transition-all duration-700 rounded-l-full"
-                  style={{ width: stats.total ? `${(stats.resolved / stats.total) * 100}%` : '0%' }}
-                />
-                <div
-                  className="bg-sev-medium h-full transition-all duration-700 rounded-r-full"
-                  style={{ width: stats.total ? `${(stats.pending / stats.total) * 100}%` : '0%' }}
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-fg border border-line">
-            <div className="flex justify-between items-center gap-4 mb-4">
-              <h2 className="font-bold text-sm text-fg-muted">Submissions over time</h2>
-              <label className="sr-only" htmlFor="range">
-                Time range
-              </label>
-              <select
-                id="range"
-                value={range}
-                onChange={(e) => setRange(e.target.value as RangeKey)}
-                className="bg-oasys-blue/10 text-oasys-blue text-xs font-bold px-3 py-1.5 rounded-md border border-oasys-blue/20 cursor-pointer hover:bg-oasys-blue/20 transition-colors"
-              >
-                {Object.entries(RANGES).map(([key, value]) => (
-                  <option key={key} value={key} className="bg-surface text-fg">
-                    {value.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {isLoading ? (
-              <p className="text-sm text-fg-muted font-bold py-10 text-center">Loading…</p>
+      <div className="stagger grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <StatTile
+          label={`Filed · ${rangeLabel}`}
+          value={v.filed.current}
+          loading={loading}
+          delta={deltaOf(v.filed.current, v.filed.previous, v.period)}
+          spark={v.series.total}
+        />
+        <StatTile
+          label={`High severity · ${rangeLabel}`}
+          value={v.high.current}
+          loading={loading}
+          tone="text-sev-high"
+          delta={deltaOf(v.high.current, v.high.previous, v.period, false)}
+          spark={v.series.bySeverity.High}
+          sparkColor="var(--sev-high)"
+        />
+        <StatTile label="Needs action" value={v.waiting} loading={loading} href="/admin/reports" />
+        <div className="lift flex flex-col rounded-2xl bg-surface border border-line p-4 sm:p-5 min-h-[8.5rem]">
+          <span className="text-sm font-medium text-fg-muted">Avg crack density</span>
+          <span className="mt-3 font-stat text-4xl sm:text-5xl leading-none text-fg">
+            {loading ? (
+              <span className="skeleton inline-block h-10 w-20 rounded-lg align-middle" />
+            ) : v.density === null ? (
+              '—'
             ) : (
-              <TrendLine data={trend} />
+              <>
+                {v.density.toFixed(2)}
+                <span className="text-2xl text-fg-muted">%</span>
+              </>
             )}
-          </section>
+          </span>
+          <span className="mt-2 text-xs text-fg-muted">of road surface · {rangeLabel}</span>
         </div>
+      </div>
 
-        <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-fg border border-line mb-5">
-          <h2 className="font-bold text-sm text-fg-muted mb-6">Distress type breakdown</h2>
-          {isLoading ? (
-            <p className="text-sm text-fg-muted font-bold py-8 text-center">Loading…</p>
+      <Panel
+        className="mt-4"
+        title="Submissions over time"
+        action={
+          <UnderlineTabs
+            label="Series"
+            value={chart}
+            onChange={setChart}
+            tabs={[
+              { key: 'total', label: 'Total' },
+              { key: 'severity', label: 'By severity' },
+              { key: 'corrected', label: 'Corrections' },
+            ]}
+          />
+        }
+      >
+        {loading ? (
+          <div className="skeleton h-[260px] rounded-xl" />
+        ) : (
+          // Keyed so the lines draw in again on every switch.
+          <LineChart key={`${range}-${chart}`} labels={v.series.labels} series={lineSeries} height={260} />
+        )}
+      </Panel>
+
+      <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Panel title={`Severity · ${rangeLabel}`}>
+          {loading ? (
+            <div className="skeleton h-40 rounded-xl" />
           ) : (
-            <BarTally data={damageTally} emptyMessage="No reports submitted yet." />
+            <ProgressList
+              key={range}
+              items={SEVERITIES.map((s) => ({
+                name: s,
+                label: <SeverityBadge severity={s} size="md" />,
+                value: v.sev[s],
+                color: SEV_COLOR[s],
+              }))}
+              emptyMessage={`No graded reports in the last ${rangeLabel}.`}
+            />
           )}
-        </section>
+        </Panel>
+        <Panel title={`Distress types · ${rangeLabel}`}>
+          {loading ? (
+            <div className="skeleton h-40 rounded-xl" />
+          ) : (
+            <ProgressList key={range} items={v.types.slice(0, 6)} emptyMessage={`No reports in the last ${rangeLabel}.`} />
+          )}
+        </Panel>
+      </div>
 
-        <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-fg border border-line">
-          <div className="flex justify-between items-center gap-4 mb-5">
-            <h2 className="text-lg font-semibold tracking-wide">Recent submissions</h2>
+      <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Panel title="Resolution">
+          {loading ? (
+            <div className="skeleton h-48 rounded-xl" />
+          ) : (
+            <div className="flex flex-col items-center gap-5">
+              <RingProgress value={v.resolved} total={reports.length} label="resolved" color="var(--ok)" />
+              <div className="w-full">
+                <StackedBar
+                  parts={[
+                    { label: 'Resolved', value: v.resolved, color: 'var(--ok)' },
+                    { label: 'Needs action', value: v.waiting, color: 'var(--warn)' },
+                  ]}
+                />
+              </div>
+            </div>
+          )}
+        </Panel>
+
+        <Panel title="Waiting time">
+          {loading ? (
+            <div className="skeleton h-48 rounded-xl" />
+          ) : (
+            <ProgressList
+              items={v.age.map((b, i) => ({ ...b, color: i >= 2 ? 'var(--warn)' : 'var(--accent)' }))}
+              total={v.waiting}
+              emptyMessage="Nothing is waiting."
+            />
+          )}
+        </Panel>
+
+        <Panel
+          title="Latest"
+          action={
             <Link
               href="/admin/reports"
-              className="text-sm text-oasys-blue hover:text-accent-hover font-bold transition-colors shrink-0"
+              className="group inline-flex items-center gap-1 text-sm font-semibold text-accent hover:text-accent-hover"
             >
-              View all &rarr;
+              All
+              <IconArrow className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
-          </div>
-
-          {isLoading ? (
-            <p className="py-8 text-center text-fg-muted font-bold">Loading latest reports…</p>
-          ) : recent.length === 0 ? (
-            <p className="py-8 text-center text-fg-muted font-bold">
-              No reports found in the database.
-            </p>
+          }
+        >
+          {loading ? (
+            <div className="skeleton h-48 rounded-xl" />
+          ) : reports.length === 0 ? (
+            <p className="py-8 text-center text-sm text-fg-muted">No reports yet.</p>
           ) : (
-            <ul className="flex flex-col divide-y divide-line">
-              {recent.map((report) => (
-                <li
-                  key={report.id}
-                  className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 py-3"
-                >
-                  <span className="font-mono text-xs text-fg-muted sm:w-24 shrink-0">
-                    RPT-{String(report.id).slice(0, 8)}
-                  </span>
-                  <span className="font-bold grow min-w-0 truncate">
-                    {report.damage_type || 'Unclassified'}
-                  </span>
-                  <SeverityBadge severity={report.severity} />
-                  <span className="text-xs text-fg-muted sm:w-28 shrink-0">
-                    {report.uploadtime
-                      ? new Date(report.uploadtime).toLocaleDateString('en-GB', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })
-                      : 'Unknown date'}
-                  </span>
+            <ul className="stagger -my-2 divide-y divide-line">
+              {reports.slice(0, 5).map((r) => (
+                <li key={r.id}>
                   <Link
-                    href={`/admin/reports?report=${report.id}`}
-                    className="text-oasys-blue hover:text-fg text-xs font-bold transition-colors shrink-0"
+                    href={`/admin/reports?report=${r.id}`}
+                    className="group flex items-center gap-3 py-2.5 -mx-2 px-2 rounded-xl hover:bg-fg/[0.04] transition-colors"
                   >
-                    Review &rarr;
+                    <span className="min-w-0 grow">
+                      <span className="block text-sm font-semibold text-fg truncate">{r.damage_type || 'Unclassified'}</span>
+                      <span className="block text-xs text-fg-muted">{shortDate(r.uploadtime)}</span>
+                    </span>
+                    <SeverityBadge severity={r.corrected_severity ?? r.severity} />
                   </Link>
                 </li>
               ))}
             </ul>
           )}
-        </section>
+        </Panel>
       </div>
-    </div>
+    </main>
   );
 }
