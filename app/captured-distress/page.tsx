@@ -25,7 +25,7 @@ import type { Position } from '../report-damage/Map';
 const MapComponent = dynamic(() => import('../report-damage/Map'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-black/40 text-gray-400 font-bold">
+    <div className="w-full h-full flex items-center justify-center bg-inset text-fg-muted font-bold">
       Loading map…
     </div>
   ),
@@ -207,23 +207,20 @@ export default function CapturedDistressPage() {
   };
 
   return (
-    <div className="pt-28 sm:pt-32 px-4 sm:px-10 pb-16 min-h-screen">
+    <div className="pt-8 md:pt-12 px-4 sm:px-10 pb-16 min-h-screen">
       <div className="max-w-6xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-fg leading-tight">
             Captured Distress
           </h1>
         </div>
 
         {isLoadingAuth ? (
-          <p className="text-gray-500 font-bold animate-pulse">Checking sign-in…</p>
+          <p className="text-fg-muted font-bold animate-pulse">Checking sign-in…</p>
         ) : !userId ? (
-          <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <section className="bg-panel-gradient rounded-oasys border border-line shadow-2xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="font-black text-white mb-0.5">Sign in to capture</h2>
-              <p className="text-sm text-gray-400">
-                Captures are saved to your account so only you can see and report them.
-              </p>
+              <h2 className="font-semibold text-fg">Sign in to capture</h2>
             </div>
             <button onClick={() => setShowLogin(true)} className="btn-blue px-10 py-3.5 w-full sm:w-auto">
               Sign in
@@ -232,7 +229,7 @@ export default function CapturedDistressPage() {
         ) : (
           <div className="flex flex-col gap-6">
             {/* New capture */}
-            <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-8">
+            <section className="bg-panel-gradient rounded-oasys border border-line shadow-2xl p-5 sm:p-8">
               <input
                 ref={inputRef}
                 type="file"
@@ -248,7 +245,7 @@ export default function CapturedDistressPage() {
 
               {!draft ? (
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <h2 className="font-black text-white">New capture</h2>
+                  <h2 className="font-semibold text-fg">New capture</h2>
                   <button
                     type="button"
                     onClick={() => inputRef.current?.click()}
@@ -260,36 +257,36 @@ export default function CapturedDistressPage() {
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
                   <div className="lg:col-span-2 flex flex-col gap-3">
-                    <h2 className="font-black text-white">Photo</h2>
+                    <h2 className="font-semibold text-fg">Photo</h2>
                     <div className="aspect-video rounded-xl overflow-hidden bg-black">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={draft.preview} alt="The distress you just captured" className="w-full h-full object-contain" />
                     </div>
-                    <p className="text-xs text-gray-400 truncate" title={draft.file.name}>
+                    <p className="text-xs text-fg-muted truncate" title={draft.file.name}>
                       {draft.file.name}
                     </p>
                   </div>
 
                   <div className="lg:col-span-3 flex flex-col gap-3">
                     <div className="flex items-center justify-between gap-3">
-                      <h2 className="font-black text-white">Location</h2>
+                      <h2 className="font-semibold text-fg">Location</h2>
                       <button
                         type="button"
                         onClick={locateDevice}
                         disabled={isLocating}
-                        className="px-3 py-1.5 rounded-full text-xs font-bold text-white bg-white/10 hover:bg-white/20 transition-colors disabled:cursor-wait disabled:opacity-60"
+                        className="px-3 py-1.5 rounded-full text-xs font-bold text-fg bg-fg/10 hover:bg-fg/15 transition-colors disabled:cursor-wait disabled:opacity-60"
                       >
                         {isLocating ? 'Locating…' : 'Use my location'}
                       </button>
                     </div>
-                    <div className="rounded-2xl h-[16rem] sm:h-[20rem] relative overflow-hidden border border-white/10">
+                    <div className="rounded-2xl h-[16rem] sm:h-[20rem] relative overflow-hidden border border-line">
                       <MapComponent
                         position={fix ? { lat: fix.lat, lng: fix.lng } : null}
                         accuracyM={fix?.accuracy_m ?? null}
                         onPick={onPick}
                       />
                     </div>
-                    <p className="text-sm text-gray-300 tabular-nums" aria-live="polite">
+                    <p className="text-sm text-fg-soft tabular-nums" aria-live="polite">
                       {fix
                         ? `${fix.lat.toFixed(6)}, ${fix.lng.toFixed(6)} · ${SOURCE_LABEL[fix.source]}${
                             fix.accuracy_m != null ? ` ±${fix.accuracy_m} m` : ''
@@ -299,14 +296,14 @@ export default function CapturedDistressPage() {
                           : 'Tap the map to pin where the distress is.'}
                     </p>
                     {locationNote && (
-                      <p role="status" className="bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm font-bold rounded-xl px-4 py-3">
+                      <p role="status" className="bg-amber-500/10 border border-amber-500/30 text-warn text-sm font-bold rounded-xl px-4 py-3">
                         {locationNote}
                       </p>
                     )}
                   </div>
 
-                  <div className="lg:col-span-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-white/10">
-                    <p aria-live="assertive" className="text-sm font-bold text-red-400">
+                  <div className="lg:col-span-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-line">
+                    <p aria-live="assertive" className="text-sm font-bold text-danger">
                       {saveError}
                     </p>
                     <div className="flex flex-col sm:flex-row gap-3">
@@ -314,7 +311,7 @@ export default function CapturedDistressPage() {
                         type="button"
                         onClick={discardDraft}
                         disabled={isSaving}
-                        className="px-6 py-3.5 rounded-full font-bold bg-white/10 hover:bg-white/20 border border-white/15 transition-colors"
+                        className="px-6 py-3.5 rounded-full font-bold bg-fg/10 hover:bg-fg/15 border border-line-strong transition-colors"
                       >
                         Discard
                       </button>
@@ -333,7 +330,7 @@ export default function CapturedDistressPage() {
             </section>
 
             {listError && (
-              <p role="alert" className="bg-red-500/10 border border-red-500/30 text-red-300 text-sm font-bold rounded-xl px-4 py-3">
+              <p role="alert" className="bg-red-500/10 border border-danger/40 text-danger text-sm font-bold rounded-xl px-4 py-3">
                 {listError}
               </p>
             )}
@@ -395,12 +392,12 @@ function CaptureList({
   const captures = section.rows;
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="font-black text-white">
+      <h2 className="font-semibold text-fg">
         {title}
-        {section.total > 0 && <span className="text-gray-500"> ({section.total})</span>}
+        {section.total > 0 && <span className="text-fg-muted"> ({section.total})</span>}
       </h2>
       {captures.length === 0 ? (
-        <p className="text-gray-500 italic">{empty}</p>
+        <p className="text-fg-muted italic">{empty}</p>
       ) : (
         <ul
           className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 transition-opacity ${
@@ -410,7 +407,7 @@ function CaptureList({
           {captures.map((c) => (
             <li
               key={c.id}
-              className="bg-panel-gradient rounded-2xl border border-white/10 overflow-hidden flex flex-col"
+              className="bg-panel-gradient rounded-2xl border border-line overflow-hidden flex flex-col"
             >
               <div className="aspect-video bg-black">
                 {thumbs[c.image_path] && (
@@ -423,15 +420,15 @@ function CaptureList({
                 )}
               </div>
               <div className="p-4 flex flex-col gap-1 grow">
-                <p className="text-xs text-gray-500 font-bold">
+                <p className="text-xs text-fg-muted font-bold">
                   {dateFormat.format(new Date(c.captured_at))}
                 </p>
-                <p className="text-sm text-white leading-snug">
+                <p className="text-sm text-fg leading-snug">
                   <span className="font-bold">Full Address: </span>
                   {c.address ?? 'Not found'}
                 </p>
                 <Coordinates lat={c.lat} lng={c.lng} />
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-fg-muted">
                   {[
                     SOURCE_LABEL[c.location_source],
                     c.location_accuracy_m != null && `±${c.location_accuracy_m} m`,
@@ -441,7 +438,7 @@ function CaptureList({
                     .join(' · ')}
                 </p>
                 {c.reported_at && (
-                  <p className="text-xs font-bold text-[#4ade80]">
+                  <p className="text-xs font-bold text-ok">
                     Reported {dateFormat.format(new Date(c.reported_at))}
                   </p>
                 )}
@@ -458,7 +455,7 @@ function CaptureList({
                     className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${
                       confirmingDelete === c.id
                         ? 'bg-red-500/80 hover:bg-red-500 text-white'
-                        : 'bg-white/10 hover:bg-white/20 text-white'
+                        : 'bg-fg/10 hover:bg-fg/15 text-fg'
                     }`}
                   >
                     {confirmingDelete === c.id ? 'Confirm delete' : 'Delete'}

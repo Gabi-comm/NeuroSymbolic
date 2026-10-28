@@ -34,7 +34,7 @@ export function BarTally({ data, emptyMessage = 'No data yet.' }: {
   const total = data.reduce((sum, d) => sum + d.value, 0);
 
   if (!total) {
-    return <p className="text-sm text-gray-500 font-bold py-8 text-center">{emptyMessage}</p>;
+    return <p className="text-sm text-fg-muted font-bold py-8 text-center">{emptyMessage}</p>;
   }
 
   const max = Math.max(...data.map((d) => d.value));
@@ -45,19 +45,19 @@ export function BarTally({ data, emptyMessage = 'No data yet.' }: {
         const pct = max > 0 ? (datum.value / max) * 100 : 0;
         return (
           <li key={datum.label} className="flex items-center gap-3">
-            <span className="w-32 sm:w-40 shrink-0 text-xs font-bold text-gray-300 truncate">
+            <span className="w-32 sm:w-40 shrink-0 text-xs font-bold text-fg-soft truncate">
               {datum.label}
             </span>
-            <div className="grow h-5 bg-white/5 rounded-md overflow-hidden">
+            <div className="grow h-5 bg-fg/5 rounded-md overflow-hidden">
               <div
                 className="h-full rounded-md transition-all duration-700"
                 style={{ width: `${Math.max(pct, datum.value > 0 ? 2 : 0)}%`, backgroundColor: MARK }}
               />
             </div>
             {/* Direct label: a tally this small does not need an axis. */}
-            <span className="w-14 shrink-0 text-right text-sm font-black text-white tabular-nums">
+            <span className="w-14 shrink-0 text-right text-sm font-semibold text-fg tabular-nums">
               {datum.value}
-              <span className="text-gray-500 font-bold text-xs">
+              <span className="text-fg-muted font-bold text-xs">
                 {' '}
                 ({Math.round((datum.value / total) * 100)}%)
               </span>
@@ -87,7 +87,7 @@ export function TrendLine({ data }: { data: TrendPoint[] }) {
 
   if (data.length < 2) {
     return (
-      <p className="text-sm text-gray-500 font-bold py-10 text-center">
+      <p className="text-sm text-fg-muted font-bold py-10 text-center">
         Not enough data in this range to show a trend.
       </p>
     );
@@ -125,7 +125,7 @@ export function TrendLine({ data }: { data: TrendPoint[] }) {
         </defs>
 
         {/* Recessive baseline only; no full grid for a range this short. */}
-        <line x1="0" y1={height} x2={width} y2={height} stroke="white" strokeOpacity="0.12" strokeWidth="0.5" />
+        <line x1="0" y1={height} x2={width} y2={height} stroke="var(--fg)" strokeOpacity="0.14" strokeWidth="0.5" />
 
         <path d={area} fill={`url(#${gradientId})`} />
         <polyline
@@ -141,13 +141,13 @@ export function TrendLine({ data }: { data: TrendPoint[] }) {
         {data.map((datum, i) => (
           <g key={datum.label}>
             {hover === i && (
-              <line x1={x(i)} y1="0" x2={x(i)} y2={height} stroke="white" strokeOpacity="0.25" strokeWidth="0.5" />
+              <line x1={x(i)} y1="0" x2={x(i)} y2={height} stroke="var(--fg)" strokeOpacity="0.25" strokeWidth="0.5" />
             )}
             <circle
               cx={x(i)}
               cy={y(datum.value)}
               r={hover === i ? 2.4 : 1.6}
-              fill={hover === i ? '#fff' : '#18181b'}
+              fill={hover === i ? 'var(--fg)' : 'var(--surface)'}
               stroke={MARK}
               strokeWidth="1.2"
               vectorEffect="non-scaling-stroke"
@@ -165,15 +165,15 @@ export function TrendLine({ data }: { data: TrendPoint[] }) {
         ))}
       </svg>
 
-      <div className="flex justify-between text-[10px] text-gray-500 font-bold mt-1">
+      <div className="flex justify-between text-[10px] text-fg-muted font-bold mt-1">
         <span>{data[0].label}</span>
         <span>{data[data.length - 1].label}</span>
       </div>
 
       {active && (
-        <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-black border border-white/15 rounded-lg px-3 py-1.5 text-xs font-bold pointer-events-none shadow-xl">
-          <span className="text-gray-400">{active.label}: </span>
-          <span className="text-white tabular-nums">
+        <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-surface border border-line-strong rounded-lg px-3 py-1.5 text-xs font-bold pointer-events-none shadow-xl">
+          <span className="text-fg-muted">{active.label}: </span>
+          <span className="text-fg tabular-nums">
             {active.value} report{active.value === 1 ? '' : 's'}
           </span>
         </div>

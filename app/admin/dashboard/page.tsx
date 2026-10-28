@@ -120,10 +120,10 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen">
-      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-10 pt-28 sm:pt-32 pb-20 shadow-[0_24px_70px_-24px_rgba(59,130,246,0.30)]">
+      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-10 pt-8 md:pt-12 pb-20 shadow-[0_24px_70px_-24px_rgba(59,130,246,0.30)]">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-5">
           <div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-2 tracking-tight">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold mb-2 tracking-tight">
               Admin console
             </h1>
             <p className="text-oasys-blue text-sm font-bold uppercase tracking-widest">
@@ -135,7 +135,7 @@ export default function AdminDashboard() {
             <button
               onClick={exportCsv}
               disabled={isLoading || reports.length === 0}
-              className="bg-white text-black px-5 py-2.5 rounded-full font-bold text-xs hover:bg-gray-200 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="bg-white text-[#14295a] px-5 py-2.5 rounded-full font-semibold text-xs hover:bg-[#e6edff] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Export CSV
             </button>
@@ -147,7 +147,7 @@ export default function AdminDashboard() {
         {loadError && (
           <div
             role="alert"
-            className="bg-red-950/80 border border-red-500/40 text-red-200 rounded-panel p-5 mb-6"
+            className="bg-danger/10 border border-danger/40 text-danger rounded-panel p-5 mb-6"
           >
             <p className="font-bold mb-1">Could not load reports</p>
             <p className="text-sm">{loadError}</p>
@@ -155,56 +155,56 @@ export default function AdminDashboard() {
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-5">
-          <div className={`${statCard} bg-brand-gradient text-white border border-white/10`}>
-            <span className="font-bold text-sm text-gray-400">Total reports</span>
-            <span className="mt-auto text-5xl font-black tabular-nums">
+          <div className={`${statCard} bg-brand-gradient text-white border border-line`}>
+            <span className="font-bold text-sm text-fg-muted">Total reports</span>
+            <span className="mt-auto text-5xl font-semibold tabular-nums">
               {isLoading ? '—' : stats.total}
             </span>
           </div>
 
-          <div className={`${statCard} bg-panel-gradient text-white border border-white/10`}>
-            <span className="font-bold text-sm text-gray-400">Pending review</span>
-            <span className="mt-auto text-5xl font-black tabular-nums">
+          <div className={`${statCard} bg-panel-gradient text-fg border border-line`}>
+            <span className="font-bold text-sm text-fg-muted">Pending review</span>
+            <span className="mt-auto text-5xl font-semibold tabular-nums">
               {isLoading ? '—' : stats.pending}
             </span>
           </div>
 
-          <div className={`${statCard} bg-panel-gradient text-white border border-white/10`}>
-            <span className="font-bold text-sm text-gray-400">High severity</span>
-            <span className="mt-auto text-5xl font-black tabular-nums text-[#f87171]">
+          <div className={`${statCard} bg-panel-gradient text-fg border border-line`}>
+            <span className="font-bold text-sm text-fg-muted">High severity</span>
+            <span className="mt-auto text-5xl font-semibold tabular-nums text-sev-high">
               {isLoading ? '—' : stats.severe}
             </span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-          <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-white border border-white/10">
-            <h2 className="font-bold text-sm text-gray-400 mb-6">Resolution status</h2>
+          <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-fg border border-line">
+            <h2 className="font-bold text-sm text-fg-muted mb-6">Resolution status</h2>
             <div className="mt-auto">
               <div className="flex justify-between text-xs font-bold mb-2">
-                <span className="text-[#4ade80]">Resolved ({stats.resolved})</span>
-                <span className="text-[#fbbf24]">Unresolved ({stats.pending})</span>
+                <span className="text-ok">Resolved ({stats.resolved})</span>
+                <span className="text-warn">Unresolved ({stats.pending})</span>
               </div>
               <div
-                className="w-full h-4 bg-black/40 rounded-full overflow-hidden flex gap-[2px] ring-1 ring-inset ring-white/5"
+                className="w-full h-4 bg-inset rounded-full overflow-hidden flex gap-[2px] ring-1 ring-inset ring-line"
                 role="img"
                 aria-label={`${stats.resolved} resolved, ${stats.pending} unresolved of ${stats.total}`}
               >
                 <div
-                  className="bg-[#16a34a] h-full transition-all duration-700 rounded-l-full"
+                  className="bg-sev-low h-full transition-all duration-700 rounded-l-full"
                   style={{ width: stats.total ? `${(stats.resolved / stats.total) * 100}%` : '0%' }}
                 />
                 <div
-                  className="bg-[#fbbf24] h-full transition-all duration-700 rounded-r-full"
+                  className="bg-sev-medium h-full transition-all duration-700 rounded-r-full"
                   style={{ width: stats.total ? `${(stats.pending / stats.total) * 100}%` : '0%' }}
                 />
               </div>
             </div>
           </section>
 
-          <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-white border border-white/10">
+          <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-fg border border-line">
             <div className="flex justify-between items-center gap-4 mb-4">
-              <h2 className="font-bold text-sm text-gray-400">Submissions over time</h2>
+              <h2 className="font-bold text-sm text-fg-muted">Submissions over time</h2>
               <label className="sr-only" htmlFor="range">
                 Time range
               </label>
@@ -215,61 +215,61 @@ export default function AdminDashboard() {
                 className="bg-oasys-blue/10 text-oasys-blue text-xs font-bold px-3 py-1.5 rounded-md border border-oasys-blue/20 cursor-pointer hover:bg-oasys-blue/20 transition-colors"
               >
                 {Object.entries(RANGES).map(([key, value]) => (
-                  <option key={key} value={key} className="bg-zinc-800 text-white">
+                  <option key={key} value={key} className="bg-surface text-fg">
                     {value.label}
                   </option>
                 ))}
               </select>
             </div>
             {isLoading ? (
-              <p className="text-sm text-gray-500 font-bold py-10 text-center">Loading…</p>
+              <p className="text-sm text-fg-muted font-bold py-10 text-center">Loading…</p>
             ) : (
               <TrendLine data={trend} />
             )}
           </section>
         </div>
 
-        <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-white border border-white/10 mb-5">
-          <h2 className="font-bold text-sm text-gray-400 mb-6">Distress type breakdown</h2>
+        <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-fg border border-line mb-5">
+          <h2 className="font-bold text-sm text-fg-muted mb-6">Distress type breakdown</h2>
           {isLoading ? (
-            <p className="text-sm text-gray-500 font-bold py-8 text-center">Loading…</p>
+            <p className="text-sm text-fg-muted font-bold py-8 text-center">Loading…</p>
           ) : (
             <BarTally data={damageTally} emptyMessage="No reports submitted yet." />
           )}
         </section>
 
-        <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-white border border-white/10">
+        <section className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-fg border border-line">
           <div className="flex justify-between items-center gap-4 mb-5">
-            <h2 className="text-lg font-black tracking-wide">Recent submissions</h2>
+            <h2 className="text-lg font-semibold tracking-wide">Recent submissions</h2>
             <Link
               href="/admin/reports"
-              className="text-sm text-oasys-blue hover:text-blue-400 font-bold transition-colors shrink-0"
+              className="text-sm text-oasys-blue hover:text-accent-hover font-bold transition-colors shrink-0"
             >
               View all &rarr;
             </Link>
           </div>
 
           {isLoading ? (
-            <p className="py-8 text-center text-gray-500 font-bold">Loading latest reports…</p>
+            <p className="py-8 text-center text-fg-muted font-bold">Loading latest reports…</p>
           ) : recent.length === 0 ? (
-            <p className="py-8 text-center text-gray-500 font-bold">
+            <p className="py-8 text-center text-fg-muted font-bold">
               No reports found in the database.
             </p>
           ) : (
-            <ul className="flex flex-col divide-y divide-white/5">
+            <ul className="flex flex-col divide-y divide-line">
               {recent.map((report) => (
                 <li
                   key={report.id}
                   className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 py-3"
                 >
-                  <span className="font-mono text-xs text-gray-500 sm:w-24 shrink-0">
+                  <span className="font-mono text-xs text-fg-muted sm:w-24 shrink-0">
                     RPT-{String(report.id).slice(0, 8)}
                   </span>
                   <span className="font-bold grow min-w-0 truncate">
                     {report.damage_type || 'Unclassified'}
                   </span>
                   <SeverityBadge severity={report.severity} />
-                  <span className="text-xs text-gray-400 sm:w-28 shrink-0">
+                  <span className="text-xs text-fg-muted sm:w-28 shrink-0">
                     {report.uploadtime
                       ? new Date(report.uploadtime).toLocaleDateString('en-GB', {
                           day: 'numeric',
@@ -280,7 +280,7 @@ export default function AdminDashboard() {
                   </span>
                   <Link
                     href={`/admin/reports?report=${report.id}`}
-                    className="text-oasys-blue hover:text-white text-xs font-bold transition-colors shrink-0"
+                    className="text-oasys-blue hover:text-fg text-xs font-bold transition-colors shrink-0"
                   >
                     Review &rarr;
                   </Link>

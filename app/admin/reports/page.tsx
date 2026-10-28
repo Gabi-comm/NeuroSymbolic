@@ -14,7 +14,7 @@ import Pagination, { PAGE_SIZE, lastPage } from '@/components/Pagination';
 const ReportsMap = dynamic(() => import('@/components/ReportsMap'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-[22rem] sm:h-[30rem] rounded-2xl bg-black/40 flex items-center justify-center font-bold text-gray-400">
+    <div className="w-full h-[22rem] sm:h-[30rem] rounded-2xl bg-inset flex items-center justify-center font-bold text-fg-muted">
       Loading map…
     </div>
   ),
@@ -299,12 +299,12 @@ export default function AdminReports() {
     return (
       <article
         key={report.id}
-        className="bg-white rounded-panel p-5 sm:p-6 shadow-xl text-black"
+        className="bg-surface border border-line rounded-panel p-5 sm:p-6 shadow-xl text-fg"
       >
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1">
-              <h3 className="font-black text-lg truncate">
+              <h3 className="font-semibold text-lg truncate">
                 RPT-{String(report.id).slice(0, 8).toUpperCase()}
               </h3>
               {/* The admin's verdict leads where one exists; the system's
@@ -314,29 +314,29 @@ export default function AdminReports() {
                 tone="light"
               />
               {report.corrected_severity && (
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide">
+                <span className="text-[10px] font-bold text-fg-muted uppercase tracking-wide">
                   corrected · was {report.severity}
                 </span>
               )}
             </div>
-            <p className="font-bold text-sm text-zinc-700">
+            <p className="font-bold text-sm text-fg">
               {report.corrected_damage_type ?? report.damage_type ?? 'Unclassified'}
               {report.corrected_damage_type && (
-                <span className="font-normal text-zinc-500">
+                <span className="font-normal text-fg-muted">
                   {' '}
                   (system: {report.damage_type})
                 </span>
               )}
             </p>
-            <p className="text-zinc-500 font-bold text-xs mt-0.5 break-words">
+            <p className="text-fg-muted font-bold text-xs mt-0.5 break-words">
               {report.address || 'Location unknown'}
               {report.uploadtime && ` · ${new Date(report.uploadtime).toLocaleDateString('en-GB')}`}
             </p>
             <Coordinates lat={report.lat} lng={report.lng} tone="light" className="mt-0.5" />
             {report.userid && (
-              <p className="text-zinc-500 text-xs mt-0.5">
+              <p className="text-fg-muted text-xs mt-0.5">
                 Filed by{' '}
-                <span className="font-bold text-zinc-700">
+                <span className="font-bold text-fg">
                   {filers[report.userid]?.username ?? 'Unknown user'}
                 </span>
                 {filers[report.userid]?.user_type && ` · ${filers[report.userid]?.user_type}`}
@@ -352,7 +352,7 @@ export default function AdminReports() {
               className={`px-5 py-2 rounded-full font-bold text-xs transition-all border shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
                 tracked?.id === String(report.id)
                   ? 'bg-blue-50 border-oasys-blue text-blue-700'
-                  : 'border-zinc-300 text-zinc-700 hover:bg-zinc-100'
+                  : 'border-line text-fg hover:bg-inset'
               }`}
             >
               Track report
@@ -362,8 +362,8 @@ export default function AdminReports() {
               aria-expanded={isOpen}
               className={`px-6 py-2 rounded-full font-bold text-xs transition-all shadow shrink-0 ${
                 isOpen
-                  ? 'bg-zinc-200 text-zinc-700 hover:bg-zinc-300'
-                  : 'bg-oasys-blue text-white hover:bg-blue-600'
+                  ? 'bg-inset text-fg hover:bg-inset'
+                  : 'bg-oasys-blue text-accent-fg hover:bg-blue-600'
               }`}
             >
               {isOpen ? 'Close' : 'Review'}
@@ -372,11 +372,11 @@ export default function AdminReports() {
         </div>
 
         {isOpen && (
-          <div className="border-t border-gray-200 pt-5 mt-5 flex flex-col lg:flex-row gap-5">
+          <div className="border-t border-line pt-5 mt-5 flex flex-col lg:flex-row gap-5">
             <div className="w-full lg:w-1/2 flex flex-col gap-2">
               <div className="w-full aspect-video bg-black rounded-xl overflow-hidden">
                 {image === undefined ? (
-                  <p className="w-full h-full flex items-center justify-center text-gray-500 text-sm font-bold animate-pulse">
+                  <p className="w-full h-full flex items-center justify-center text-fg-muted text-sm font-bold animate-pulse">
                     Loading image…
                   </p>
                 ) : image ? (
@@ -387,55 +387,55 @@ export default function AdminReports() {
                     className="w-full h-full object-contain"
                   />
                 ) : (
-                  <p className="w-full h-full flex items-center justify-center text-gray-500 text-sm font-bold">
+                  <p className="w-full h-full flex items-center justify-center text-fg-muted text-sm font-bold">
                     No image
                   </p>
                 )}
               </div>
               <div className="flex justify-between items-center text-xs gap-3">
-                <span className="font-black text-zinc-800 truncate" title={report.file_name ?? ''}>
+                <span className="font-semibold text-fg truncate" title={report.file_name ?? ''}>
                   {report.file_name || 'unknown file'}
                 </span>
                 <span className="whitespace-nowrap shrink-0">
-                  <span className="font-bold text-zinc-500">Confidence </span>
-                  <span className="text-blue-700 font-black">
+                  <span className="font-bold text-fg-muted">Confidence </span>
+                  <span className="text-blue-700 font-semibold">
                     {formatConfidence(report.confidence ?? null)}
                   </span>
                 </span>
               </div>
               {report.crack_density_pct != null && (
-                <p className="text-xs font-bold text-zinc-600">
+                <p className="text-xs font-bold text-fg-muted">
                   Distress density: {report.crack_density_pct.toFixed(2)}%
                 </p>
               )}
             </div>
 
             <div className="w-full lg:w-1/2 flex flex-col">
-              <h4 className="text-xs font-black mb-1 uppercase tracking-wider">
+              <h4 className="text-xs font-semibold mb-1 uppercase tracking-wider">
                 Maintenance bulletin
               </h4>
-              <p className="text-xs leading-relaxed mb-4 text-zinc-600 whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar">
+              <p className="text-xs leading-relaxed mb-4 text-fg-muted whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar">
                 {report.detection_details || 'No bulletin recorded.'}
               </p>
 
-              <div className="bg-zinc-100 p-3 rounded-xl border border-zinc-200 mb-4">
-                <h4 className="font-black text-[10px] mb-2 text-blue-700 uppercase tracking-widest">
+              <div className="bg-inset p-3 rounded-xl border border-line mb-4">
+                <h4 className="font-semibold text-[10px] mb-2 text-blue-700 uppercase tracking-widest">
                   Detected distresses
                 </h4>
-                <ul className="text-[11px] space-y-1 list-disc list-inside font-medium text-zinc-700">
+                <ul className="text-[11px] space-y-1 list-disc list-inside font-medium text-fg">
                   {observations.map((line, idx) => (
                     <li key={idx}>{line}</li>
                   ))}
                 </ul>
               </div>
 
-              <div className="mt-auto flex flex-wrap justify-between items-end gap-3 pt-2 border-t border-zinc-100">
+              <div className="mt-auto flex flex-wrap justify-between items-end gap-3 pt-2 border-t border-line">
                 <div>
-                  <p className="text-[10px] font-bold uppercase text-zinc-400 mb-1">
+                  <p className="text-[10px] font-bold uppercase text-fg-muted mb-1">
                     Current state
                   </p>
                   <span
-                    className={`text-[10px] px-2 py-1 rounded font-black uppercase tracking-wider ${
+                    className={`text-[10px] px-2 py-1 rounded font-semibold uppercase tracking-wider ${
                       isResolvedColumn
                         ? 'bg-green-100 text-green-800'
                         : 'bg-amber-100 text-amber-900'
@@ -452,7 +452,7 @@ export default function AdminReports() {
                       is the quieter of the two, because most reports need it. */}
                   <button
                     onClick={() => setFixing(report)}
-                    className="px-5 py-2.5 rounded-xl font-bold text-xs transition-colors border border-zinc-300 text-zinc-700 hover:bg-zinc-100 hover:border-zinc-400"
+                    className="px-5 py-2.5 rounded-xl font-bold text-xs transition-colors border border-line text-fg hover:bg-inset hover:border-line"
                   >
                     Fix report
                   </button>
@@ -466,8 +466,8 @@ export default function AdminReports() {
                     }
                     className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow ${
                       isResolvedColumn
-                        ? 'bg-zinc-900 text-white hover:bg-black'
-                        : 'bg-[#16a34a] text-white hover:bg-green-700'
+                        ? 'bg-fg text-bg hover:bg-fg-soft'
+                        : 'bg-[#15803d] text-white hover:bg-[#166534]'
                     }`}
                   >
                     {isResolvedColumn ? 'Reopen report' : 'Mark resolved'}
@@ -483,17 +483,17 @@ export default function AdminReports() {
 
   return (
     <div className="min-h-screen">
-      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-12 pt-28 sm:pt-32 pb-12 shadow-[0_24px_70px_-24px_rgba(59,130,246,0.30)]">
+      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-12 pt-8 md:pt-12 pb-12 shadow-[0_24px_70px_-24px_rgba(59,130,246,0.30)]">
         <div className="max-w-7xl mx-auto flex justify-between items-end gap-4">
           <div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-2">Reports</h1>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold mb-2">Reports</h1>
             <p className="text-oasys-blue text-sm font-bold uppercase tracking-widest">
               Master database
             </p>
           </div>
           <Link
             href="/admin/dashboard"
-            className="text-zinc-400 hover:text-white font-bold text-sm transition-colors shrink-0"
+            className="text-fg-muted hover:text-fg font-bold text-sm transition-colors shrink-0"
           >
             &larr; Dashboard
           </Link>
@@ -504,7 +504,7 @@ export default function AdminReports() {
         {loadError && (
           <div
             role="alert"
-            className="bg-red-950/80 border border-red-500/40 text-red-200 rounded-panel p-5 mb-6"
+            className="bg-danger/10 border border-danger/40 text-danger rounded-panel p-5 mb-6"
           >
             <p className="font-bold mb-1">Could not load reports</p>
             <p className="text-sm">{loadError}</p>
@@ -525,12 +525,12 @@ export default function AdminReports() {
               setResolvedPage(1);
             }}
             placeholder="Search by location, severity, distress type or ID…"
-            className="grow bg-white rounded-full px-6 py-3.5 text-black font-bold shadow-lg focus:outline-none focus:ring-4 focus:ring-oasys-blue/50 placeholder-gray-400"
+            className="off-brand grow bg-surface rounded-full px-6 py-3.5 text-fg font-semibold shadow-lg focus:outline-none focus:ring-4 focus:ring-oasys-blue/50 placeholder:text-fg-faint"
           />
           <button
             onClick={() => setShowMap((open) => !open)}
             aria-expanded={showMap}
-            className="bg-white/5 hover:bg-white/10 text-white border border-white/15 px-6 py-3.5 rounded-full font-bold text-sm transition-colors shrink-0"
+            className="bg-fg/5 hover:bg-fg/10 text-fg border border-line-strong px-6 py-3.5 rounded-full font-bold text-sm transition-colors shrink-0"
           >
             {showMap ? 'Hide map' : 'Show map'}
           </button>
@@ -539,11 +539,11 @@ export default function AdminReports() {
         {showMap && (
           <section
             ref={mapRef}
-            className="bg-panel-gradient rounded-panel p-4 sm:p-6 border border-white/10 mb-6 scroll-mt-28"
+            className="bg-panel-gradient rounded-panel p-4 sm:p-6 border border-line mb-6 scroll-mt-28"
           >
-            <h2 className="font-bold text-sm text-gray-400 mb-4">
+            <h2 className="font-bold text-sm text-fg-muted mb-4">
               Defect locations{' '}
-              <span className="text-gray-500">
+              <span className="text-fg-muted">
                 ({filtered.filter((r) => r.lat != null).length} mapped)
               </span>
             </h2>
@@ -558,15 +558,15 @@ export default function AdminReports() {
         )}
 
         {isLoading && (
-          <p className="text-center text-white font-bold py-10 text-lg">
+          <p className="text-center text-fg font-bold py-10 text-lg">
             Loading database records…
           </p>
         )}
 
         {!isLoading && filtered.length === 0 && (
-          <div className="bg-white/10 rounded-panel p-10 text-center border border-white/20">
-            <h2 className="text-white text-xl font-black mb-2">No reports found</h2>
-            <p className="text-gray-400 font-bold">
+          <div className="bg-fg/10 rounded-panel p-10 text-center border border-line-strong">
+            <h2 className="text-fg text-xl font-semibold mb-2">No reports found</h2>
+            <p className="text-fg-muted font-bold">
               {reports.length === 0
                 ? 'Nothing has been submitted yet.'
                 : 'Try adjusting your search terms.'}
@@ -579,12 +579,12 @@ export default function AdminReports() {
             <div
               role="group"
               aria-label="Report queue"
-              className="flex w-full sm:w-max rounded-full bg-white/5 border border-white/10 p-1"
+              className="flex w-full sm:w-max rounded-full bg-fg/5 border border-line p-1"
             >
               {(
                 [
-                  { key: 'needs', label: 'Needs action', count: unresolved.length, dot: 'bg-[#fbbf24]' },
-                  { key: 'resolved', label: 'Resolved', count: resolved.length, dot: 'bg-[#16a34a]' },
+                  { key: 'needs', label: 'Needs action', count: unresolved.length, dot: 'bg-sev-medium' },
+                  { key: 'resolved', label: 'Resolved', count: resolved.length, dot: 'bg-sev-low' },
                 ] as const
               ).map((tab) => {
                 const active = view === tab.key;
@@ -594,13 +594,13 @@ export default function AdminReports() {
                     type="button"
                     aria-pressed={active}
                     onClick={() => setView(tab.key)}
-                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-5 sm:px-7 py-2.5 rounded-full text-sm font-black uppercase tracking-widest transition-colors ${
-                      active ? 'bg-white text-black shadow' : 'text-zinc-300 hover:text-white hover:bg-white/10'
+                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-5 sm:px-7 py-2.5 rounded-full text-sm font-semibold uppercase tracking-widest transition-colors ${
+                      active ? 'bg-fg text-bg shadow' : 'text-fg-soft hover:text-fg hover:bg-fg/10'
                     }`}
                   >
                     <span aria-hidden="true" className={`w-2.5 h-2.5 rounded-full ${tab.dot}`} />
                     {tab.label}
-                    <span className="tabular-nums text-zinc-500">
+                    <span className="tabular-nums text-fg-muted">
                       {tab.count}
                     </span>
                   </button>
@@ -609,7 +609,7 @@ export default function AdminReports() {
             </div>
 
             {shown.length === 0 ? (
-              <p className="text-zinc-300 font-medium px-1 italic">
+              <p className="text-fg-soft font-medium px-1 italic">
                 {isResolvedView ? 'No resolved reports.' : 'All caught up — nothing pending.'}
               </p>
             ) : (
@@ -635,11 +635,11 @@ export default function AdminReports() {
           aria-labelledby="confirm-title"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
         >
-          <div className="bg-white rounded-panel p-7 max-w-sm w-full shadow-2xl">
-            <h2 id="confirm-title" className="text-xl font-black text-black mb-2">
+          <div className="bg-surface rounded-panel p-7 max-w-sm w-full shadow-2xl">
+            <h2 id="confirm-title" className="text-xl font-semibold text-fg mb-2">
               {pendingAction.to === 'Resolved' ? 'Resolve report?' : 'Reopen report?'}
             </h2>
-            <p className="text-zinc-600 font-medium text-sm mb-7">
+            <p className="text-fg-muted font-medium text-sm mb-7">
               {pendingAction.to === 'Resolved'
                 ? 'This moves the report to the resolved queue.'
                 : 'This moves the report back to the Needs Action queue.'}
@@ -647,16 +647,16 @@ export default function AdminReports() {
             <div className="flex gap-3">
               <button
                 onClick={() => setPendingAction(null)}
-                className="flex-1 bg-zinc-200 text-black py-3 rounded-xl font-bold text-sm hover:bg-zinc-300 transition-colors"
+                className="flex-1 bg-inset text-fg py-3 rounded-xl font-bold text-sm hover:bg-inset transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={applyStateChange}
-                className={`flex-1 text-white py-3 rounded-xl font-bold text-sm transition-colors ${
+                className={`flex-1 py-3 rounded-xl font-bold text-sm transition-colors ${
                   pendingAction.to === 'Resolved'
-                    ? 'bg-[#16a34a] hover:bg-green-700'
-                    : 'bg-zinc-900 hover:bg-black'
+                    ? 'bg-[#15803d] text-white hover:bg-[#166534]'
+                    : 'bg-fg text-bg hover:bg-fg-soft'
                 }`}
               >
                 {pendingAction.to === 'Resolved' ? 'Resolve' : 'Reopen'}
@@ -682,7 +682,7 @@ export default function AdminReports() {
       {actionError && (
         <div
           role="alert"
-          className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-red-950 border border-red-500/50 text-red-100 px-5 py-3 rounded-xl shadow-2xl max-w-md"
+          className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-danger/10 border border-danger/40 text-danger px-5 py-3 rounded-xl shadow-2xl max-w-md"
         >
           <p className="text-sm font-bold">{actionError}</p>
           <button

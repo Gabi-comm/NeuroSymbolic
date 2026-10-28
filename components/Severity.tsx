@@ -17,8 +17,9 @@ interface SeverityStyle {
   label: Severity;
   /** Distinct silhouette, legible in greyscale and at small sizes. */
   icon: ReactNode;
-  onDark: string;
-  onLight: string;
+  /** Theme-aware text colour (validated palette; see app/globals.css). */
+  text: string;
+  /** Filled tile, for the one large verdict icon on the result page. */
   solid: string;
   description: string;
 }
@@ -45,24 +46,21 @@ export const SEVERITY: Record<Severity, SeverityStyle> = {
   Low: {
     label: 'Low',
     icon: CircleIcon,
-    onDark: 'bg-[#16a34a]/15 text-[#16a34a] border-[#16a34a]/40',
-    onLight: 'bg-white/70 text-[#15803d] border-[#15803d]/40',
+    text: 'text-sev-low',
     solid: 'bg-[#16a34a] text-white',
     description: 'Monitor during routine inspection',
   },
   Medium: {
     label: 'Medium',
     icon: TriangleIcon,
-    onDark: 'bg-[#fbbf24]/15 text-[#fbbf24] border-[#fbbf24]/40',
-    onLight: 'bg-white/70 text-[#854d0e] border-[#854d0e]/40',
+    text: 'text-sev-medium',
     solid: 'bg-[#fbbf24] text-black',
     description: 'Schedule maintenance',
   },
   High: {
     label: 'High',
     icon: OctagonIcon,
-    onDark: 'bg-[#dc2626]/15 text-[#f87171] border-[#dc2626]/50',
-    onLight: 'bg-white/70 text-[#dc2626] border-[#dc2626]/40',
+    text: 'text-sev-high',
     solid: 'bg-[#dc2626] text-white',
     description: 'Prioritise for repair',
   },
@@ -82,29 +80,24 @@ export const SEVERITY_RANK: Record<Severity, number> = { Low: 0, Medium: 1, High
 
 interface BadgeProps {
   severity: unknown;
-  /** Surface the badge sits on. Controls contrast, not meaning. */
+  /** Kept for existing call sites; colours now follow the theme tokens. */
   tone?: 'dark' | 'light';
   size?: 'sm' | 'md';
   className?: string;
 }
 
-export function SeverityBadge({
-  severity,
-  tone = 'dark',
-  size = 'sm',
-  className = '',
-}: BadgeProps) {
+/**
+ * Glyph + word, no pill behind it (2026-10 redesign). The colour comes from the
+ * theme, so the same badge reads on light cards, dark cards and navy bands.
+ */
+export function SeverityBadge({ severity, size = 'sm', className = '' }: BadgeProps) {
   const key = toSeverity(severity);
+  const textSize = size === 'sm' ? 'text-[11px]' : 'text-xs';
 
   if (!key) {
     return (
-      <span
-        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-bold ${
-          tone === 'dark'
-            ? 'bg-white/5 text-gray-400 border-white/10'
-            : 'bg-gray-100 text-gray-600 border-gray-300'
-        } ${size === 'sm' ? 'text-[10px]' : 'text-xs'} ${className}`}
-      >
+      <span className={`inline-flex items-center gap-1.5 font-semibold text-fg-muted ${textSize} ${className}`}>
+        <span aria-hidden="true" className="w-3 h-3 rounded-full border-[1.5px] border-current shrink-0" />
         Unknown
       </span>
     );
@@ -114,13 +107,31 @@ export function SeverityBadge({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-bold uppercase tracking-wide ${
-        tone === 'dark' ? style.onDark : style.onLight
-      } ${size === 'sm' ? 'text-[10px]' : 'text-xs'} ${className}`}
+      className={`inline-flex items-center gap-1.5 font-semibold uppercase tracking-wide ${style.text} ${textSize} ${className}`}
     >
       {style.icon}
       {style.label}
       <span className="sr-only"> severity. {style.description}.</span>
+    </span>
+  );
+}
+
+const RESOLVED_STATES = ['resolved', 'done'];
+
+export const isResolvedState = (state: unknown) =>
+  typeof state === 'string' && RESOLVED_STATES.includes(state.trim().toLowerCase());
+
+/** Report status as a dot + word, with no chip behind it. */
+export function StatusLabel({ state, className = '' }: { state: string | null | undefined; className?: string }) {
+  const resolved = isResolvedState(state);
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide ${
+        resolved ? 'text-ok' : 'text-warn'
+      } ${className}`}
+    >
+      <span aria-hidden="true" className="w-2 h-2 rounded-full bg-current shrink-0" />
+      {state || 'Needs Action'}
     </span>
   );
 }

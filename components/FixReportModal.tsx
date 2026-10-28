@@ -9,7 +9,7 @@ import type { Position } from '@/app/report-damage/Map';
 const MapComponent = dynamic(() => import('@/app/report-damage/Map'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-black/40 text-gray-400 font-bold text-sm">
+    <div className="w-full h-full flex items-center justify-center bg-inset text-fg-muted font-bold text-sm">
       Loading map…
     </div>
   ),
@@ -195,9 +195,9 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
   };
 
   const field =
-    'w-full bg-white text-black px-4 py-2.5 rounded-xl outline-none border border-transparent ' +
+    'w-full bg-inset text-fg px-4 py-2.5 rounded-xl outline-none border border-line ' +
     'focus:border-oasys-blue focus:ring-2 focus:ring-oasys-blue/40 transition-all';
-  const label = 'block text-xs font-bold text-gray-300 mb-1.5 uppercase tracking-wide';
+  const label = 'block text-xs font-bold text-fg-soft mb-1.5 uppercase tracking-wide';
 
   return (
     <div
@@ -209,16 +209,16 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
         aria-modal="true"
         aria-labelledby="fix-report-title"
         onClick={(e) => e.stopPropagation()}
-        className="bg-panel-gradient border border-white/10 rounded-oasys shadow-2xl w-full max-w-2xl my-8 p-6 sm:p-8"
+        className="bg-panel-gradient border border-line rounded-oasys shadow-2xl w-full max-w-2xl my-8 p-6 sm:p-8"
       >
         <div className="flex items-start justify-between gap-4 mb-1">
-          <h2 id="fix-report-title" className="text-2xl font-black text-white">
+          <h2 id="fix-report-title" className="text-2xl font-semibold text-fg">
             Fix report
           </h2>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+            className="w-9 h-9 flex items-center justify-center rounded-full text-fg-muted hover:text-fg hover:bg-fg/10 transition-colors shrink-0"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
               <path d="M18 6 6 18" />
@@ -226,7 +226,7 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
             </svg>
           </button>
         </div>
-        <p className="text-sm text-gray-400 mb-6">
+        <p className="text-sm text-fg-muted mb-6">
           RPT-{String(report.id).slice(0, 8).toUpperCase()} — correct anything the
           system got wrong.
         </p>
@@ -254,8 +254,8 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
                 ))}
               </select>
               {typeChanged && (
-                <p className="text-xs text-gray-500 mt-1.5">
-                  System said: <span className="text-gray-300">{report.damage_type}</span>
+                <p className="text-xs text-fg-muted mt-1.5">
+                  System said: <span className="text-fg-soft">{report.damage_type}</span>
                 </p>
               )}
             </div>
@@ -277,7 +277,7 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
                 ))}
               </select>
               {severityChanged && (
-                <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1.5">
+                <p className="text-xs text-fg-muted mt-1.5 flex items-center gap-1.5">
                   System said: <SeverityBadge severity={report.severity} />
                 </p>
               )}
@@ -317,14 +317,14 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
 
             {showMap && (
               <div className="mt-3">
-                <div className="h-64 rounded-2xl overflow-hidden border border-white/10">
+                <div className="h-64 rounded-2xl overflow-hidden border border-line">
                   <MapComponent
                     position={position}
                     accuracyM={null}
                     onPick={movePin}
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-2 tabular-nums">
+                <p className="text-xs text-fg-muted mt-2 tabular-nums">
                   Tap or drag to move the pin · {position.lat.toFixed(5)},{' '}
                   {position.lng.toFixed(5)}
                 </p>
@@ -335,7 +335,7 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
           {/* Note */}
           <div>
             <label htmlFor="fix-note" className={label}>
-              Note <span className="text-gray-500 normal-case">(optional)</span>
+              Note <span className="text-fg-muted normal-case">(optional)</span>
             </label>
             <textarea
               id="fix-note"
@@ -349,7 +349,7 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
 
           <div aria-live="polite" className="min-h-[1.25rem]">
             {errorMsg && (
-              <p role="alert" className="text-red-400 text-sm font-bold">
+              <p role="alert" className="text-danger text-sm font-bold">
                 {errorMsg}
               </p>
             )}
@@ -358,7 +358,7 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={onClose}
-              className="sm:flex-1 px-6 py-3 rounded-full font-bold bg-white/10 hover:bg-white/20 border border-white/15 transition-colors"
+              className="sm:flex-1 px-6 py-3 rounded-full font-bold bg-fg/10 hover:bg-fg/15 border border-line-strong transition-colors"
             >
               Cancel
             </button>

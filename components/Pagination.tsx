@@ -41,8 +41,8 @@ export default function Pagination({
   const to = Math.min(page * pageSize, total);
 
   const button =
-    'px-4 py-2 rounded-full font-bold text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-white/10 hover:bg-white/20 text-white border border-white/15';
-  const muted = tone === 'light' ? 'text-zinc-500' : 'text-gray-400';
+    'px-4 py-2 rounded-full font-bold text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-fg/10 hover:bg-fg/15 text-fg border border-line-strong';
+  const muted = tone === 'light' ? 'text-fg-muted' : 'text-fg-muted';
 
   return (
     <nav

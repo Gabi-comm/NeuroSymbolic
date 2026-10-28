@@ -24,7 +24,7 @@ import Coordinates from '@/components/Coordinates';
 const MapComponent = dynamic(() => import('./Map'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-black/40 text-gray-400 font-bold">
+    <div className="w-full h-full flex items-center justify-center bg-inset text-fg-muted font-bold">
       Loading map…
     </div>
   ),
@@ -216,7 +216,7 @@ export default function ReportDamagePage() {
 
   if (!acknowledged) {
     return (
-      <div className="pt-28 sm:pt-32 px-4 sm:px-10 pb-16 min-h-screen">
+      <div className="pt-8 md:pt-12 px-4 sm:px-10 pb-16 min-h-screen">
         <CaptureGuidelines onAcknowledge={() => {}} />
       </div>
     );
@@ -224,25 +224,25 @@ export default function ReportDamagePage() {
 
   const segment = (active: boolean) =>
     `flex-1 px-4 py-2.5 rounded-full text-sm font-bold transition-colors ${
-      active ? 'bg-oasys-blue text-white' : 'text-gray-300 hover:bg-white/10'
+      active ? 'bg-oasys-blue text-accent-fg' : 'text-fg-soft hover:bg-fg/10'
     }`;
 
   return (
-    <div className="pt-28 sm:pt-32 px-4 sm:px-10 pb-16 min-h-screen">
+    <div className="pt-8 md:pt-12 px-4 sm:px-10 pb-16 min-h-screen">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-start justify-between gap-4 mb-6">
           <div>
             <p className="text-oasys-blue font-bold text-sm uppercase tracking-wider mb-1">
               Report distress
             </p>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-fg leading-tight">
               Where is the damage?
             </h1>
           </div>
           <Link
             href="/"
             aria-label="Back to home"
-            className="p-2 rounded-full hover:bg-white/10 transition-all text-white group shrink-0"
+            className="p-2 rounded-full hover:bg-fg/10 transition-all text-fg group shrink-0"
           >
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="group-hover:-translate-x-1 transition-transform">
               <path d="M19 12H5" />
@@ -251,23 +251,23 @@ export default function ReportDamagePage() {
           </Link>
         </div>
 
-        <div className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-8">
+        <div className="bg-panel-gradient rounded-oasys border border-line shadow-2xl p-5 sm:p-8">
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
             {/* Map */}
             <div className="lg:col-span-3 flex flex-col gap-3">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="font-black text-white">Location</h2>
+                <h2 className="font-semibold text-fg">Location</h2>
                 <button
                   type="button"
                   onClick={locateDevice}
                   disabled={isLocating}
-                  className="px-3 py-1.5 rounded-full text-xs font-bold text-white bg-white/10 hover:bg-white/20 transition-colors disabled:cursor-wait disabled:opacity-60"
+                  className="px-3 py-1.5 rounded-full text-xs font-bold text-fg bg-fg/10 hover:bg-fg/15 transition-colors disabled:cursor-wait disabled:opacity-60"
                 >
                   {isLocating ? 'Locating…' : 'Use my location'}
                 </button>
               </div>
 
-              <div className="rounded-2xl h-[18rem] sm:h-[24rem] relative overflow-hidden border border-white/10">
+              <div className="rounded-2xl h-[18rem] sm:h-[24rem] relative overflow-hidden border border-line">
                 <MapComponent
                   position={fix ? { lat: fix.lat, lng: fix.lng } : null}
                   accuracyM={fix?.accuracy_m ?? null}
@@ -278,7 +278,7 @@ export default function ReportDamagePage() {
               <div
                 aria-live="polite"
                 className={`rounded-xl px-4 py-3 text-sm border ${
-                  fix ? 'bg-black/30 border-white/10 text-white' : 'bg-black/20 border-white/5 text-gray-500 italic'
+                  fix ? 'bg-inset border-line text-fg' : 'bg-inset border-line text-fg-muted italic'
                 }`}
               >
                 {fix && <span className="font-bold">Full Address: </span>}
@@ -289,7 +289,7 @@ export default function ReportDamagePage() {
                     : place.address ?? 'Address not found. The pin location is still recorded.'}
                 {fix && <Coordinates lat={fix.lat} lng={fix.lng} className="mt-1" />}
                 {fix && (place.barangay || place.road_name) && !isFetchingAddress && (
-                  <span className="block text-xs text-gray-400 mt-1">
+                  <span className="block text-xs text-fg-muted mt-1">
                     {[place.road_name, place.road_class && `${place.road_class} road`, place.barangay]
                       .filter(Boolean)
                       .join(' · ')}
@@ -298,7 +298,7 @@ export default function ReportDamagePage() {
               </div>
 
               {locationNote && (
-                <p role="status" className="bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm font-bold rounded-xl px-4 py-3">
+                <p role="status" className="bg-amber-500/10 border border-amber-500/30 text-warn text-sm font-bold rounded-xl px-4 py-3">
                   {locationNote}
                 </p>
               )}
@@ -307,10 +307,10 @@ export default function ReportDamagePage() {
             {/* Photo + pavement */}
             <div className="lg:col-span-2 flex flex-col gap-3">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="font-black text-white">Photo</h2>
+                <h2 className="font-semibold text-fg">Photo</h2>
                 <Link
                   href="/captured-distress"
-                  className="px-3 py-1.5 rounded-full text-xs font-bold text-white bg-white/10 hover:bg-white/20 transition-colors"
+                  className="px-3 py-1.5 rounded-full text-xs font-bold text-fg bg-fg/10 hover:bg-fg/15 transition-colors"
                 >
                   Use a captured photo
                 </Link>
@@ -325,8 +325,8 @@ export default function ReportDamagePage() {
                   isDragging
                     ? 'border-oasys-blue bg-oasys-blue/10'
                     : hasPhoto
-                      ? 'border-white/15 bg-black/40'
-                      : 'border-white/20 bg-black/30 hover:border-oasys-blue/60'
+                      ? 'border-line-strong bg-inset'
+                      : 'border-line-strong bg-inset hover:border-oasys-blue/60'
                 }`}
               >
                 <input
@@ -350,12 +350,12 @@ export default function ReportDamagePage() {
                       <img src={mediaPreview} alt="The damage photo you selected" className="w-full h-full object-contain" />
                     </div>
                     <div className="flex items-center justify-between gap-2 mt-3">
-                      <p className="text-xs text-gray-400 truncate min-w-0" title={fileName ?? ''}>
+                      <p className="text-xs text-fg-muted truncate min-w-0" title={fileName ?? ''}>
                         {fileName}
                       </p>
                       <button
                         onClick={() => inputRef.current?.click()}
-                        className="px-3 py-1.5 rounded-full text-xs font-bold text-white bg-white/10 hover:bg-white/20 transition-colors shrink-0"
+                        className="px-3 py-1.5 rounded-full text-xs font-bold text-fg bg-fg/10 hover:bg-fg/15 transition-colors shrink-0"
                       >
                         Replace
                       </button>
@@ -371,19 +371,19 @@ export default function ReportDamagePage() {
                     <span
                       aria-hidden="true"
                       className={`w-14 h-14 rounded-full flex items-center justify-center transition-transform ${
-                        isDragging ? 'bg-oasys-blue scale-110' : 'bg-white/10'
+                        isDragging ? 'bg-oasys-blue scale-110' : 'bg-fg/10'
                       }`}
                     >
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-fg">
                         <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z" />
                         <circle cx="12" cy="13" r="3" />
                       </svg>
                     </span>
                     <span>
-                      <span className="block font-black text-white mb-0.5">
+                      <span className="block font-semibold text-fg mb-0.5">
                         {isPreparing ? 'Preparing…' : isDragging ? 'Drop to add' : 'Take or add a photo'}
                       </span>
-                      <span className="block text-xs text-gray-400">
+                      <span className="block text-xs text-fg-muted">
                         Drag one in, or <span className="text-oasys-blue font-bold">browse</span>
                       </span>
                     </span>
@@ -392,7 +392,7 @@ export default function ReportDamagePage() {
               </div>
 
               {uploadError && (
-                <p role="alert" className="bg-red-500/10 border border-red-500/30 text-red-300 text-sm font-bold rounded-xl px-4 py-3">
+                <p role="alert" className="bg-red-500/10 border border-danger/40 text-danger text-sm font-bold rounded-xl px-4 py-3">
                   {uploadError}
                 </p>
               )}
@@ -400,8 +400,8 @@ export default function ReportDamagePage() {
               {/* Pavement decides the repair: reblocking is a concrete repair,
                   patching and overlay are asphalt ones. */}
               <fieldset className="flex flex-col gap-2 mt-1">
-                <legend className="font-black text-white mb-2">Road surface</legend>
-                <div role="radiogroup" aria-label="Road surface" className="flex gap-1 p-1 rounded-full bg-black/30 border border-white/10">
+                <legend className="font-semibold text-fg mb-2">Road surface</legend>
+                <div role="radiogroup" aria-label="Road surface" className="flex gap-1 p-1 rounded-full bg-inset border border-line">
                   {(['concrete', 'asphalt'] as const).map((value) => (
                     <button
                       key={value}
@@ -420,17 +420,17 @@ export default function ReportDamagePage() {
           </div>
 
           {/* Footer */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6 pt-5 border-t border-white/10">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6 pt-5 border-t border-line">
             <dl className="flex flex-wrap gap-x-7 gap-y-3 text-xs">
               <div>
-                <dt className="text-gray-500 font-bold uppercase tracking-wide mb-0.5">Scale</dt>
-                <dd className="text-white font-bold tabular-nums">{GSD_MM_PX.toFixed(3)} mm/px</dd>
+                <dt className="text-fg-muted font-bold uppercase tracking-wide mb-0.5">Scale</dt>
+                <dd className="text-fg font-bold tabular-nums">{GSD_MM_PX.toFixed(3)} mm/px</dd>
               </div>
 
               <div>
-                <dt className="text-gray-500 font-bold uppercase tracking-wide mb-0.5">Location</dt>
-                <dd className={`font-bold tabular-nums flex items-center gap-1.5 ${fix ? 'text-white' : 'text-gray-500'}`}>
-                  {fix && <span aria-hidden="true" className="text-[#4ade80]">✓</span>}
+                <dt className="text-fg-muted font-bold uppercase tracking-wide mb-0.5">Location</dt>
+                <dd className={`font-bold tabular-nums flex items-center gap-1.5 ${fix ? 'text-fg' : 'text-fg-muted'}`}>
+                  {fix && <span aria-hidden="true" className="text-ok">✓</span>}
                   {fix
                     ? `${SOURCE_LABEL[fix.source]}${fix.accuracy_m != null ? ` ±${fix.accuracy_m} m` : ''}`
                     : 'Not set'}
@@ -438,9 +438,9 @@ export default function ReportDamagePage() {
               </div>
 
               <div className="min-w-0">
-                <dt className="text-gray-500 font-bold uppercase tracking-wide mb-0.5">Photo</dt>
-                <dd className={`font-bold flex items-center gap-1.5 ${hasPhoto ? 'text-white' : 'text-gray-500'}`}>
-                  {hasPhoto && <span aria-hidden="true" className="text-[#4ade80]">✓</span>}
+                <dt className="text-fg-muted font-bold uppercase tracking-wide mb-0.5">Photo</dt>
+                <dd className={`font-bold flex items-center gap-1.5 ${hasPhoto ? 'text-fg' : 'text-fg-muted'}`}>
+                  {hasPhoto && <span aria-hidden="true" className="text-ok">✓</span>}
                   <span className="truncate max-w-[12rem]" title={fileName ?? undefined}>
                     {hasPhoto ? (fileName ?? 'Added') : 'Not added'}
                   </span>
@@ -458,7 +458,7 @@ export default function ReportDamagePage() {
             ) : (
               <button
                 disabled
-                className="bg-white/5 text-gray-500 px-10 py-3.5 rounded-full font-bold cursor-not-allowed border border-white/10 w-full sm:w-auto"
+                className="bg-fg/5 text-fg-muted px-10 py-3.5 rounded-full font-bold cursor-not-allowed border border-line w-full sm:w-auto"
               >
                 {!hasPhoto ? 'Add a photo first' : !fix ? 'Set the location first' : 'Looking up address…'}
               </button>

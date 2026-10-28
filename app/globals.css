@@ -11,24 +11,156 @@
    duplicate postcss config) were deleted rather than maintained.
    =========================================================================== */
 
+/* ---------------------------------------------------------------------------
+   Light / dark themes (2026-10 redesign, approved in Figma file
+   x8yXuIT9Xazyb5VKOnfR28).
+
+   Every colour below resolves through a CSS variable set on <html data-theme>,
+   so one class works in both themes. The pre-paint script in app/layout.tsx
+   sets the attribute before first paint; there is no "system" mode by design.
+
+   Navy brand from the mobile mockups, neutral surfaces and hairlines from the
+   clean.jpg reference. Severity values are the validated palette (see the
+   block further down) -- do not re-pick them by eye.
+   --------------------------------------------------------------------------- */
+:root,
+.off-brand {
+  --bg: #f4f6fa;
+  --surface: #ffffff;
+  --surface-2: #eef2f8;
+  --inset: #eef2f8;
+  --line: #e2e7ef;
+  --line-strong: #d3dae5;
+  --fg: #0d1b36;
+  --fg-soft: #2b3a55;
+  --fg-muted: #5a6478;
+  --fg-faint: #6f7a8d;
+  --brand: #14295a;
+  --brand-fg: #ffffff;
+  --accent: #1f4fd1;
+  --accent-hover: #1a43b3;
+  --accent-fg: #ffffff;
+  --accent-soft: #e6edff;
+  --danger: #dc2626;
+  --warn: #854d0e;
+  --ok: #15803d;
+  --sev-low: #15803d;
+  --sev-medium: #854d0e;
+  --sev-high: #dc2626;
+  --grid-line: rgba(13, 27, 54, 0.035);
+  --glow: rgba(31, 79, 209, 0.08);
+  --shadow: 0 1px 2px rgba(13, 27, 54, 0.04), 0 8px 24px -12px rgba(13, 27, 54, 0.12);
+  --map-filter: none;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'],
+:root[data-theme='dark'] .off-brand {
+  --bg: #0a0c10;
+  --surface: #12151b;
+  --surface-2: #191d25;
+  --inset: #0d1015;
+  --line: #252a34;
+  --line-strong: #333946;
+  --fg: #eef1f6;
+  --fg-soft: #c9d0dc;
+  --fg-muted: #98a2b5;
+  --fg-faint: #7d8799;
+  --brand: #172c5f;
+  --brand-fg: #ffffff;
+  --accent: #7c9dff;
+  --accent-hover: #a3bbff;
+  --accent-fg: #0a0c10;
+  --accent-soft: #1a2440;
+  --danger: #f87171;
+  --warn: #fbbf24;
+  --ok: #4ade80;
+  --sev-low: #16a34a;
+  --sev-medium: #fbbf24;
+  --sev-high: #f87171;
+  --grid-line: rgba(255, 255, 255, 0.022);
+  --glow: rgba(124, 157, 255, 0.1);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -16px rgba(0, 0, 0, 0.6);
+  /* OSM tiles have no dark style; invert and re-hue them instead. */
+  --map-filter: invert(0.92) hue-rotate(180deg) brightness(0.95) contrast(0.9) saturate(0.6);
+  color-scheme: dark;
+}
+
+/* Navy bands (heroes, admin headers, the mobile top bar) stay navy in both
+   themes, so the tokens are re-scoped inside them: any text-fg / text-fg-muted
+   / border-line descendant reads as light-on-navy without per-element
+   overrides. */
+.on-brand,
+.bg-header-gradient,
+.bg-brand-gradient {
+  --fg: #ffffff;
+  --fg-soft: rgba(255, 255, 255, 0.88);
+  --fg-muted: rgba(255, 255, 255, 0.72);
+  --fg-faint: rgba(255, 255, 255, 0.6);
+  --line: rgba(255, 255, 255, 0.16);
+  --line-strong: rgba(255, 255, 255, 0.28);
+  --accent: #a9beff;
+  --accent-hover: #c7d5ff;
+  --accent-fg: #0d1b36;
+  --inset: rgba(0, 0, 0, 0.2);
+  color: #ffffff;
+}
+
+/* A popover opened from inside a navy band gets the page theme back. */
+.off-brand {
+  color: var(--fg);
+}
+
+/* The navy mark on light surfaces, the silver one on dark (components/shell/Logo). */
+.logo-on-dark {
+  display: none;
+}
+:root[data-theme='dark'] .logo-on-dark {
+  display: block;
+}
+:root[data-theme='dark'] .logo-on-light {
+  display: none;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-inset: var(--inset);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-soft: var(--fg-soft);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-faint: var(--fg-faint);
+  --color-brand: var(--brand);
+  --color-brand-fg: var(--brand-fg);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-warn: var(--warn);
+  --color-ok: var(--ok);
+  --color-sev-low: var(--sev-low);
+  --color-sev-medium: var(--sev-medium);
+  --color-sev-high: var(--sev-high);
+
+  /* The pre-redesign names, kept so nothing that still uses them breaks.
+     `oasys-blue` is the interactive accent; the rest are surfaces. */
+  --color-oasys-blue: var(--accent);
+  --color-oasys-blue-hover: var(--accent-hover);
+  --color-app-bg: var(--bg);
+  --color-card-bg: var(--surface-2);
+  --color-panel-bg: var(--bg);
+  --color-surface-light: var(--surface-2);
+
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-barlow), var(--font-geist), sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
 @theme {
-  /* Surfaces.
-
-     One canvas colour for every tab. There used to be three: a flat #525252 on
-     the admin tabs, a flat #1a1a1a on /report-damage, and nothing at all on the
-     rest, which fell through to the :root colour. The grey was the worst of the
-     three -- black gradient panels sat on a mid-grey sheet, so the panels read
-     as holes punched through the page instead of as cards raised off it.
-
-     Dark UI reads elevation as lightness: the further from the page, the
-     lighter the surface. The scale below is ordered that way, and the admin
-     console no longer inverts it. */
-  --color-oasys-blue: #3b82f6;
-  --color-oasys-blue-hover: #2563eb;
-  --color-app-bg: #08090c;
-  --color-card-bg: #262626;
-  --color-panel-bg: #1e1e1e;
-  --color-surface-light: #d9d9d9;
 
   /* Severity. One definition for the whole app. Medium was previously yellow on
      the dashboard and orange on the reports page; for a tool whose entire output
@@ -56,7 +188,7 @@
 
   /* Chart marks. Single-series throughout, so no categorical palette is needed
      and no CVD adjacency applies. */
-  --color-chart-mark: #3b82f6;
+  --color-chart-mark: var(--accent);
 
   --radius-oasys: 40px;
   --radius-panel: 30px;
@@ -72,38 +204,69 @@
    the logo's silver reading against them.
    --------------------------------------------------------------------------- */
 
-/* Most elevated: feature cards that need to sit above a panel. */
+/* Navy feature surface (heroes, feature cards). Tokens are re-scoped above. */
 .bg-brand-gradient {
-  background-image:
-    radial-gradient(120% 120% at 15% 0%, rgba(59, 130, 246, 0.16) 0%, transparent 55%),
-    linear-gradient(155deg, #262c38 0%, #1b1f29 38%, #14171f 72%, #101319 100%);
+  background-color: var(--brand);
+  background-image: radial-gradient(120% 120% at 85% 0%, rgba(124, 157, 255, 0.22) 0%, transparent 55%);
 }
 
-/* The workhorse: every card, panel and modal body. */
+/* The workhorse: every card, panel and modal body. Kept as a class name so the
+   pages did not need rewriting; it is now a flat themed surface with a
+   hairline, as in the clean reference. */
 .bg-panel-gradient {
-  background-image: linear-gradient(160deg, #1f232b 0%, #171a21 55%, #12141a 100%);
+  background-color: var(--surface);
+  box-shadow: var(--shadow);
 }
 
-/* Header bands on the admin console and page heroes. These used to run to
-   near-black, which worked when the page behind them was mid-grey. Against the
-   new canvas a black band would vanish, so the band is now the lighter of the
-   two and its rounded bottom edge is what reads. */
+/* Header bands on the admin console: navy in both themes. */
 .bg-header-gradient {
-  background-image:
-    radial-gradient(90% 140% at 85% 0%, rgba(59, 130, 246, 0.14) 0%, transparent 62%),
-    linear-gradient(180deg, #191d27 0%, #13161e 58%, #0d0f15 100%);
+  background-color: var(--brand);
+  background-image: radial-gradient(90% 140% at 85% 0%, rgba(124, 157, 255, 0.2) 0%, transparent 62%);
 }
 
 :root {
-  background-color: var(--color-app-bg);
-  color: white;
+  background-color: var(--bg);
+  color: var(--fg);
 }
 
 body {
   min-height: 100vh;
   margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
   /* Nothing should ever scroll sideways on a phone. */
   overflow-x: hidden;
+}
+
+/* Theme switch without View Transitions (Firefox): a short colour cross-fade.
+   The class is added for the duration of the switch only, so ordinary hovers
+   keep their own timing. */
+html.theme-fade *,
+html.theme-fade *::before,
+html.theme-fade *::after {
+  transition:
+    background-color 0.35s ease,
+    border-color 0.35s ease,
+    color 0.35s ease,
+    fill 0.35s ease,
+    stroke 0.35s ease !important;
+}
+
+/* Theme switch with View Transitions: the new theme is revealed as a circle
+   growing from the toggle (clip-path animated from ThemeToggle). The default
+   cross-fade is switched off so the old frame stays put underneath. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  z-index: 2;
+}
+
+.leaflet-tile-pane {
+  filter: var(--map-filter);
+  transition: filter 0.35s ease;
 }
 
 /* ---------------------------------------------------------------------------
@@ -128,15 +291,13 @@ body::before {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-color: var(--color-app-bg);
+  background-color: var(--bg);
   /* First layer listed paints on top. */
   background-image:
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 48px),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 48px),
-    radial-gradient(70% 55% at 6% -10%, rgba(59, 130, 246, 0.13) 0%, transparent 68%),
-    radial-gradient(60% 50% at 97% 2%, rgba(59, 130, 246, 0.07) 0%, transparent 70%),
-    radial-gradient(95% 65% at 50% 112%, rgba(59, 130, 246, 0.06) 0%, transparent 72%),
-    linear-gradient(170deg, #0c0e13 0%, #08090c 55%, #050609 100%);
+    repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 48px),
+    repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 48px),
+    radial-gradient(70% 55% at 6% -10%, var(--glow) 0%, transparent 68%),
+    radial-gradient(60% 50% at 97% 2%, var(--glow) 0%, transparent 70%);
 }
 
 /* Respect the OS reduced-motion setting. Several screens animate-pulse. */
@@ -169,11 +330,13 @@ nav {
 @keyframes page-enter {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(10px);
+    filter: blur(4px);
   }
   to {
     opacity: 1;
     transform: none;
+    filter: none;
   }
 }
 
@@ -192,7 +355,138 @@ nav {
    base style already matches the `to` frame (opacity 1, no transform), so
    nothing jumps at the end. */
 .page-enter {
-  animation: page-enter 0.32s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: page-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/* ---------------------------------------------------------------------------
+   Motion primitives (redesign). All of them are neutralised by the
+   reduced-motion rule above.
+   --------------------------------------------------------------------------- */
+
+/* Staggered entrance: children rise in one after another. Set --i on each
+   child (style={{'--i': n}}) or rely on the nth-child fallback. Same
+   `backwards` fill as .page-enter, for the same containing-block reason. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.stagger > * {
+  animation: rise-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms + 60ms);
+}
+.stagger > *:nth-child(2) { --i: 1; }
+.stagger > *:nth-child(3) { --i: 2; }
+.stagger > *:nth-child(4) { --i: 3; }
+.stagger > *:nth-child(5) { --i: 4; }
+.stagger > *:nth-child(6) { --i: 5; }
+.stagger > *:nth-child(7) { --i: 6; }
+.stagger > *:nth-child(8) { --i: 7; }
+
+/* Cards lift towards the pointer. */
+.lift {
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.35s ease,
+    border-color 0.25s ease;
+}
+.lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 2px 4px rgba(13, 27, 54, 0.05), 0 18px 40px -18px rgba(13, 27, 54, 0.28);
+  border-color: var(--line-strong);
+}
+
+/* Bars that grow to their value on mount (width set inline). */
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+.grow-x {
+  transform-origin: left;
+  animation: grow-x 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 90ms + 250ms);
+}
+
+/* A soft pulse ring, for "this is live" dots and the tracked pin. */
+@keyframes ping-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+.ping::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: currentColor;
+  animation: ping-ring 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Loading shimmer for skeletons. */
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--line) 50%, var(--surface-2) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+/* The sliding active indicator behind sidebar and tab-bar items. */
+.nav-indicator {
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.2s ease;
+}
+
+/* Popovers and the tour tooltip. */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+}
+.pop-in {
+  animation: pop-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/* Spotlight cut-out for the guided tour: a box whose giant shadow dims the
+   rest of the page. It glides between targets. */
+.tour-spot {
+  position: fixed;
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 0 0 9999px rgba(5, 10, 24, 0.62);
+  pointer-events: none;
+  transition:
+    top 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    left 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Numbers set in the condensed display face (stat tiles). */
+.font-stat {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 
 /* Sliding underline on the active nav item. */
@@ -220,14 +514,14 @@ nav {
 }
 
 .bg-dark-card {
-  background-color: var(--color-card-bg);
+  background-color: var(--surface);
   border-radius: var(--radius-oasys);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
 }
 
 .btn-blue {
-  background-color: var(--color-oasys-blue);
-  color: white;
+  background-color: var(--accent);
+  color: var(--accent-fg);
   font-weight: bold;
   padding: 0.75rem 2rem;
   border-radius: 9999px;
@@ -238,7 +532,10 @@ nav {
 }
 
 .btn-blue:hover {
-  background-color: var(--color-oasys-blue-hover);
+  background-color: var(--accent-hover);
+}
+.btn-blue:active {
+  transform: scale(0.98);
 }
 
 .btn-blue:disabled {
@@ -249,13 +546,13 @@ nav {
 /* Scrollable panels inside the light cards. */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.3) transparent;
+  scrollbar-color: var(--line-strong) transparent;
 }
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: var(--line-strong);
   border-radius: 3px;
 }
 
@@ -287,4 +584,333 @@ nav {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border-width: 0;
+}
+
+/* Leaflet popups follow the theme instead of staying white. */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: var(--shadow);
+}
+.leaflet-container a.leaflet-popup-close-button {
+  color: var(--fg-muted);
+}
+
+/* Pins drop onto the map. Leaflet positions the outer element with a
+   transform, so the animation runs on the inner disc. */
+@keyframes pin-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(2px) scale(1.06);
+  }
+  100% {
+    transform: none;
+  }
+}
+.oasys-pin > div {
+  animation: pin-drop 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/* ---------------------------------------------------------------------------
+   Hero ambience (dashboard + landing)
+   --------------------------------------------------------------------------- */
+@keyframes scan-sweep {
+  from {
+    transform: translateX(-12rem);
+  }
+  to {
+    transform: translateX(calc(100vw + 12rem));
+  }
+}
+.scan-beam {
+  left: 0;
+  animation: scan-sweep 7s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+  animation-delay: 1.2s;
+}
+@keyframes road-dash {
+  to {
+    stroke-dashoffset: -48;
+  }
+}
+.road-dash {
+  animation: road-dash 1.6s linear infinite;
+}
+
+/* ---------------------------------------------------------------------------
+   Intro splash (components/help/IntroSplash). Until React mounts it, the
+   flagged page is covered in the same navy so nothing flashes underneath.
+   --------------------------------------------------------------------------- */
+html[data-intro] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 89;
+  background: #0d1b36;
+}
+
+@keyframes intro-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes intro-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes intro-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(6px);
+  }
+}
+@keyframes intro-resolve {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+    filter: blur(10px);
+  }
+}
+@keyframes intro-sweep {
+  from {
+    transform: translateX(-14rem);
+  }
+  to {
+    transform: translateX(calc(100vw + 14rem));
+  }
+}
+@keyframes intro-lift {
+  to {
+    transform: translateY(-100%);
+    border-bottom-left-radius: 40% 12%;
+    border-bottom-right-radius: 40% 12%;
+  }
+}
+
+.intro-road {
+  stroke-dasharray: 1;
+  animation: intro-draw 0.8s cubic-bezier(0.65, 0, 0.35, 1) backwards;
+}
+.intro-line {
+  animation: intro-fade 0.5s ease 0.35s backwards;
+}
+.intro-beam {
+  left: 0;
+  animation: intro-sweep 1s cubic-bezier(0.45, 0, 0.25, 1) 0.45s backwards;
+  transform: translateX(calc(100vw + 14rem));
+}
+.intro-box {
+  stroke-dasharray: 1;
+  animation: intro-draw 0.6s cubic-bezier(0.65, 0, 0.35, 1) 0.9s backwards;
+}
+.intro-corners {
+  animation: intro-fade 0.3s ease 1.3s backwards;
+}
+.intro-logo {
+  animation: intro-resolve 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1.15s backwards;
+}
+.intro-word {
+  animation: intro-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) 1.5s backwards;
+}
+.intro-tag {
+  animation: intro-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) 1.7s backwards;
+}
+.intro-exit {
+  animation: intro-lift 0.65s cubic-bezier(0.7, 0, 0.3, 1) forwards;
+}
+
+/* ---------------------------------------------------------------------------
+   Help demos (components/help/demos). Each loops on a 3.2s cycle.
+   --------------------------------------------------------------------------- */
+@keyframes demo-drop {
+  0%,
+  8% {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.6);
+  }
+  22%,
+  85% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.demo-drop {
+  animation: demo-drop 3.2s cubic-bezier(0.22, 1, 0.36, 1) infinite backwards;
+}
+@keyframes demo-ring {
+  0%,
+  20% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  45% {
+    opacity: 0.9;
+  }
+  80%,
+  100% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+.demo-ring {
+  animation: demo-ring 3.2s ease-out infinite;
+}
+@keyframes demo-type {
+  0%,
+  30% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  45%,
+  90% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.demo-type {
+  animation: demo-type 3.2s ease infinite;
+}
+@keyframes demo-tab {
+  0%,
+  30% {
+    transform: translateX(0);
+  }
+  45%,
+  65% {
+    transform: translateX(62px);
+  }
+  80%,
+  100% {
+    transform: translateX(124px);
+  }
+}
+.demo-tab {
+  animation: demo-tab 3.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+@keyframes demo-slide {
+  0% {
+    opacity: 0;
+    transform: translate(-60px, -30px) rotate(-8deg);
+  }
+  30%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+.demo-slide {
+  animation: demo-slide 3.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+@keyframes demo-progress {
+  0%,
+  30% {
+    transform: scaleX(0);
+  }
+  80%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+.demo-progress {
+  animation: demo-progress 3.2s ease-in-out infinite;
+}
+@keyframes demo-box {
+  0%,
+  10% {
+    stroke-dashoffset: 100;
+  }
+  45%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+.demo-box {
+  animation: demo-box 3.2s ease infinite;
+}
+@keyframes demo-pop {
+  0%,
+  50% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  65%,
+  95% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.demo-pop {
+  animation: demo-pop 3.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+@keyframes demo-flash {
+  0%,
+  25% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.95;
+  }
+  45%,
+  100% {
+    opacity: 0;
+  }
+}
+.demo-flash {
+  animation: demo-flash 3.2s ease infinite;
+}
+@keyframes demo-stack {
+  0%,
+  40% {
+    opacity: 0;
+    transform: translate(-60px, -30px) scale(1.4);
+  }
+  65%,
+  92% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.demo-stack {
+  animation: demo-stack 3.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+@keyframes demo-status {
+  0%,
+  45% {
+    fill: var(--warn);
+    transform: scale(1);
+  }
+  55% {
+    transform: scale(1.6);
+  }
+  65%,
+  100% {
+    fill: var(--ok);
+    transform: scale(1);
+  }
+}
+.demo-status {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: demo-status 3.2s ease infinite;
 }

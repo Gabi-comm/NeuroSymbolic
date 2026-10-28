@@ -3,7 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/utils/supabase';
-import { AdminSessionContext, loadAdminSummary, type AdminSession } from '@/utils/adminData';
+import {
+  AdminSessionContext,
+  getVerifiedAdmin,
+  loadAdminSummary,
+  setVerifiedAdmin,
+  type AdminSession,
+} from '@/utils/adminData';
 
 type AuthState = 'checking' | 'authorized' | 'denied';
 
@@ -28,8 +34,12 @@ type AuthState = 'checking' | 'authorized' | 'denied';
  * data is requested alongside it.
  */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [authState, setAuthState] = useState<AuthState>('checking');
-  const [session, setSession] = useState<AdminSession | null>(null);
+  // Already verified in this browser session (the layout remounts on every
+  // admin page change): render now, re-check below.
+  const [authState, setAuthState] = useState<AuthState>(() =>
+    getVerifiedAdmin() ? 'authorized' : 'checking'
+  );
+  const [session, setSession] = useState<AdminSession | null>(() => getVerifiedAdmin());
   const router = useRouter();
 
   useEffect(() => {
@@ -44,6 +54,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         const user = authSession?.user;
 
         if (authError || !user) {
+          setVerifiedAdmin(null);
           if (isMounted) setAuthState('denied');
           router.replace('/');
           return;
@@ -59,16 +70,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           .maybeSingle();
 
         if (dbError || profile?.role?.toLowerCase() !== 'admin') {
+          setVerifiedAdmin(null);
           if (isMounted) setAuthState('denied');
           router.replace('/');
           return;
         }
 
+        const verified = { userId: user.id, username: profile.username ?? user.email ?? null };
+        setVerifiedAdmin(verified);
         if (isMounted) {
-          setSession({ userId: user.id, username: profile.username ?? user.email ?? null });
+          setSession(verified);
           setAuthState('authorized');
         }
       } catch {
+        setVerifiedAdmin(null);
         if (isMounted) setAuthState('denied');
         router.replace('/');
       }
@@ -83,7 +98,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (authState !== 'authorized') {
     return (
       <div
-        className="min-h-screen flex items-center justify-center text-white px-4"
+        className="min-h-screen flex items-center justify-center text-fg px-4"
         aria-live="polite"
       >
         <p className="font-bold tracking-widest uppercase text-sm text-center">

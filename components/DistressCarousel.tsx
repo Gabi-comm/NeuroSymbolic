@@ -31,7 +31,7 @@ export default function DistressCarousel({ distresses }: { distresses: Distress[
 
   if (total === 0) {
     return (
-      <p className="text-center py-8 text-zinc-500 font-bold italic">No distress detected.</p>
+      <p className="text-center py-8 text-fg-muted font-bold italic">No distress detected.</p>
     );
   }
 
@@ -50,8 +50,8 @@ export default function DistressCarousel({ distresses }: { distresses: Distress[
   const arrow = (disabled: boolean) =>
     `w-9 h-9 rounded-full flex items-center justify-center transition-all ${
       disabled
-        ? 'bg-zinc-300/60 text-zinc-400 cursor-not-allowed'
-        : 'bg-zinc-800 text-white hover:bg-black active:scale-95'
+        ? 'bg-fg/5 text-fg-faint cursor-not-allowed'
+        : 'bg-fg text-bg hover:bg-fg-soft active:scale-95'
     }`;
 
   return (
@@ -65,7 +65,7 @@ export default function DistressCarousel({ distresses }: { distresses: Distress[
         aria-roledescription="carousel"
         aria-label={`Detected distress, ${index + 1} of ${total}`}
         onKeyDown={onKeyDown}
-        className="grow min-w-0 h-44 overflow-hidden rounded-xl bg-white/60 border border-white/40 focus-visible:ring-2 focus-visible:ring-oasys-blue"
+        className="grow min-w-0 h-44 overflow-hidden rounded-xl bg-surface border border-line focus-visible:ring-2 focus-visible:ring-oasys-blue"
       >
         <div
           className="h-full transition-transform duration-300 ease-out"
@@ -82,17 +82,17 @@ export default function DistressCarousel({ distresses }: { distresses: Distress[
             >
               <div className="min-w-0">
                 <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <p className="font-black text-base text-zinc-900 leading-tight">
+                  <p className="font-semibold text-base text-fg leading-tight">
                     {distress.label}
                   </p>
-                  <span className="bg-zinc-800 text-white text-[11px] font-black px-2 py-1 rounded-lg shrink-0">
+                  <span className="text-fg-muted text-xs font-semibold tabular-nums shrink-0">
                     {(distress.confidence * 100).toFixed(0)}%
                   </span>
                 </div>
                 <SeverityBadge severity={distress.severity} tone="light" />
               </div>
 
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-zinc-700">
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-fg">
                 <dt className="font-bold">{distress.measurement_type}</dt>
                 <dd className="text-right tabular-nums">
                   {distress.metric_value?.toFixed(3)} {distress.unit}
@@ -137,12 +137,12 @@ export default function DistressCarousel({ distresses }: { distresses: Distress[
                 onClick={() => go(i)}
                 tabIndex={-1}
                 className={`rounded-full transition-all ${
-                  i === index ? 'bg-zinc-800 w-2 h-4' : 'bg-zinc-400 hover:bg-zinc-600 w-2 h-2'
+                  i === index ? 'bg-accent w-2 h-4' : 'bg-fg/25 hover:bg-fg/50 w-2 h-2'
                 }`}
               />
             ))
           ) : (
-            <span className="text-[10px] font-black text-zinc-600 tabular-nums">
+            <span className="text-[10px] font-semibold text-fg-muted tabular-nums">
               {index + 1}/{total}
             </span>
           )}

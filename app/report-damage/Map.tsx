@@ -75,7 +75,7 @@ export default function Map({ position, accuracyM, onPick }: MapProps) {
         <Circle
           center={[position.lat, position.lng]}
           radius={accuracyM}
-          pathOptions={{ color: '#3b82f6', weight: 1, fillOpacity: 0.12 }}
+          pathOptions={{ color: '#4f75e0', weight: 1, fillOpacity: 0.12 }}
         />
       )}
       {position && (

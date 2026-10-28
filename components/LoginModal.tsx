@@ -158,13 +158,13 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
   // ---------------------------------------------------------------- markup
 
   const field =
-    'w-full bg-white text-black px-4 py-3 rounded-xl outline-none border border-transparent ' +
-    'focus:border-oasys-blue focus:ring-2 focus:ring-oasys-blue/40 transition-all placeholder-gray-400';
-  const label = 'block text-xs font-bold text-gray-300 mb-1.5 uppercase tracking-wide';
+    'w-full bg-inset text-fg px-4 py-3 rounded-xl outline-none border border-line ' +
+    'focus:border-oasys-blue focus:ring-2 focus:ring-oasys-blue/40 transition-all placeholder:text-fg-faint';
+  const label = 'block text-xs font-bold text-fg-soft mb-1.5 uppercase tracking-wide';
 
   const tab = (active: boolean) =>
     `flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${
-      active ? 'bg-oasys-blue text-white shadow' : 'text-gray-400 hover:text-white'
+      active ? 'bg-oasys-blue text-accent-fg shadow' : 'text-fg-muted hover:text-accent-fg'
     }`;
 
   return (
@@ -178,12 +178,12 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
         aria-modal="true"
         aria-labelledby="auth-title"
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-4xl my-auto bg-panel-gradient rounded-oasys shadow-2xl border border-white/10 overflow-hidden flex flex-col lg:flex-row"
+        className="relative w-full max-w-4xl my-auto bg-panel-gradient rounded-oasys shadow-2xl border border-line overflow-hidden flex flex-col lg:flex-row"
       >
         <button
           onClick={onClose}
           aria-label="Close"
-          className="absolute top-4 right-4 z-10 w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+          className="absolute top-4 right-4 z-10 w-9 h-9 flex items-center justify-center rounded-full text-fg-muted hover:text-fg hover:bg-fg/10 transition-colors"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
             <path d="M18 6 6 18" />
@@ -193,7 +193,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
 
         {/* Brand panel — desktop only; on mobile it would just push the form
             below the fold, which is the opposite of helpful. */}
-        <aside className="hidden lg:flex lg:w-5/12 bg-brand-gradient p-10 flex-col items-center justify-center text-center border-r border-white/10">
+        <aside className="hidden lg:flex lg:w-5/12 bg-brand-gradient p-10 flex-col items-center justify-center text-center border-r border-line">
           <Image
             src="/oasys-logo.png"
             alt=""
@@ -202,8 +202,8 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
             priority
             className="w-40 h-40 object-contain mb-6 drop-shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
           />
-          <p className="font-black text-4xl tracking-tight text-white mb-2">OASYS</p>
-          <p className="text-gray-400 text-sm font-medium">Road distress assessment</p>
+          <p className="font-semibold text-4xl tracking-tight text-fg mb-2">OASYS</p>
+          <p className="text-fg-muted text-sm font-medium">Road distress assessment</p>
         </aside>
 
         {/* Form */}
@@ -223,14 +223,14 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
                 </svg>
               </span>
 
-              <h2 id="auth-title" className="text-2xl font-black text-white mb-2">
+              <h2 id="auth-title" className="text-2xl font-semibold text-fg mb-2">
                 Check your email
               </h2>
-              <p className="text-gray-400 text-sm leading-relaxed mb-1">
+              <p className="text-fg-muted text-sm leading-relaxed mb-1">
                 We sent a confirmation link to
               </p>
-              <p className="font-bold text-white mb-5 break-all">{awaitingConfirmation}</p>
-              <p className="text-gray-500 text-xs leading-relaxed mb-7 max-w-sm mx-auto">
+              <p className="font-bold text-fg mb-5 break-all">{awaitingConfirmation}</p>
+              <p className="text-fg-muted text-xs leading-relaxed mb-7 max-w-sm mx-auto">
                 Click it to activate your account, then come back and sign in. The
                 link expires after a while — request a new one by signing up again
                 if it does. Check spam if it has not arrived in a minute.
@@ -242,10 +242,10 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
             </div>
           ) : (
             <>
-              <h2 id="auth-title" className="text-2xl sm:text-3xl font-black text-white mb-1">
+              <h2 id="auth-title" className="text-2xl sm:text-3xl font-semibold text-fg mb-1">
                 {isLogin ? 'Welcome back' : 'Create an account'}
               </h2>
-              <p className="text-gray-400 text-sm mb-6">
+              <p className="text-fg-muted text-sm mb-6">
                 {isLogin
                   ? 'Sign in to submit and track road distress reports.'
                   : 'It takes a moment, and lets you submit reports.'}
@@ -254,7 +254,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
               <div
                 role="tablist"
                 aria-label="Authentication mode"
-                className="flex gap-1 bg-black/30 p-1 rounded-xl mb-6"
+                className="flex gap-1 bg-inset p-1 rounded-xl mb-6"
               >
                 <button role="tab" aria-selected={isLogin} onClick={() => toggleMode(true)} className={tab(isLogin)}>
                   Sign in
@@ -319,7 +319,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1.5 text-xs font-bold text-gray-600 hover:text-black rounded-lg hover:bg-gray-100 transition-colors"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1.5 text-xs font-bold text-fg-faint hover:text-fg rounded-lg hover:bg-fg/5 transition-colors"
                     >
                       {showPassword ? 'Hide' : 'Show'}
                     </button>
@@ -331,7 +331,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
                     type="button"
                     onClick={handleForgotPassword}
                     disabled={isLoading}
-                    className="self-end text-xs text-gray-400 hover:text-oasys-blue font-bold transition-colors disabled:opacity-50"
+                    className="self-end text-xs text-fg-muted hover:text-oasys-blue font-bold transition-colors disabled:opacity-50"
                   >
                     Forgot password?
                   </button>
@@ -339,12 +339,12 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
 
                 <div aria-live="polite" className="min-h-[1.25rem]">
                   {errorMsg && (
-                    <p role="alert" className="text-red-400 text-sm font-bold">
+                    <p role="alert" className="text-danger text-sm font-bold">
                       {errorMsg}
                     </p>
                   )}
                   {successMsg && (
-                    <p className="text-green-400 text-sm font-bold">{successMsg}</p>
+                    <p className="text-ok text-sm font-bold">{successMsg}</p>
                   )}
                 </div>
 
@@ -359,7 +359,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
                 </button>
               </form>
 
-              <p className="text-center text-sm text-gray-400 mt-6">
+              <p className="text-center text-sm text-fg-muted mt-6">
                 {isLogin ? "Don't have an account? " : 'Already have an account? '}
                 <button
                   onClick={() => toggleMode(!isLogin)}

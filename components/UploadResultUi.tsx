@@ -277,11 +277,11 @@ export default function UploadResultUi({
     const noRoad = fetchReason === 'no_road_detected';
 
     return (
-      <div className="pt-28 sm:pt-32 px-4 min-h-screen bg-panel-bg flex flex-col items-center justify-center text-center gap-7">
+      <div className="pt-8 md:pt-12 px-4 min-h-screen bg-panel-bg flex flex-col items-center justify-center text-center gap-7">
         <div
           aria-hidden="true"
           className={`w-16 h-16 rounded-full flex items-center justify-center ${
-            noRoad ? 'bg-amber-500/15 text-amber-400' : 'bg-red-500/15 text-red-400'
+            noRoad ? 'bg-amber-500/15 text-warn' : 'bg-red-500/15 text-danger'
           }`}
         >
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -301,14 +301,14 @@ export default function UploadResultUi({
         </div>
 
         <div className="max-w-md">
-          <h1 className="text-2xl font-bold text-white mb-3">
+          <h1 className="text-2xl font-bold text-fg mb-3">
             {noRoad ? 'No road surface detected' : 'Analysis failed'}
           </h1>
-          <p className="text-gray-400 leading-relaxed">{fetchError}</p>
+          <p className="text-fg-muted leading-relaxed">{fetchError}</p>
         </div>
 
         {noRoad && (
-          <ul className="text-sm text-gray-400 text-left bg-black/25 border border-white/5 rounded-2xl p-5 max-w-md flex flex-col gap-2">
+          <ul className="text-sm text-fg-muted text-left bg-inset border border-line rounded-2xl p-5 max-w-md flex flex-col gap-2">
             <li>• Point the camera down at the pavement, not along the street</li>
             <li>• Stand about 2 m back, at chest height</li>
             <li>• Keep vehicles, people and deep shadow out of the frame</li>
@@ -326,15 +326,15 @@ export default function UploadResultUi({
   if (!data) {
     return (
       <div
-        className="pt-28 sm:pt-32 px-4 min-h-screen bg-panel-bg flex items-center justify-center"
+        className="pt-8 md:pt-12 px-4 min-h-screen bg-panel-bg flex items-center justify-center"
         aria-live="polite"
       >
         <div className="flex flex-col items-center text-center">
           <div className="w-14 h-14 border-4 border-oasys-blue border-t-transparent rounded-full animate-spin mb-6" />
-          <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-fg mb-2">
             Analyzing road distress
           </h1>
-          <p className="text-gray-400">This usually takes 20–30 seconds.</p>
+          <p className="text-fg-muted">This usually takes 20–30 seconds.</p>
         </div>
       </div>
     );
@@ -366,7 +366,7 @@ export default function UploadResultUi({
   const accent = severityKey ? SEVERITY[severityKey] : null;
 
   return (
-    <div className="pt-28 sm:pt-32 px-4 sm:px-10 pb-16 min-h-screen text-white">
+    <div className="pt-8 md:pt-12 px-4 sm:px-10 pb-16 min-h-screen text-fg">
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
 
       <div className="max-w-6xl mx-auto flex flex-col gap-5">
@@ -376,14 +376,14 @@ export default function UploadResultUi({
             <p className="text-oasys-blue font-bold text-sm uppercase tracking-wider mb-1">
               Analysis complete
             </p>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black leading-tight">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight">
               Road distress report
             </h1>
           </div>
           <Link
             href={backLinkHref}
             aria-label="Back"
-            className="p-2 rounded-full hover:bg-white/10 transition-all group shrink-0"
+            className="p-2 rounded-full hover:bg-fg/10 transition-all group shrink-0"
           >
             <svg className="h-6 w-6 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -392,52 +392,52 @@ export default function UploadResultUi({
         </div>
 
         {/* Verdict strip — the first thing an inspector needs: how bad is it. */}
-        <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-7">
+        <section className="bg-panel-gradient rounded-oasys border border-line shadow-2xl p-5 sm:p-7">
           <div className="flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-8">
             <div className="flex items-center gap-4 min-w-0">
               <span
                 aria-hidden="true"
                 className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${
-                  accent ? accent.solid : 'bg-white/10'
+                  accent ? accent.solid : 'bg-fg/10'
                 }`}
               >
                 <span className="scale-[1.9]">{accent?.icon}</span>
               </span>
               <div className="min-w-0">
-                <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-0.5">
+                <p className="text-xs font-bold uppercase tracking-widest text-fg-muted mb-0.5">
                   Overall severity
                 </p>
-                <p className="text-3xl sm:text-4xl font-black leading-none">
+                <p className="text-3xl sm:text-4xl font-semibold leading-none">
                   {data.overall_severity}
                 </p>
               </div>
             </div>
 
-            <div className="hidden lg:block w-px self-stretch bg-white/10" />
+            <div className="hidden lg:block w-px self-stretch bg-fg/10" />
 
             <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3 grow text-sm">
               <div>
-                <dt className="text-xs text-gray-500 font-bold uppercase tracking-wide">Detections</dt>
-                <dd className="font-black tabular-nums">{data.distresses.length}</dd>
+                <dt className="text-xs text-fg-muted font-bold uppercase tracking-wide">Detections</dt>
+                <dd className="font-semibold tabular-nums">{data.distresses.length}</dd>
               </div>
               <div>
-                <dt className="text-xs text-gray-500 font-bold uppercase tracking-wide">Main defect</dt>
+                <dt className="text-xs text-fg-muted font-bold uppercase tracking-wide">Main defect</dt>
                 <dd className="font-bold truncate" title={primary?.label}>
                   {primary?.label ?? '—'}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-gray-500 font-bold uppercase tracking-wide">Distress extent</dt>
-                <dd className="font-black tabular-nums">
+                <dt className="text-xs text-fg-muted font-bold uppercase tracking-wide">Distress extent</dt>
+                <dd className="font-semibold tabular-nums">
                   {data.crack_density_pct?.toFixed(2) ?? '—'}%
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-gray-500 font-bold uppercase tracking-wide">Scale</dt>
-                <dd className="font-black tabular-nums">
+                <dt className="text-xs text-fg-muted font-bold uppercase tracking-wide">Scale</dt>
+                <dd className="font-semibold tabular-nums">
                   {data.gsd_mm_px?.toFixed(3) ?? '—'} mm/px
                 </dd>
-                <dd className="text-xs text-gray-500 font-bold">
+                <dd className="text-xs text-fg-muted font-bold">
                   {data.scale_source === 'reference_card'
                     ? 'Measured from reference card'
                     : 'One-lane capture rule'}
@@ -450,15 +450,15 @@ export default function UploadResultUi({
         {/* Evidence + detections */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Annotated image gets two thirds: it is the evidence. */}
-          <section className="lg:col-span-2 bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-6 flex flex-col gap-4">
+          <section className="lg:col-span-2 bg-panel-gradient rounded-oasys border border-line shadow-2xl p-5 sm:p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="font-black">Detected distress</h2>
-              <p className="text-xs text-gray-500 font-bold truncate max-w-[14rem]" title={data.filename}>
+              <h2 className="font-semibold">Detected distress</h2>
+              <p className="text-xs text-fg-muted font-bold truncate max-w-[14rem]" title={data.filename}>
                 {data.filename}
               </p>
             </div>
 
-            <div className="rounded-2xl overflow-hidden bg-black border border-white/10">
+            <div className="rounded-2xl overflow-hidden bg-black border border-line">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={data.fileUrl}
@@ -467,7 +467,7 @@ export default function UploadResultUi({
               />
             </div>
 
-            <ul className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-gray-500">
+            <ul className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-fg-muted">
               <li><span className="inline-block w-3 h-0.5 bg-[#22c55e] align-middle mr-1.5" />Detection box</li>
               <li><span className="inline-block w-3 h-0.5 bg-[#ef4444] align-middle mr-1.5" />Traced centreline</li>
               <li>Perspective corrected: {data.ipm_applied ? 'yes' : 'no'}</li>
@@ -476,27 +476,27 @@ export default function UploadResultUi({
           </section>
 
           <div className="flex flex-col gap-5">
-            <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-6">
-              <h2 className="font-black mb-3">
+            <section className="bg-panel-gradient rounded-oasys border border-line shadow-2xl p-5 sm:p-6">
+              <h2 className="font-semibold mb-3">
                 Findings{' '}
-                <span className="text-xs font-bold text-gray-500">
+                <span className="text-xs font-bold text-fg-muted">
                   ({data.distresses.length})
                 </span>
               </h2>
               <DistressCarousel distresses={data.distresses} />
             </section>
 
-            <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-6">
-              <h2 className="font-black mb-2">Location</h2>
-              <p className="text-sm text-gray-300 leading-snug break-words">
-                {context && <span className="font-bold text-white">Full Address: </span>}
+            <section className="bg-panel-gradient rounded-oasys border border-line shadow-2xl p-5 sm:p-6">
+              <h2 className="font-semibold mb-2">Location</h2>
+              <p className="text-sm text-fg-soft leading-snug break-words">
+                {context && <span className="font-bold text-fg">Full Address: </span>}
                 {context
                   ? context.address ?? `${context.lat.toFixed(5)}, ${context.lng.toFixed(5)}`
                   : 'No location set'}
               </p>
               {context && <Coordinates lat={context.lat} lng={context.lng} className="mt-2" />}
               {context && (
-                <p className="text-xs text-gray-500 mt-2 leading-snug">
+                <p className="text-xs text-fg-muted mt-2 leading-snug">
                   {[
                     `${SOURCE_LABEL[context.source]}${context.accuracy_m != null ? ` ±${context.accuracy_m} m` : ''}`,
                     context.barangay,
@@ -517,9 +517,9 @@ export default function UploadResultUi({
                 a reload that lost them -- rather than offering a button that
                 opens an empty page. */}
             {hasStages && (
-              <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-6 flex flex-col grow">
-                <h2 className="font-black mb-2">How does the detection work?</h2>
-                <p className="text-sm text-gray-400 leading-snug mb-5">
+              <section className="bg-panel-gradient rounded-oasys border border-line shadow-2xl p-5 sm:p-6 flex flex-col grow">
+                <h2 className="font-semibold mb-2">How does the detection work?</h2>
+                <p className="text-sm text-fg-muted leading-snug mb-5">
                   This image passed through six steps, from finding the road surface
                   to tracing each crack. See what every stage did to your photo.
                 </p>
@@ -539,9 +539,9 @@ export default function UploadResultUi({
         </div>
 
         {repairs.length > 0 && (
-          <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-7">
-            <h2 className="font-black mb-1">Recommended repairs</h2>
-            <p className="text-xs text-gray-500 mb-4">
+          <section className="bg-panel-gradient rounded-oasys border border-line shadow-2xl p-5 sm:p-7">
+            <h2 className="font-semibold mb-1">Recommended repairs</h2>
+            <p className="text-xs text-fg-muted mb-4">
               DPWH activity, method and response time for each defect, on{' '}
               {(data.pavement_type ?? 'concrete') === 'concrete' ? 'concrete' : 'asphalt'} pavement.
               Resolved from engineering rules, not by the language model.
@@ -550,21 +550,21 @@ export default function UploadResultUi({
               {repairs.map(({ label, severity, count, rec }) => (
                 <li
                   key={`${label}-${severity}`}
-                  className="bg-black/30 border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-5"
+                  className="bg-inset border border-line rounded-2xl p-4 flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-5"
                 >
                   <div className="sm:w-48 shrink-0 flex flex-col gap-1.5">
-                    <p className="font-black leading-tight">
+                    <p className="font-semibold leading-tight">
                       {label}
-                      {count > 1 && <span className="text-gray-500 font-bold"> ×{count}</span>}
+                      {count > 1 && <span className="text-fg-muted font-bold"> ×{count}</span>}
                     </p>
                     <SeverityBadge severity={severity} />
                   </div>
                   <div className="min-w-0 grow">
-                    <p className="font-bold text-white leading-snug">{rec.activity}</p>
-                    <p className="text-sm text-gray-300 leading-snug mt-0.5">{rec.method}</p>
+                    <p className="font-bold text-fg leading-snug">{rec.activity}</p>
+                    <p className="text-sm text-fg-soft leading-snug mt-0.5">{rec.method}</p>
                   </div>
-                  <p className="sm:w-44 shrink-0 text-sm text-gray-400 leading-snug">
-                    <span className="block text-xs text-gray-500 font-bold uppercase tracking-wide">Response</span>
+                  <p className="sm:w-44 shrink-0 text-sm text-fg-muted leading-snug">
+                    <span className="block text-xs text-fg-muted font-bold uppercase tracking-wide">Response</span>
                     {rec.response}
                   </p>
                 </li>
@@ -574,13 +574,13 @@ export default function UploadResultUi({
         )}
 
         {/* Bulletin */}
-        <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-7">
-          <h2 className="font-black mb-1">Maintenance bulletin</h2>
-          <p className="text-xs text-gray-500 mb-4">
+        <section className="bg-panel-gradient rounded-oasys border border-line shadow-2xl p-5 sm:p-7">
+          <h2 className="font-semibold mb-1">Maintenance bulletin</h2>
+          <p className="text-xs text-fg-muted mb-4">
             Interventions and priority are resolved from engineering rules; the summary
             is written locally on this machine.
           </p>
-          <div className="bg-black/30 border border-white/10 rounded-2xl p-5 whitespace-pre-wrap text-sm text-gray-200 leading-relaxed max-h-[26rem] overflow-y-auto custom-scrollbar">
+          <div className="bg-inset border border-line rounded-2xl p-5 whitespace-pre-wrap text-sm text-fg-soft leading-relaxed max-h-[26rem] overflow-y-auto custom-scrollbar">
             {data.gemini_bulletin}
           </div>
         </section>
@@ -596,24 +596,24 @@ export default function UploadResultUi({
           >
             <span
               aria-hidden="true"
-              className="w-14 h-14 rounded-full bg-[#16a34a] text-white flex items-center justify-center text-2xl font-black shrink-0"
+              className="w-14 h-14 rounded-full bg-sev-low text-fg flex items-center justify-center text-2xl font-semibold shrink-0"
             >
               ✓
             </span>
             <div className="grow">
-              <h2 className="text-xl font-black text-white mb-1">
+              <h2 className="text-xl font-semibold text-fg mb-1">
                 Report has been submitted
               </h2>
-              <p className="text-sm text-gray-300 leading-snug">
+              <p className="text-sm text-fg-soft leading-snug">
                 It is now in the admin review queue with a status of{' '}
-                <strong className="text-white">Needs Action</strong>. An admin
+                <strong className="text-fg">Needs Action</strong>. An admin
                 will assess it and mark it resolved.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 shrink-0 w-full sm:w-auto">
               <button
                 onClick={handleScanAnother}
-                className="px-6 py-3.5 rounded-full font-bold bg-white/10 hover:bg-white/20 border border-white/15 transition-colors w-full sm:w-auto"
+                className="px-6 py-3.5 rounded-full font-bold bg-fg/10 hover:bg-fg/15 border border-line-strong transition-colors w-full sm:w-auto"
               >
                 Report another
               </button>
@@ -623,23 +623,23 @@ export default function UploadResultUi({
             </div>
           </section>
         ) : (
-          <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <section className="bg-panel-gradient rounded-oasys border border-line shadow-2xl p-5 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="font-black mb-0.5">Submit this report</h2>
-              <p className="text-sm text-gray-400">
+              <h2 className="font-semibold mb-0.5">Submit this report</h2>
+              <p className="text-sm text-fg-muted">
                 {isSignedIn
                   ? 'Sends the assessment to an admin for review.'
                   : 'Sign in to send this to the review queue.'}
               </p>
               <p aria-live="assertive" className="text-xs font-bold mt-1.5">
                 {submitState === 'error' && (
-                  <span className="text-red-400">{submitMessage}</span>
+                  <span className="text-danger">{submitMessage}</span>
                 )}
               </p>
             </div>
 
             {isLoading ? (
-              <p className="px-8 py-3.5 rounded-full bg-white/5 text-gray-500 font-bold text-sm animate-pulse text-center">
+              <p className="px-8 py-3.5 rounded-full bg-fg/5 text-fg-muted font-bold text-sm animate-pulse text-center">
                 Checking sign-in…
               </p>
             ) : isSignedIn ? (
@@ -653,7 +653,7 @@ export default function UploadResultUi({
             ) : (
               <button
                 onClick={() => setShowLogin(true)}
-                className="px-10 py-3.5 rounded-full font-bold bg-white/10 hover:bg-white/20 border border-white/15 transition-colors w-full sm:w-auto"
+                className="px-10 py-3.5 rounded-full font-bold bg-fg/10 hover:bg-fg/15 border border-line-strong transition-colors w-full sm:w-auto"
               >
                 Sign in to submit
               </button>

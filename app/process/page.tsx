@@ -45,19 +45,19 @@ export default function ProcessPage() {
 
   if (!total || !current) {
     return (
-      <div className="pt-28 sm:pt-32 px-4 pb-16 min-h-screen flex items-start justify-center">
-        <div className="bg-panel-gradient border border-white/10 rounded-oasys shadow-2xl p-8 sm:p-10 max-w-md w-full text-center">
+      <div className="pt-8 md:pt-12 px-4 pb-16 min-h-screen flex items-start justify-center">
+        <div className="bg-panel-gradient border border-line rounded-oasys shadow-2xl p-8 sm:p-10 max-w-md w-full text-center">
           <span
             aria-hidden="true"
-            className="w-14 h-14 mx-auto mb-5 rounded-full bg-white/5 border border-white/10 flex items-center justify-center"
+            className="w-14 h-14 mx-auto mb-5 rounded-full bg-fg/5 border border-line flex items-center justify-center"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-fg-muted">
               <circle cx="11" cy="11" r="7" />
               <path d="m20 20-3.5-3.5" />
             </svg>
           </span>
-          <h1 className="text-2xl font-black mb-2">No analysis to walk through</h1>
-          <p className="text-sm text-gray-400 leading-snug mb-7">
+          <h1 className="text-2xl font-semibold mb-2">No analysis to walk through</h1>
+          <p className="text-sm text-fg-muted leading-snug mb-7">
             This page shows how a photo you have just reported was graded.
             Report one and the walkthrough opens from the result screen.
           </p>
@@ -70,14 +70,14 @@ export default function ProcessPage() {
   }
 
   return (
-    <div className="pt-28 sm:pt-32 px-4 sm:px-10 pb-16 min-h-screen">
+    <div className="pt-8 md:pt-12 px-4 sm:px-10 pb-16 min-h-screen">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-start justify-between gap-4 mb-6">
           <div>
             <p className="text-oasys-blue font-bold text-sm uppercase tracking-wider mb-1">
               How does the detection work?
             </p>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black leading-tight">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight">
               Six steps, on your image
             </h1>
           </div>
@@ -88,7 +88,7 @@ export default function ProcessPage() {
             href={returnTo}
             aria-label={returnLabel}
             title={returnLabel}
-            className="p-2 rounded-full hover:bg-white/10 transition-all group shrink-0"
+            className="p-2 rounded-full hover:bg-fg/10 transition-all group shrink-0"
           >
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="group-hover:-translate-x-1 transition-transform">
               <path d="M19 12H5" />
@@ -107,7 +107,7 @@ export default function ProcessPage() {
             <span
               key={stage.key}
               className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
-                i <= safeIndex ? 'bg-oasys-blue' : 'bg-white/10'
+                i <= safeIndex ? 'bg-oasys-blue' : 'bg-fg/10'
               }`}
             />
           ))}
@@ -115,8 +115,8 @@ export default function ProcessPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* The frame. */}
-          <section className="lg:col-span-2 bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-6 flex flex-col gap-4">
-            <div className="rounded-2xl overflow-hidden bg-black border border-white/10">
+          <section className="lg:col-span-2 bg-panel-gradient rounded-oasys border border-line shadow-2xl p-5 sm:p-6 flex flex-col gap-4">
+            <div className="rounded-2xl overflow-hidden bg-black border border-line">
               {/* eslint-disable-next-line @next/next/no-img-element -- base64 data URL from the analysis */}
               <img
                 key={current.key}
@@ -130,11 +130,11 @@ export default function ProcessPage() {
               <button
                 onClick={() => setIndex((i) => Math.max(i - 1, 0))}
                 disabled={safeIndex === 0}
-                className="px-5 py-2.5 rounded-full font-bold text-sm bg-white/10 hover:bg-white/20 border border-white/15 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 rounded-full font-bold text-sm bg-fg/10 hover:bg-fg/15 border border-line-strong transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 &larr; Previous
               </button>
-              <span className="text-xs font-bold text-gray-500 tabular-nums">
+              <span className="text-xs font-bold text-fg-muted tabular-nums">
                 {safeIndex + 1} / {total}
               </span>
               <button
@@ -148,15 +148,15 @@ export default function ProcessPage() {
           </section>
 
           {/* What this stage did. */}
-          <aside className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-5 sm:p-6 flex flex-col">
-            <span className="text-xs font-black text-oasys-blue uppercase tracking-widest mb-2">
+          <aside className="bg-panel-gradient rounded-oasys border border-line shadow-2xl p-5 sm:p-6 flex flex-col">
+            <span className="text-xs font-semibold text-oasys-blue uppercase tracking-widest mb-2">
               Step {safeIndex + 1}
             </span>
-            <h2 className="text-2xl font-black leading-tight mb-1.5">{current.title}</h2>
-            <p className="text-sm font-bold text-gray-300 mb-4">{current.summary}</p>
-            <p className="text-sm text-gray-400 leading-relaxed">{current.detail}</p>
+            <h2 className="text-2xl font-semibold leading-tight mb-1.5">{current.title}</h2>
+            <p className="text-sm font-bold text-fg-soft mb-4">{current.summary}</p>
+            <p className="text-sm text-fg-muted leading-relaxed">{current.detail}</p>
 
-            <p className="text-xs text-gray-500 mt-auto pt-5 leading-snug">
+            <p className="text-xs text-fg-muted mt-auto pt-5 leading-snug">
               These are the real intermediate frames from your analysis, not
               illustrations. Use the arrow keys to step through them.
             </p>
@@ -174,7 +174,7 @@ export default function ProcessPage() {
                   className={`w-full text-left rounded-2xl overflow-hidden border transition-all ${
                     i === safeIndex
                       ? 'border-oasys-blue ring-2 ring-oasys-blue/40'
-                      : 'border-white/10 hover:border-white/30 opacity-70 hover:opacity-100'
+                      : 'border-line hover:border-line-strong opacity-70 hover:opacity-100'
                   }`}
                 >
                   <span className="block aspect-video bg-black">
@@ -185,8 +185,8 @@ export default function ProcessPage() {
                       className="w-full h-full object-cover"
                     />
                   </span>
-                  <span className="block p-2.5 bg-black/40">
-                    <span className="block text-[10px] font-black text-gray-500 tabular-nums">
+                  <span className="block p-2.5 bg-inset">
+                    <span className="block text-[10px] font-semibold text-fg-muted tabular-nums">
                       {String(i + 1).padStart(2, '0')}
                     </span>
                     <span className="block text-xs font-bold leading-snug">

@@ -966,3 +966,11 @@ backend as concrete and as asphalt, `npx tsc --noEmit`, eslint, `npm run build`.
 
 - Cause: `components/Navigation.tsx` sent admins to `/admin` on every `SIGNED_IN` event. Supabase auth-js (2.100) also fires `SIGNED_IN` from `_recoverAndRefresh()` whenever the browser tab becomes visible again, so every tab switch looked like a fresh login.
 - Fix: a ref remembers who was signed in before each auth event; the redirect runs only on a signed-out → signed-in transition. Verified by simulating tab hide/show: old code jumped `/admin/users` → `/admin`, new code stays put across repeated switches.
+
+## Console and Dashboard load faster — 2026-10-25
+
+- `utils/adminData.ts` (new): one light query of every report (no photos/bulletins) plus a head-only account count, shared by Console and Dashboard and kept in memory for 30 s (stale copy shown at once, refreshed in the background). Also `AdminSessionContext` (admin's id and username) and a verified-admin memory, both cleared on sign-out or account change.
+- `app/admin/layout.tsx`: reads the session locally (`getSession`) instead of an auth-server round trip — the role query under RLS still verifies the token; fetches role + username in one query; starts the report summary in parallel with the role check. `components/PageTransition` remounts the layout on every route change, so a verified admin now renders immediately and is re-checked in the background (no "Verifying admin access…" on each move).
+- `app/admin/page.tsx`: no own auth calls or 7 count queries; counts are derived from the shared summary. `app/admin/dashboard/page.tsx`: same summary.
+- `app/admin/reports/page.tsx`: resolve/reopen/fix clears the cached summary so Console numbers update.
+- Measured (production build, localhost): Console opened with 4 requests in parallel instead of 20 chained; on screen at ~1.1 s (its data used to finish ~3.1 s in dev); Console ↔ Dashboard switches 9–22 ms with no report refetch (previously 350–970 ms, each re-running the role check).

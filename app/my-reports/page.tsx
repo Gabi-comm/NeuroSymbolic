@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/utils/supabase';
-import { SeverityBadge } from '@/components/Severity';
+import { StatusLabel, SeverityBadge } from '@/components/Severity';
 import LoginModal from '@/components/LoginModal';
 import Coordinates from '@/components/Coordinates';
 import Pagination, { pageRange } from '@/components/Pagination';
@@ -110,15 +110,15 @@ export default function MyReportsPage() {
   };
 
   return (
-    <div className="pt-28 sm:pt-32 px-4 sm:px-10 pb-16 min-h-screen">
+    <div className="pt-8 md:pt-12 px-4 sm:px-10 pb-16 min-h-screen">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-fg leading-tight">
               My reports
             </h1>
             {userId && total > 0 && (
-              <p className="text-gray-400 mt-2">
+              <p className="text-fg-muted mt-2">
                 {total} filed · {open} awaiting action
               </p>
             )}
@@ -131,26 +131,25 @@ export default function MyReportsPage() {
         </div>
 
         {isLoadingAuth ? (
-          <p className="text-gray-500 font-bold animate-pulse">Checking sign-in…</p>
+          <p className="text-fg-muted font-bold animate-pulse">Checking sign-in…</p>
         ) : !userId ? (
-          <section className="bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <section className="bg-panel-gradient rounded-oasys border border-line shadow-2xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="font-black text-white mb-0.5">Sign in to see your reports</h2>
-              <p className="text-sm text-gray-400">Every report you file is tracked here until it is resolved.</p>
+              <h2 className="font-semibold text-fg">Sign in to see your reports</h2>
             </div>
             <button onClick={() => setShowLogin(true)} className="btn-blue px-10 py-3.5 w-full sm:w-auto">
               Sign in
             </button>
           </section>
         ) : loadError ? (
-          <p role="alert" className="bg-red-500/10 border border-red-500/30 text-red-300 text-sm font-bold rounded-xl px-4 py-3">
+          <p role="alert" className="bg-red-500/10 border border-danger/40 text-danger text-sm font-bold rounded-xl px-4 py-3">
             Could not load your reports: {loadError}
           </p>
         ) : isLoading && reports.length === 0 ? (
-          <p className="text-gray-500 font-bold animate-pulse">Loading your reports…</p>
+          <p className="text-fg-muted font-bold animate-pulse">Loading your reports…</p>
         ) : total === 0 ? (
-          <section className="bg-panel-gradient rounded-oasys border border-white/10 p-6 sm:p-8">
-            <p className="text-gray-400">
+          <section className="bg-panel-gradient rounded-oasys border border-line p-6 sm:p-8">
+            <p className="text-fg-muted">
               You have not filed any reports yet.{' '}
               <Link href="/report-damage" className="text-oasys-blue font-bold hover:underline">
                 Report distress
@@ -166,12 +165,11 @@ export default function MyReportsPage() {
           <div ref={listRef} className="flex flex-col gap-4 scroll-mt-28">
             <ul className={`flex flex-col gap-3 transition-opacity ${isLoading ? 'opacity-50' : ''}`}>
               {reports.map((r) => {
-                const resolved = r.state === 'Resolved';
                 const severity = r.corrected_severity ?? r.severity;
                 return (
                   <li
                     key={r.id}
-                    className="bg-panel-gradient rounded-2xl border border-white/10 p-4 flex flex-col sm:flex-row gap-4"
+                    className="bg-panel-gradient rounded-2xl border border-line p-4 flex flex-col sm:flex-row gap-4"
                   >
                     <div className="sm:w-40 aspect-video sm:aspect-[4/3] shrink-0 rounded-xl overflow-hidden bg-black">
                       {r.image_url && (
@@ -181,37 +179,29 @@ export default function MyReportsPage() {
                     </div>
                     <div className="min-w-0 grow flex flex-col gap-1.5">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-black text-white">
+                        <p className="font-semibold text-fg">
                           {r.corrected_damage_type ?? r.damage_type ?? 'Distress'}
                         </p>
                         <SeverityBadge severity={severity} />
-                        <span
-                          className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
-                            resolved
-                              ? 'bg-[#4ade80]/10 text-[#4ade80] border-[#4ade80]/30'
-                              : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                          }`}
-                        >
-                          {r.state ?? 'Needs Action'}
-                        </span>
+                        <StatusLabel state={r.state} />
                         {r.corrected_severity && (
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                          <span className="text-[10px] font-bold text-fg-muted uppercase tracking-wide">
                             Reviewed by an admin
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-300 leading-snug">
-                        <span className="font-bold text-white">Full Address: </span>
+                      <p className="text-sm text-fg-soft leading-snug">
+                        <span className="font-bold text-fg">Full Address: </span>
                         {r.address ?? 'Not recorded'}
                       </p>
                       <Coordinates lat={r.lat} lng={r.lng} />
                       {r.recommendation?.activity && (
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-fg-muted">
                           {r.recommendation.activity}
                           {r.recommendation.response && ` · ${r.recommendation.response}`}
                         </p>
                       )}
-                      <p className="text-xs text-gray-500 font-bold mt-auto">
+                      <p className="text-xs text-fg-muted font-bold mt-auto">
                         {r.uploadtime ? `Filed ${dateFormat.format(new Date(r.uploadtime))}` : ''}
                       </p>
                     </div>

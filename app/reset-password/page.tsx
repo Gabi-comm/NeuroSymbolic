@@ -84,21 +84,21 @@ export default function ResetPasswordPage() {
   };
 
   const field =
-    'w-full bg-white text-black px-4 py-3 rounded-xl outline-none border border-transparent ' +
-    'focus:border-oasys-blue focus:ring-2 focus:ring-oasys-blue/40 transition-all placeholder-gray-400';
-  const label = 'block text-xs font-bold text-gray-300 mb-1.5 uppercase tracking-wide';
+    'w-full bg-inset text-fg px-4 py-3 rounded-xl outline-none border border-line ' +
+    'focus:border-oasys-blue focus:ring-2 focus:ring-oasys-blue/40 transition-all placeholder:text-fg-faint';
+  const label = 'block text-xs font-bold text-fg-soft mb-1.5 uppercase tracking-wide';
 
   const shell =
-    'pt-28 sm:pt-32 px-4 pb-16 min-h-screen flex items-start justify-center';
+    'pt-8 md:pt-12 px-4 pb-16 min-h-screen flex items-start justify-center';
   const card =
-    'bg-panel-gradient rounded-oasys border border-white/10 shadow-2xl p-7 sm:p-10 w-full max-w-md';
+    'bg-panel-gradient rounded-oasys border border-line shadow-2xl p-7 sm:p-10 w-full max-w-md';
 
   if (status === 'checking') {
     return (
       <div className={shell} aria-live="polite">
         <div className={`${card} text-center`}>
           <div className="w-10 h-10 border-4 border-oasys-blue border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-400 font-bold">Checking your link…</p>
+          <p className="text-fg-muted font-bold">Checking your link…</p>
         </div>
       </div>
     );
@@ -110,7 +110,7 @@ export default function ResetPasswordPage() {
         <div className={`${card} text-center`}>
           <span
             aria-hidden="true"
-            className="w-14 h-14 mx-auto mb-5 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center"
+            className="w-14 h-14 mx-auto mb-5 rounded-full bg-amber-500/15 text-warn flex items-center justify-center"
           >
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <path d="M12 9v4" />
@@ -118,8 +118,8 @@ export default function ResetPasswordPage() {
               <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
             </svg>
           </span>
-          <h1 className="text-2xl font-black text-white mb-2">Link expired</h1>
-          <p className="text-gray-400 text-sm leading-relaxed mb-7">
+          <h1 className="text-2xl font-semibold text-fg mb-2">Link expired</h1>
+          <p className="text-fg-muted text-sm leading-relaxed mb-7">
             Password reset links can only be used once, and they expire after a
             short time. Request a fresh one from the sign-in screen.
           </p>
@@ -137,12 +137,12 @@ export default function ResetPasswordPage() {
         <div className={`${card} text-center`}>
           <span
             aria-hidden="true"
-            className="w-14 h-14 mx-auto mb-5 rounded-full bg-[#16a34a]/15 text-[#4ade80] flex items-center justify-center text-2xl font-black"
+            className="w-14 h-14 mx-auto mb-5 rounded-full bg-[#16a34a]/15 text-ok flex items-center justify-center text-2xl font-semibold"
           >
             ✓
           </span>
-          <h1 className="text-2xl font-black text-white mb-2">Password updated</h1>
-          <p className="text-gray-400 text-sm leading-relaxed mb-7">
+          <h1 className="text-2xl font-semibold text-fg mb-2">Password updated</h1>
+          <p className="text-fg-muted text-sm leading-relaxed mb-7">
             You have been signed out everywhere. Sign in again with your new
             password.
           </p>
@@ -157,10 +157,10 @@ export default function ResetPasswordPage() {
   return (
     <div className={shell}>
       <div className={card}>
-        <h1 className="text-2xl sm:text-3xl font-black text-white mb-1">
+        <h1 className="text-2xl sm:text-3xl font-semibold text-fg mb-1">
           Set a new password
         </h1>
-        <p className="text-gray-400 text-sm mb-7">
+        <p className="text-fg-muted text-sm mb-7">
           Choose something you have not used here before.
         </p>
 
@@ -184,7 +184,7 @@ export default function ResetPasswordPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1.5 text-xs font-bold text-gray-600 hover:text-black rounded-lg hover:bg-gray-100 transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1.5 text-xs font-bold text-fg-faint hover:text-fg rounded-lg hover:bg-fg/5 transition-colors"
               >
                 {showPassword ? 'Hide' : 'Show'}
               </button>
@@ -209,7 +209,7 @@ export default function ResetPasswordPage() {
 
           <div aria-live="polite" className="min-h-[1.25rem]">
             {errorMsg && (
-              <p role="alert" className="text-red-400 text-sm font-bold">
+              <p role="alert" className="text-danger text-sm font-bold">
                 {errorMsg}
               </p>
             )}

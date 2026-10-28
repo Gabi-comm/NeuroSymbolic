@@ -103,3 +103,31 @@ export const AdminSessionContext = createContext<AdminSession | null>(null);
 export function useAdminSession(): AdminSession | null {
   return useContext(AdminSessionContext);
 }
+
+// The last account the admin layout verified. components/PageTransition keys
+// the whole tree on the pathname, so the admin layout remounts on every move
+// between admin pages; without this each move waited on the role query again
+// behind "Verifying admin access…". With it, a remount for the same account
+// renders at once and the layout re-checks in the background.
+let verifiedAdmin: AdminSession | null = null;
+
+export function getVerifiedAdmin(): AdminSession | null {
+  return verifiedAdmin;
+}
+
+export function setVerifiedAdmin(session: AdminSession | null) {
+  verifiedAdmin = session;
+}
+
+// Signing out or switching account must not leave the previous admin's access
+// or data in memory.
+if (typeof window !== 'undefined') {
+  supabase.auth.onAuthStateChange((_event, session) => {
+    const signedOut = !session?.user;
+    const otherAccount = verifiedAdmin !== null && session?.user?.id !== verifiedAdmin.userId;
+    if (signedOut || otherAccount) {
+      verifiedAdmin = null;
+      cached = null;
+    }
+  });
+}

@@ -176,25 +176,25 @@ export default function UserManagementPage() {
 
           The "← Dashboard" button that lived in this header is gone: Dashboard
           is a nav tab now, which is where a reader looks for it. */}
-      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-10 pt-28 sm:pt-32 pb-20 shadow-[0_24px_70px_-24px_rgba(59,130,246,0.30)]">
+      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-10 pt-8 md:pt-12 pb-20 shadow-[0_24px_70px_-24px_rgba(59,130,246,0.30)]">
         <div className="max-w-4xl mx-auto">
           <p className="text-oasys-blue text-sm font-bold uppercase tracking-widest mb-2">
             Access control
           </p>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight mb-3">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight mb-3">
             Users
           </h1>
-          <p className="text-lg text-gray-300 max-w-2xl">
+          <p className="text-lg text-fg-soft max-w-2xl">
             {counts.All === undefined ? (
-              <span className="text-gray-500">Loading accounts…</span>
+              <span className="text-fg-muted">Loading accounts…</span>
             ) : (
               <>
-                <strong className="text-white">
+                <strong className="text-fg">
                   {accountCount} account{accountCount === 1 ? '' : 's'}
                 </strong>
                 {adminCount > 0 && (
                   <>
-                    , <strong className="text-white">{adminCount}</strong> with
+                    , <strong className="text-fg">{adminCount}</strong> with
                     admin access
                   </>
                 )}
@@ -206,11 +206,11 @@ export default function UserManagementPage() {
       </header>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-10 -mt-12 relative z-10 pb-20">
-        <div className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-white border border-white/10">
+        <div className="bg-panel-gradient rounded-panel p-6 sm:p-8 shadow-xl text-fg border border-line">
           {loadError && (
             <div
               role="alert"
-              className="bg-red-950/80 border border-red-500/40 text-red-200 rounded-xl p-4 mb-6"
+              className="bg-danger/10 border border-danger/40 text-danger rounded-xl p-4 mb-6"
             >
               <p className="font-bold mb-1">Could not load users</p>
               <p className="text-sm">{loadError}</p>
@@ -229,27 +229,27 @@ export default function UserManagementPage() {
                 }}
                 className={`px-4 py-2 rounded-full text-xs font-bold border transition-colors ${
                   filter === f
-                    ? 'bg-oasys-blue text-white border-oasys-blue'
-                    : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10'
+                    ? 'bg-oasys-blue text-accent-fg border-oasys-blue'
+                    : 'bg-fg/5 text-fg-soft border-line hover:bg-fg/10'
                 }`}
               >
                 {f}
                 {counts[f] !== undefined && (
-                  <span className={filter === f ? 'text-blue-100' : 'text-gray-500'}> {counts[f]}</span>
+                  <span className={filter === f ? 'text-accent' : 'text-fg-muted'}> {counts[f]}</span>
                 )}
               </button>
             ))}
           </div>
 
           {isLoading && users.length === 0 ? (
-            <p className="text-center text-gray-500 font-bold py-10">Loading users…</p>
+            <p className="text-center text-fg-muted font-bold py-10">Loading users…</p>
           ) : users.length === 0 ? (
-            <p className="text-center text-gray-400 font-bold py-10">
+            <p className="text-center text-fg-muted font-bold py-10">
               {filter === 'All' ? 'No users found.' : `No ${filter.toLowerCase()} accounts.`}
             </p>
           ) : (
             <ul
-              className={`flex flex-col divide-y divide-white/5 transition-opacity ${
+              className={`flex flex-col divide-y divide-line transition-opacity ${
                 isLoading ? 'opacity-50' : ''
               }`}
             >
@@ -267,18 +267,18 @@ export default function UserManagementPage() {
                         {user.username || 'Unnamed user'}
                         {isSelf && <span className="text-oasys-blue ml-2 text-sm">(you)</span>}
                       </p>
-                      <p className="text-gray-400 text-sm truncate">{user.email || 'No email'}</p>
+                      <p className="text-fg-muted text-sm truncate">{user.email || 'No email'}</p>
                     </div>
 
                     {role !== 'admin' && (
-                      <label className="flex items-center gap-2 shrink-0 text-xs text-gray-400 font-bold">
+                      <label className="flex items-center gap-2 shrink-0 text-xs text-fg-muted font-bold">
                         <span className="sr-only sm:not-sr-only">Type</span>
                         <select
                           value={user.user_type ?? 'Civilian'}
                           disabled={savingType === user.id}
                           onChange={(e) => applyUserType(user, e.target.value)}
                           aria-label={`Reporter type for ${user.username || user.email || 'this user'}`}
-                          className="bg-zinc-800 text-white border border-white/15 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-60"
+                          className="bg-surface text-fg border border-line-strong rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-60"
                         >
                           {USER_TYPES.map((t) => (
                             <option key={t} value={t}>
@@ -292,15 +292,15 @@ export default function UserManagementPage() {
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-bold uppercase shrink-0 w-max ${
                         role === 'admin'
-                          ? 'bg-oasys-blue/20 text-blue-300 border border-oasys-blue/40'
-                          : 'bg-white/5 text-gray-400 border border-white/10'
+                          ? 'bg-oasys-blue/20 text-accent border border-oasys-blue/40'
+                          : 'bg-fg/5 text-fg-muted border border-line'
                       }`}
                     >
                       {roleLabel(role)}
                     </span>
 
                     {isSelf ? (
-                      <span className="text-xs text-gray-500 italic shrink-0 sm:w-44 sm:text-right">
+                      <span className="text-xs text-fg-muted italic shrink-0 sm:w-44 sm:text-right">
                         Protected
                       </span>
                     ) : (
@@ -308,7 +308,7 @@ export default function UserManagementPage() {
                         onClick={() =>
                           setPending({ user, newRole: role === 'admin' ? 'user' : 'admin' })
                         }
-                        className="text-xs font-bold text-white bg-zinc-700 hover:bg-zinc-600 px-4 py-2 rounded-lg transition-colors shrink-0 sm:w-44"
+                        className="text-xs font-bold text-fg bg-fg/10 hover:bg-fg/15 px-4 py-2 rounded-lg transition-colors shrink-0 sm:w-44"
                       >
                         {role === 'admin' ? 'Remove admin' : 'Make admin'}
                       </button>
@@ -332,11 +332,11 @@ export default function UserManagementPage() {
           aria-labelledby="role-dialog-title"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
         >
-          <div className="bg-white rounded-panel p-7 max-w-sm w-full shadow-2xl text-black">
-            <h2 id="role-dialog-title" className="text-xl font-black mb-2">
+          <div className="pop-in bg-surface border border-line rounded-panel p-7 max-w-sm w-full shadow-2xl text-fg">
+            <h2 id="role-dialog-title" className="text-xl font-semibold mb-2">
               {pending.newRole === 'admin' ? 'Make admin?' : 'Remove admin access?'}
             </h2>
-            <p className="text-zinc-600 font-medium text-sm mb-7">
+            <p className="text-fg-muted font-medium text-sm mb-7">
               {pending.user.username || pending.user.email || 'This account'} will
               {pending.newRole === 'admin'
                 ? ' gain full access to every report and user.'
@@ -345,13 +345,13 @@ export default function UserManagementPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setPending(null)}
-                className="flex-1 bg-zinc-200 py-3 rounded-xl font-bold text-sm hover:bg-zinc-300 transition-colors"
+                className="flex-1 bg-inset py-3 rounded-xl font-bold text-sm hover:bg-inset transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={applyRoleChange}
-                className="flex-1 bg-oasys-blue text-white py-3 rounded-xl font-bold text-sm hover:bg-blue-600 transition-colors"
+                className="flex-1 bg-oasys-blue text-accent-fg py-3 rounded-xl font-bold text-sm hover:bg-blue-600 transition-colors"
               >
                 Confirm
               </button>
@@ -363,7 +363,7 @@ export default function UserManagementPage() {
       {actionError && (
         <div
           role="alert"
-          className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-red-950 border border-red-500/50 text-red-100 px-5 py-3 rounded-xl shadow-2xl max-w-md"
+          className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-danger/10 border border-danger/40 text-danger px-5 py-3 rounded-xl shadow-2xl max-w-md"
         >
           <p className="text-sm font-bold">{actionError}</p>
           <button onClick={() => setActionError(null)} className="text-xs underline mt-1 font-bold">

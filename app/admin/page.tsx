@@ -90,35 +90,35 @@ export default function AdminHome() {
 
   return (
     <div className="min-h-screen">
-      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-10 pt-28 sm:pt-32 pb-20 shadow-[0_24px_70px_-24px_rgba(59,130,246,0.30)]">
+      <header className="bg-header-gradient text-white rounded-b-[50px] px-4 sm:px-10 pt-8 md:pt-12 pb-20 shadow-[0_24px_70px_-24px_rgba(59,130,246,0.30)]">
         <div className="max-w-5xl mx-auto">
           <p className="text-oasys-blue text-sm font-bold uppercase tracking-widest mb-2">
             Admin console
           </p>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight mb-3">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight mb-3">
             {username ? `Welcome back, ${username}` : 'Welcome back'}
           </h1>
 
           {/* Lead with the state of the queue, not a total. */}
-          <p className="text-lg text-gray-300 max-w-2xl">
+          <p className="text-lg text-fg-soft max-w-2xl">
             {stats === null ? (
-              <span className="text-gray-500">Loading the queue…</span>
+              <span className="text-fg-muted">Loading the queue…</span>
             ) : nothingWaiting ? (
               <>
                 Nothing is waiting for review.{' '}
-                <span className="text-gray-500">
+                <span className="text-fg-muted">
                   {stats.total} report{stats.total === 1 ? '' : 's'} filed in total.
                 </span>
               </>
             ) : (
               <>
-                <strong className="text-white">
+                <strong className="text-fg">
                   {stats.pending} report{stats.pending === 1 ? '' : 's'}
                 </strong>{' '}
                 {stats.pending === 1 ? 'needs' : 'need'} review
                 {stats.high > 0 && (
                   <>
-                    , <strong className="text-[#f87171]">{stats.high} high severity</strong>
+                    , <strong className="text-sev-high">{stats.high} high severity</strong>
                   </>
                 )}
                 .
@@ -132,7 +132,7 @@ export default function AdminHome() {
         {loadError && (
           <div
             role="alert"
-            className="bg-red-950/80 border border-red-500/40 text-red-200 rounded-panel p-5 mb-6"
+            className="bg-danger/10 border border-danger/40 text-danger rounded-panel p-5 mb-6"
           >
             <p className="font-bold mb-1">Could not load the overview</p>
             <p className="text-sm">{loadError}</p>
@@ -145,38 +145,38 @@ export default function AdminHome() {
             <Link
               key={section.href}
               href={section.href}
-              className="bg-panel-gradient border border-white/10 rounded-panel p-6 shadow-xl hover:border-oasys-blue/50 hover:-translate-y-1 transition-all group"
+              className="bg-panel-gradient border border-line rounded-panel p-6 shadow-xl hover:border-oasys-blue/50 hover:-translate-y-1 transition-all group"
             >
               <span
                 aria-hidden="true"
-                className="w-11 h-11 rounded-xl bg-oasys-blue/15 text-oasys-blue flex items-center justify-center mb-4 group-hover:bg-oasys-blue group-hover:text-white transition-colors"
+                className="w-11 h-11 rounded-xl bg-oasys-blue/15 text-oasys-blue flex items-center justify-center mb-4 group-hover:bg-oasys-blue group-hover:text-accent-fg transition-colors"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   {section.icon}
                 </svg>
               </span>
               <div className="flex items-center justify-between gap-2 mb-1.5">
-                <h2 className="font-black text-white text-lg">{section.title}</h2>
+                <h2 className="font-semibold text-fg text-lg">{section.title}</h2>
                 <span
                   aria-hidden="true"
-                  className="text-oasys-blue group-hover:translate-x-1 transition-transform font-black"
+                  className="text-oasys-blue group-hover:translate-x-1 transition-transform font-semibold"
                 >
                   &rarr;
                 </span>
               </div>
-              <p className="text-sm text-gray-400 leading-snug">{section.detail}</p>
+              <p className="text-sm text-fg-muted leading-snug">{section.detail}</p>
             </Link>
           ))}
         </section>
 
         {/* Waiting work, with a route straight into it. */}
-        <section className="bg-panel-gradient border border-white/10 rounded-panel p-6 sm:p-7 shadow-xl mb-6">
+        <section className="bg-panel-gradient border border-line rounded-panel p-6 sm:p-7 shadow-xl mb-6">
           <div className="flex items-center justify-between gap-4 mb-4">
-            <h2 className="font-black text-white">Waiting for review</h2>
+            <h2 className="font-semibold text-fg">Waiting for review</h2>
             {stats !== null && stats.pending > 0 && (
               <Link
                 href="/admin/reports"
-                className="text-sm text-oasys-blue hover:text-blue-400 font-bold shrink-0"
+                className="text-sm text-oasys-blue hover:text-accent-hover font-bold shrink-0"
               >
                 Open reports &rarr;
               </Link>
@@ -184,17 +184,17 @@ export default function AdminHome() {
           </div>
 
           {stats === null ? (
-            <p className="text-sm text-gray-500 font-bold py-6 text-center">Loading…</p>
+            <p className="text-sm text-fg-muted font-bold py-6 text-center">Loading…</p>
           ) : recent.length === 0 ? (
-            <p className="text-sm text-gray-400 py-6 text-center">
+            <p className="text-sm text-fg-muted py-6 text-center">
               The queue is empty. Submitted reports appear here.
             </p>
           ) : (
-            <ul className="flex flex-col divide-y divide-white/5">
+            <ul className="flex flex-col divide-y divide-line">
               {recent.map((report) => (
                 <li key={report.id} className="flex flex-wrap items-center gap-3 py-3">
                   <SeverityBadge severity={report.corrected_severity ?? report.severity} />
-                  <span className="font-bold text-white grow min-w-0 truncate">
+                  <span className="font-bold text-fg grow min-w-0 truncate">
                     {report.corrected_severity ? (
                       <>
                         {report.damage_type || 'Unclassified'}{' '}
@@ -204,10 +204,10 @@ export default function AdminHome() {
                       report.damage_type || 'Unclassified'
                     )}
                   </span>
-                  <span className="text-xs text-gray-500 truncate max-w-[16rem]">
+                  <span className="text-xs text-fg-muted truncate max-w-[16rem]">
                     {report.address || 'No address'}
                   </span>
-                  <span className="text-xs text-gray-500 shrink-0">
+                  <span className="text-xs text-fg-muted shrink-0">
                     {report.uploadtime
                       ? new Date(report.uploadtime).toLocaleDateString('en-GB', {
                           day: 'numeric',
@@ -225,18 +225,18 @@ export default function AdminHome() {
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: 'Total reports', value: stats?.total },
-            { label: 'Resolved', value: stats?.resolved, accent: 'text-[#4ade80]' },
+            { label: 'Resolved', value: stats?.resolved, accent: 'text-ok' },
             { label: 'Corrected', value: stats?.corrected, accent: 'text-oasys-blue' },
             { label: 'Users', value: stats?.users },
           ].map((item) => (
             <div
               key={item.label}
-              className="bg-black/30 border border-white/10 rounded-2xl p-5"
+              className="bg-inset border border-line rounded-2xl p-5"
             >
-              <p className="text-xs text-gray-500 font-bold uppercase tracking-wide mb-1">
+              <p className="text-xs text-fg-muted font-bold uppercase tracking-wide mb-1">
                 {item.label}
               </p>
-              <p className={`text-3xl font-black tabular-nums ${item.accent ?? 'text-white'}`}>
+              <p className={`text-3xl font-semibold tabular-nums ${item.accent ?? 'text-fg'}`}>
                 {item.value === undefined ? '—' : item.value}
               </p>
             </div>

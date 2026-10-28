@@ -12,8 +12,8 @@ interface Props {
 
 export default function Coordinates({ lat, lng, tone = 'dark', className = '' }: Props) {
   const valid = typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng);
-  const label = tone === 'dark' ? 'text-white' : 'text-zinc-800';
-  const muted = tone === 'dark' ? 'text-gray-400' : 'text-zinc-500';
+  const label = tone === 'dark' ? 'text-fg' : 'text-fg';
+  const muted = tone === 'dark' ? 'text-fg-muted' : 'text-fg-muted';
   const link = tone === 'dark' ? 'text-oasys-blue' : 'text-blue-700';
 
   if (!valid) {
