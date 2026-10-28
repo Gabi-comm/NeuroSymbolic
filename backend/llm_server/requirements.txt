@@ -1,0 +1,7 @@
+# VPS-only. Not needed by backend/api.py.
+fastapi
+uvicorn[standard]
+pydantic>=2
+transformers>=4.45
+torch
+accelerate
