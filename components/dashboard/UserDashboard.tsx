@@ -8,7 +8,7 @@ import { SEVERITY, SeverityBadge, StatusLabel, isResolvedState, toSeverity, type
 import type { MapReport } from '@/components/ReportsMap';
 import HelpButton from '@/components/help/HelpButton';
 import CountUp from './CountUp';
-import { ScanLine } from './Landing';
+import Street from './Street';
 import { IconArrow, IconCamera, IconCompass, IconList, IconPlus, IconReport } from '@/components/shell/icons';
 import { SHELL_EVENTS } from '@/components/shell/nav';
 
@@ -124,9 +124,8 @@ export default function UserDashboard({ userId, name }: { userId: string; name: 
   return (
     <main className="px-4 sm:px-8 lg:px-10 pt-5 md:pt-8 pb-12 max-w-[1240px] mx-auto">
       {/* Hero */}
-      <section className="page-enter relative overflow-hidden rounded-[28px] bg-brand-gradient p-6 sm:p-9 flex flex-col lg:flex-row lg:items-end gap-6">
-        <ScanLine />
-        <RoadGrid />
+      <section className="page-enter relative overflow-hidden rounded-[28px] hero-theme px-6 sm:px-9 pt-6 sm:pt-9 pb-[116px] flex flex-col lg:flex-row lg:items-end gap-6">
+        <Street />
         <div className="relative grow">
           <p className="text-sm font-semibold text-fg-muted">{dateLong.format(new Date())}</p>
           <h1 className="mt-1 text-3xl sm:text-[44px] leading-tight font-semibold tracking-tight text-fg">
@@ -139,7 +138,7 @@ export default function UserDashboard({ userId, name }: { userId: string; name: 
         <div className="relative flex flex-wrap gap-3">
           <Link
             href="/report-damage"
-            className="group inline-flex items-center gap-2 h-12 px-5 rounded-xl bg-white text-[#14295a] font-semibold hover:bg-[#e6edff] transition-colors"
+            className="hero-cta group inline-flex items-center gap-2 h-12 px-5 rounded-xl font-semibold transition-colors"
           >
             <IconPlus className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90" />
             Report a distress
@@ -236,11 +235,14 @@ export default function UserDashboard({ userId, name }: { userId: string; name: 
                           <CountUp value={severityCounts[key]} />
                         </span>
                       </div>
-                      <div className="h-2 rounded-full bg-fg/5 overflow-hidden">
+                      {/* A cut scored along a dashed guide, ending at the count. */}
+                      <div className={`cut-track ${SEVERITY[key].text}`}>
                         <div
-                          className={`grow-x h-full rounded-full ${SEVERITY[key].text} bg-current`}
-                          style={{ width: `${(severityCounts[key] / maxSeverity) * 100}%`, ['--i' as string]: i }}
-                        />
+                          className="cut-line"
+                          style={{ ['--w' as string]: `${(severityCounts[key] / maxSeverity) * 100}%`, ['--i' as string]: i }}
+                        >
+                          {severityCounts[key] > 0 && <span className="cut-tip" />}
+                        </div>
                       </div>
                     </li>
                   ))}
@@ -362,22 +364,6 @@ export default function UserDashboard({ userId, name }: { userId: string; name: 
         </>
       )}
     </main>
-  );
-}
-
-/** Faint perspective road lines drifting in the hero. */
-function RoadGrid() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="absolute right-0 bottom-0 h-full w-2/3 opacity-30 pointer-events-none"
-      viewBox="0 0 400 200"
-      preserveAspectRatio="xMaxYMax slice"
-      fill="none"
-    >
-      <path d="M200 200 L330 0 M260 200 L345 0 M320 200 L360 0" stroke="#a9beff" strokeWidth="1" />
-      <path className="road-dash" d="M290 200 L352 0" stroke="#ffffff" strokeWidth="2" strokeDasharray="10 14" />
-    </svg>
   );
 }
 

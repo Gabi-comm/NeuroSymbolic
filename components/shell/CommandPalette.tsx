@@ -3,19 +3,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from './AuthProvider';
-import { setTheme } from './theme';
 import { ADMIN_LINKS, INFO_LINKS, USER_LINKS, SHELL_EVENTS } from './nav';
-import { IconArrow, IconCompass, IconMoon, IconSearch, IconSun } from './icons';
+import { IconArrow, IconCompass, IconSearch } from './icons';
 
 interface Command {
   id: string;
   label: string;
-  hint: string;
+  hint?: string;
   icon: React.ComponentType<{ className?: string }>;
   run: () => void;
 }
 
-/** Ctrl/⌘ K: jump to a page or run a shell action. */
+/** Ctrl/⌘ K: jump to a page or start the tour. */
 export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -48,7 +47,6 @@ export default function CommandPalette() {
     const pages = (isAdmin ? ADMIN_LINKS : [...USER_LINKS, ...INFO_LINKS]).map<Command>((link) => ({
       id: link.href,
       label: link.label,
-      hint: 'Page',
       icon: link.icon,
       run: () => {
         close();
@@ -58,8 +56,6 @@ export default function CommandPalette() {
     }));
     return [
       ...pages,
-      { id: 'light', label: 'Light theme', hint: 'Theme', icon: IconSun, run: () => (close(), setTheme('light')) },
-      { id: 'dark', label: 'Dark theme', hint: 'Theme', icon: IconMoon, run: () => (close(), setTheme('dark')) },
       ...(isAdmin
         ? []
         : [
@@ -116,8 +112,8 @@ export default function CommandPalette() {
                 setCursor((c) => Math.max(c - 1, 0));
               } else if (e.key === 'Enter') results[active]?.run();
             }}
-            placeholder="Go to a page or run a command"
-            aria-label="Search pages and commands"
+            placeholder="Search"
+            aria-label="Search"
             className="grow bg-transparent text-fg placeholder:text-fg-faint outline-none text-[15px]"
           />
           <kbd className="font-mono text-[11px] text-fg-faint">Esc</kbd>
@@ -136,7 +132,7 @@ export default function CommandPalette() {
               >
                 <c.icon className="w-[18px] h-[18px]" />
                 <span className="grow font-medium">{c.label}</span>
-                <span className="text-xs text-fg-faint">{c.hint}</span>
+                {c.hint && <span className="text-xs text-fg-faint">{c.hint}</span>}
                 {i === active && <IconArrow className="w-4 h-4" />}
               </button>
             </li>

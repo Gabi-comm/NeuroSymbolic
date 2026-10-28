@@ -2,38 +2,34 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
-import { INTRO_KEY } from '@/components/shell/themeBoot';
 
-export { INTRO_KEY };
 export const INTRO_DONE_EVENT = 'oasys:intro-done';
 
 /** Set by the boot script in app/layout before first paint; see themeBoot. */
 export const introPlaying = () =>
   typeof document !== 'undefined' && document.documentElement.dataset.intro === '1';
 
-const HOLD_MS = 2400;
-const EXIT_MS = 650;
+const HOLD_MS = 2300;
+const EXIT_MS = 700;
+const WORD = 'OASYS';
 
 /**
- * Once per browser session: a road centre-line draws across, a scan beam sweeps
- * it, the logo resolves inside a detection box, the wordmark rises, and the
- * whole sheet lifts away into the app. ~3s, skippable, never shown under
- * reduced motion (the boot script does not set the flag then).
+ * On every page load: the logo pops in with two burst rings and a glow, the
+ * name flips up letter by letter with a light sweep, the tagline settles, and
+ * an iris closes onto the app. ~3s, skippable, never shown under reduced motion.
  */
 export default function IntroSplash() {
   const [phase, setPhase] = useState<'off' | 'on' | 'exit'>('off');
 
   const end = useCallback(() => {
     setPhase('off');
-    delete document.documentElement.dataset.intro;
-    try {
-      sessionStorage.setItem(INTRO_KEY, '1');
-    } catch {}
     window.dispatchEvent(new Event(INTRO_DONE_EVENT));
   }, []);
 
   const skip = useCallback(() => {
-    setPhase('exit');
+    setPhase((p) => (p === 'on' ? 'exit' : p));
+    // Lift the pre-paint navy cover now, so the app shows through the iris.
+    delete document.documentElement.dataset.intro;
     window.setTimeout(end, EXIT_MS);
   }, [end]);
 
@@ -50,33 +46,31 @@ export default function IntroSplash() {
 
   return (
     <div
-      className={`intro fixed inset-0 z-[90] grid place-items-center overflow-hidden bg-[#0d1b36] text-white ${
-        phase === 'exit' ? 'intro-exit' : ''
-      }`}
       role="presentation"
+      className={`intro fixed inset-0 z-[90] overflow-hidden text-white ${phase === 'exit' ? 'intro-exit' : ''}`}
+      style={{ background: 'radial-gradient(80% 70% at 50% 45%, #13265a 0%, #050a1a 100%)' }}
     >
-      <div
-        className="absolute inset-0"
-        style={{ background: 'radial-gradient(70% 60% at 50% 45%, rgba(124,157,255,0.22), transparent 70%)' }}
-      />
-
-      {/* Road and centre line */}
-      <svg aria-hidden="true" className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full h-40" viewBox="0 0 1000 160" preserveAspectRatio="none">
-        <path className="intro-road" d="M0 80 H1000" stroke="rgba(169,190,255,0.25)" strokeWidth="70" pathLength="1" />
-        <path className="intro-line" d="M0 80 H1000" stroke="#ffffff" strokeWidth="3" strokeDasharray="0.03 0.025" pathLength="1" />
-      </svg>
-      <div className="intro-beam absolute inset-y-0 w-48 bg-gradient-to-r from-transparent via-[#7c9dff]/35 to-transparent" />
-
-      <div aria-hidden="true" className="relative flex flex-col items-center">
-        <div className="relative w-36 h-36 grid place-items-center">
-          <svg className="absolute inset-0" viewBox="0 0 144 144" fill="none">
-            <rect className="intro-box" x="4" y="4" width="136" height="136" rx="6" stroke="#22c55e" strokeWidth="2.5" pathLength="1" />
-            <path className="intro-corners" d="M4 28V4h24M116 4h24v24M140 116v24h-24M28 140H4v-24" stroke="#ffffff" strokeWidth="3" />
-          </svg>
-          <Image src="/oasys-logo.png" alt="" width={192} height={192} priority className="intro-logo w-24 h-24 object-contain" />
+      <div aria-hidden="true" className="absolute inset-0 flex flex-col items-center justify-center">
+        <div className="relative grid place-items-center w-36 h-36">
+          <span className="intro-ring absolute inset-0 rounded-full border border-[#86a3ff]" />
+          <span className="intro-ring intro-ring-2 absolute inset-0 rounded-full border border-[#38bdf8]" />
+          <span className="intro-halo absolute inset-[-30%] rounded-full" />
+          <Image src="/oasys-logo.png" alt="" width={224} height={224} priority className="intro-logo relative w-28 h-28 object-contain" />
         </div>
-        <p className="intro-word mt-6 text-5xl font-semibold tracking-tight">OASYS</p>
-        <p className="intro-tag mt-2 text-sm font-semibold text-[#a9beff] tracking-[0.2em] uppercase">Road distress assessment</p>
+        <p className="mt-6 flex text-5xl sm:text-7xl font-semibold tracking-tight [perspective:600px]">
+          {WORD.split('').map((ch, i) => (
+            <span
+              key={i}
+              className="intro-letter inline-block"
+              style={{ animationDelay: `${0.55 + i * 0.07}s, ${1.25 + i * 0.06}s` }}
+            >
+              {ch}
+            </span>
+          ))}
+        </p>
+        <p className="intro-tag mt-3 text-xs sm:text-sm font-semibold tracking-[0.32em] uppercase">
+          Road distress assessment
+        </p>
       </div>
 
       <button

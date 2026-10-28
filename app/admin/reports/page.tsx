@@ -579,7 +579,7 @@ export default function AdminReports() {
             <div
               role="group"
               aria-label="Report queue"
-              className="flex w-full sm:w-max rounded-full bg-fg/5 border border-line p-1"
+              className="flex w-full sm:w-max gap-6 border-b border-line"
             >
               {(
                 [
@@ -594,8 +594,8 @@ export default function AdminReports() {
                     type="button"
                     aria-pressed={active}
                     onClick={() => setView(tab.key)}
-                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-5 sm:px-7 py-2.5 rounded-full text-sm font-semibold uppercase tracking-widest transition-colors ${
-                      active ? 'bg-fg text-bg shadow' : 'text-fg-soft hover:text-fg hover:bg-fg/10'
+                    className={`relative flex-1 sm:flex-none flex items-center justify-center gap-2.5 pb-3 text-sm uppercase tracking-widest transition-colors after:absolute after:left-0 after:right-0 after:-bottom-px after:h-0.5 after:rounded-full after:bg-accent after:origin-left after:transition-transform after:duration-300 ${
+                      active ? 'font-bold text-fg after:scale-x-100' : 'font-semibold text-fg-muted hover:text-fg after:scale-x-0'
                     }`}
                   >
                     <span aria-hidden="true" className={`w-2.5 h-2.5 rounded-full ${tab.dot}`} />
