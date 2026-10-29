@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useEffect, useRef } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 import { ADMIN_LINKS, isActive, type NavLink } from './nav';
 import { IconCamera, IconHome, IconInfo, IconList, IconPlus } from './icons';
@@ -20,6 +21,14 @@ export default function BottomTabBar() {
   const { authUser, authChecked, isAdmin, openLogin } = useAuth();
   const tabs = isAdmin ? ADMIN_LINKS : USER_TABS;
   const reportActive = isActive(pathname, '/report-damage');
+  const router = useRouter();
+
+  // On Report the "+" turns into an ×, so tapping it again has to leave:
+  // back to the page Report was opened from (Home if it was opened directly).
+  const lastPage = useRef('/');
+  useEffect(() => {
+    if (!isActive(pathname, '/report-damage')) lastPage.current = pathname;
+  }, [pathname]);
 
   return (
     <nav
@@ -33,8 +42,14 @@ export default function BottomTabBar() {
               <li key="fab" className="relative w-16 h-16 flex justify-center">
                 <Link
                   href="/report-damage"
-                  aria-label="Report a distress"
+                  aria-label={reportActive ? 'Close report' : 'Report a distress'}
                   aria-current={reportActive ? 'page' : undefined}
+                  onClick={(e) => {
+                    if (reportActive) {
+                      e.preventDefault();
+                      router.push(lastPage.current);
+                    }
+                  }}
                   data-tour="fab"
                   className={`absolute -top-6 grid place-items-center w-14 h-14 rounded-full bg-brand text-brand-fg shadow-[0_10px_24px_-8px_rgba(20,41,90,0.7)] ring-4 ring-bg transition-transform duration-300 active:scale-90 ${
                     reportActive ? 'rotate-45' : ''

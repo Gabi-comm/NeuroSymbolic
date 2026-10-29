@@ -1061,3 +1061,5 @@ Approved in Figma (`x8yXuIT9Xazyb5VKOnfR28`) before any code changed.
 - Follow-up 10: sidebar Guide card moved from the bottom block to directly under the Info group (inside the nav); theme switch and account stay at the bottom.
 - Follow-up 11: Guide is now a row in the sidebar Info group (compass icon + "Guide", same style as the links; "Take the 1-minute tour" removed). It starts the tour rather than navigating.
 - Follow-up 12: About > How it works step numbers are plain accent numerals (font-stat) with no circle fill or ring.
+- Follow-up 13: How it works steps redesigned: zero-padded numerals (01–10) in a fixed left column, a hairline above each step with a short accent bar over the number, numbered down each column on desktop (1–5 left, 6–10 right); one column on phones.
+- Follow-up 14: mobile tab bar: on Report the centre button (shown as ×) now closes Report, returning to the page it was opened from (Home if opened directly); aria-label switches to "Close report". Previously it linked to /report-damage again and did nothing.

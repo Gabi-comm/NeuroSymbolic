@@ -95,18 +95,20 @@ export default function AboutUs() {
           Ten stages, from photograph to maintenance bulletin. Neural perception
           handles what the image contains; symbolic reasoning decides what it means.
         </p>
-        <ol className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+        {/* Numbered down each column (1-5, then 6-10) so the order reads as a
+            sequence. Each step sits under a hairline whose start is marked in
+            accent above its number; the number is part of the list's order,
+            so the visible one is decorative. */}
+        <ol className="grid grid-cols-1 md:grid-cols-2 md:grid-flow-col md:grid-rows-5 gap-x-10">
           {PIPELINE.map((stage, index) => (
-            <li key={stage.title} className="flex gap-4">
-              <span
-                aria-hidden="true"
-                className="shrink-0 w-8 font-stat text-2xl leading-6 text-accent tabular-nums"
-              >
-                {index + 1}
+            <li key={stage.title} className="relative grid grid-cols-[3.25rem_1fr] gap-x-2 py-4 border-t border-line">
+              <span aria-hidden="true" className="absolute -top-px left-0 w-9 h-0.5 rounded-full bg-accent" />
+              <span aria-hidden="true" className="font-stat text-[1.9rem] leading-none text-accent tabular-nums">
+                {String(index + 1).padStart(2, '0')}
               </span>
-              <div>
-                <p className="font-bold text-fg">{stage.title}</p>
-                <p className="text-sm text-fg-muted leading-snug">{stage.detail}</p>
+              <div className="pt-0.5">
+                <p className="font-bold text-fg leading-tight">{stage.title}</p>
+                <p className="mt-1 text-sm text-fg-muted leading-snug">{stage.detail}</p>
               </div>
             </li>
           ))}
