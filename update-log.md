@@ -1058,3 +1058,6 @@ Approved in Figma (`x8yXuIT9Xazyb5VKOnfR28`) before any code changed.
   - **Legend:** dot + label + bold count + %.
   - **Colours:** sky `#4ea6e6` (Dark) / accent `#2347d6` (Light) for resolved, neutral grey for waiting, and the validated `--sev-high`. Sky and grey passed the dataviz validator's separation checks on the dark card. The grey reads as neutral on purpose, and the red's lightness is the fixed severity palette.
   - **Motion:** the donut turns in while the segments draw one after another, the centre counts up, the bar segments grow in order, and a glint passes over the resolved piece. The ticks, stripes and travelling head from follow-up 8 are removed.
+- Follow-up 10: sidebar Guide card moved from the bottom block to directly under the Info group (inside the nav); theme switch and account stay at the bottom.
+- Follow-up 11: Guide is now a row in the sidebar Info group (compass icon + "Guide", same style as the links; "Take the 1-minute tour" removed). It starts the tour rather than navigating.
+- Follow-up 12: About > How it works step numbers are plain accent numerals (font-stat) with no circle fill or ring.

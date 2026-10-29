@@ -107,26 +107,26 @@ export default function Sidebar() {
                   </li>
                 );
               })}
+              {/* The tour lives in Info as one more row, styled like the links. */}
+              {group.title === 'Info' && (
+                <li>
+                  <button
+                    onClick={() => window.dispatchEvent(new Event(SHELL_EVENTS.tour))}
+                    data-tour="guide"
+                    className="group w-full flex items-center gap-3 h-10 px-3 rounded-xl text-sm text-fg-soft hover:text-fg hover:bg-fg/5 transition-colors"
+                  >
+                    <IconCompass className="w-[18px] h-[18px] shrink-0 transition-transform duration-500 group-hover:rotate-[200deg]" />
+                    Guide
+                  </button>
+                </li>
+              )}
             </ul>
           </div>
         ))}
+
       </nav>
 
       <div className="px-4 pb-5 flex flex-col gap-3">
-        {!isAdmin && (
-          <button
-            onClick={() => window.dispatchEvent(new Event(SHELL_EVENTS.tour))}
-            data-tour="guide"
-            className="lift group text-left rounded-2xl border border-line bg-surface-2 p-4"
-          >
-            <span className="flex items-center gap-2 text-sm font-semibold text-fg">
-              <IconCompass className="w-[18px] h-[18px] text-accent transition-transform duration-500 group-hover:rotate-[200deg]" />
-              Guide
-            </span>
-            <span className="mt-1 block text-xs text-fg-muted">Take the 1-minute tour</span>
-          </button>
-        )}
-
         <ThemeSwitch />
 
         <div className="flex items-center gap-3 pt-3 border-t border-line">

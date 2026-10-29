@@ -100,7 +100,7 @@ export default function AboutUs() {
             <li key={stage.title} className="flex gap-4">
               <span
                 aria-hidden="true"
-                className="shrink-0 w-8 h-8 rounded-full bg-oasys-blue/15 text-oasys-blue border border-oasys-blue/30 font-semibold text-sm flex items-center justify-center"
+                className="shrink-0 w-8 font-stat text-2xl leading-6 text-accent tabular-nums"
               >
                 {index + 1}
               </span>
