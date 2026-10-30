@@ -3,7 +3,7 @@ val: ../valid/images
 test: ../test/images
 
 nc: 4
-names: ['Alligator Crack', 'Longitudinal Crack', 'Pothole', 'Transverse Crack']
+names: ['Alligator Distress', 'Longitudinal Distress', 'Pothole', 'Transverse Distress']
 
 roboflow:
   workspace: gab-pkfzz

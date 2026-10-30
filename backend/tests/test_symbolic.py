@@ -20,7 +20,7 @@ import fuzzy_engine as fe  # noqa: E402
 import measure  # noqa: E402
 import scale  # noqa: E402
 
-LINEAR = ("Longitudinal Crack", "Transverse Crack")
+LINEAR = ("Longitudinal Distress", "Transverse Distress")
 SPARSE = 5.0
 
 
@@ -40,15 +40,15 @@ class CrackBands(unittest.TestCase):
     def test_crisp_baseline_uses_same_cuts(self):
         for width, expected in ((3.0, "Low"), (3.1, "Medium"), (10.0, "Medium"), (10.1, "High")):
             with self.subTest(width=width):
-                self.assertEqual(fe.crisp_severity(width, SPARSE, "Transverse Crack"), expected)
+                self.assertEqual(fe.crisp_severity(width, SPARSE, "Transverse Distress"), expected)
 
     def test_dense_alligator_is_high_whatever_the_width(self):
         for width in (1.0, 6.0, 14.0):
             with self.subTest(width=width):
-                self.assertEqual(self.grade("Alligator Crack", width, 70.0)["severity_fuzzy"], "High")
+                self.assertEqual(self.grade("Alligator Distress", width, 70.0)["severity_fuzzy"], "High")
 
     def test_sparse_narrow_alligator_is_low(self):
-        self.assertEqual(self.grade("Alligator Crack", 1.5, 2.0)["severity_fuzzy"], "Low")
+        self.assertEqual(self.grade("Alligator Distress", 1.5, 2.0)["severity_fuzzy"], "Low")
 
     def test_dpwh_two_band_verdict_unchanged(self):
         self.assertEqual(fe.dpwh_severity(3.0), "Narrow")
@@ -56,7 +56,7 @@ class CrackBands(unittest.TestCase):
         self.assertEqual(fe.dpwh_severity(15.0), "Wide")
 
     def test_trace_reports_three_width_terms(self):
-        trace = self.grade("Transverse Crack", 9.0)["membership_trace"]["width"]
+        trace = self.grade("Transverse Distress", 9.0)["membership_trace"]["width"]
         self.assertEqual(set(trace), {"narrow", "open", "wide"})
         self.assertGreater(trace["open"], trace["wide"])
 
@@ -104,14 +104,14 @@ class Recommendations(unittest.TestCase):
                         self.assertTrue(rec["response"])
 
     def test_concrete_and_asphalt_differ_where_the_repair_does(self):
-        concrete = fe.intervention_for("Transverse Crack", "High", "concrete")
-        asphalt = fe.intervention_for("Transverse Crack", "High", "asphalt")
+        concrete = fe.intervention_for("Transverse Distress", "High", "concrete")
+        asphalt = fe.intervention_for("Transverse Distress", "High", "asphalt")
         self.assertIn("Item 311", concrete["activity"])
         self.assertIn("reconstruction", asphalt["activity"])
 
     def test_dpwh_activity_numbers(self):
-        self.assertIn("Act. 122", fe.intervention_for("Longitudinal Crack", "Low", "concrete")["activity"])
-        self.assertIn("Act. 113", fe.intervention_for("Longitudinal Crack", "Low", "asphalt")["activity"])
+        self.assertIn("Act. 122", fe.intervention_for("Longitudinal Distress", "Low", "concrete")["activity"])
+        self.assertIn("Act. 113", fe.intervention_for("Longitudinal Distress", "Low", "asphalt")["activity"])
         self.assertIn("Act. 121", fe.intervention_for("Pothole", "Medium", "concrete")["activity"])
         self.assertIn("Act. 111", fe.intervention_for("Pothole", "High", "asphalt")["activity"])
 
@@ -129,6 +129,25 @@ class Recommendations(unittest.TestCase):
         rec = fe.intervention_for("Pothole", "High", "asphalt")
         rec["activity"] = "changed"
         self.assertNotEqual(fe.intervention_for("Pothole", "High", "asphalt")["activity"], "changed")
+
+
+class LegacyLabels(unittest.TestCase):
+    """Weights trained before dataset v3 still emit "... Crack"; they must grade the same."""
+
+    def test_old_names_map_to_new(self):
+        for old, new in fe.LEGACY_LABELS.items():
+            with self.subTest(old=old):
+                self.assertEqual(fe.canonical_label(old), new)
+        self.assertEqual(fe.canonical_label("Pothole"), "Pothole")
+        self.assertIsNone(fe.canonical_label(None))
+
+    def test_old_names_grade_and_recommend_like_new(self):
+        for old, new in fe.LEGACY_LABELS.items():
+            with self.subTest(old=old):
+                self.assertEqual(fe.evaluate(old, 6.0, 70.0, 0.8)["severity_fuzzy"],
+                                 fe.evaluate(new, 6.0, 70.0, 0.8)["severity_fuzzy"])
+                self.assertEqual(fe.crisp_severity(6.0, 70.0, old), fe.crisp_severity(6.0, 70.0, new))
+                self.assertEqual(fe.intervention_for(old, "High"), fe.intervention_for(new, "High"))
 
 
 class Width(unittest.TestCase):

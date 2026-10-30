@@ -47,11 +47,19 @@ export interface FixableReport {
 }
 
 const DAMAGE_TYPES = [
-  'Alligator Crack',
-  'Longitudinal Crack',
-  'Transverse Crack',
+  'Alligator Distress',
+  'Longitudinal Distress',
+  'Transverse Distress',
   'Pothole',
 ];
+
+/** Reports saved before dataset v3 say "... Crack"; same class, older name. */
+const LEGACY_TYPES: Record<string, string> = {
+  'Alligator Crack': 'Alligator Distress',
+  'Longitudinal Crack': 'Longitudinal Distress',
+  'Transverse Crack': 'Transverse Distress',
+};
+const canonicalType = (type: string) => LEGACY_TYPES[type] ?? type;
 const SEVERITIES: Severity[] = ['Low', 'Medium', 'High'];
 
 /** Caloocan City — the study area, used when a report has no coordinates. */
@@ -65,7 +73,7 @@ interface Props {
 
 export default function FixReportModal({ report, onClose, onSaved }: Props) {
   const [damageType, setDamageType] = useState(
-    report.corrected_damage_type ?? report.damage_type ?? ''
+    canonicalType(report.corrected_damage_type ?? report.damage_type ?? '')
   );
   const [severity, setSeverity] = useState(
     report.corrected_severity ?? report.severity ?? ''
@@ -124,7 +132,9 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
     }
   };
 
-  const typeChanged = damageType !== (report.damage_type ?? '');
+  // Compared on the current names, so a renamed class is not counted as an
+  // admin disagreement (that would skew Cohen's Kappa).
+  const typeChanged = damageType !== canonicalType(report.damage_type ?? '');
   const severityChanged = severity !== (report.severity ?? '');
 
   const handleSave = async () => {

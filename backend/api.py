@@ -504,7 +504,7 @@ def trace_cracks(image, crack_results, predictor, gsd, road_area_px,
 
     for i in keep_indices:
         x1, y1, x2, y2 = yolo_boxes[i]
-        label = names[class_ids[i]]
+        label = fuzzy_engine.canonical_label(names[class_ids[i]])
 
         masks, _, _ = predictor.predict(box=np.array([x1, y1, x2, y2]), multimask_output=False)
         sam_mask = masks[0].astype(np.uint8) * 255

@@ -163,8 +163,23 @@ SEVERITY_MF = {
 BAND_LOW_MAX = 33.34
 BAND_MEDIUM_MAX = 66.67
 
+# Detector classes. Dataset v3 renamed "... Crack" to "... Distress"; weights
+# trained before that (and reports stored before it) still carry the old names,
+# so they are mapped here, once, and everything below uses the new names.
+LEGACY_LABELS = {
+    "Alligator Crack": "Alligator Distress",
+    "Longitudinal Crack": "Longitudinal Distress",
+    "Transverse Crack": "Transverse Distress",
+}
+
+
+def canonical_label(label: str | None) -> str | None:
+    """The current class name for a label from any model version."""
+    return LEGACY_LABELS.get(label, label)
+
+
 # Defects measured by surface extent rather than by crack width.
-AREA_DEFECT_LABELS = {"Alligator Crack", "Pothole"}
+AREA_DEFECT_LABELS = {"Alligator Distress", "Pothole"}
 
 # --- Potholes -----------------------------------------------------------------
 #
@@ -331,7 +346,7 @@ def _crisp_density_term(density_pct: float) -> str:
 
 def crisp_severity(width_mm: float, density_pct: float, label: str | None = None) -> str:
     """The same DPWH inputs and rule table with hard cuts: the rule-based baseline."""
-    table = AREA_RULES if label in AREA_DEFECT_LABELS else LINEAR_RULES
+    table = AREA_RULES if canonical_label(label) in AREA_DEFECT_LABELS else LINEAR_RULES
     term = table[(_crisp_width_term(width_mm), _crisp_density_term(density_pct))]
     return term.capitalize()
 
@@ -414,6 +429,7 @@ def evaluate(
     Returns the fuzzy grade and score, the two baselines, the rule base used, and
     the membership trace. area_m2 and pothole_count are only read for potholes.
     """
+    label = canonical_label(label)
     width_mm = float(np.clip(width_mm, 0.0, WIDTH_MAX_MM))
     density_pct = float(np.clip(density_pct, 0.0, DENSITY_MAX_PCT))
 
@@ -551,9 +567,9 @@ _POTHOLE = {
 }
 
 INTERVENTIONS = {
-    "Longitudinal Crack": _LINEAR_CRACK,
-    "Transverse Crack": _LINEAR_CRACK,
-    "Alligator Crack": {
+    "Longitudinal Distress": _LINEAR_CRACK,
+    "Transverse Distress": _LINEAR_CRACK,
+    "Alligator Distress": {
         "Low": {
             "concrete": _rec(
                 ACT_122, "Seal the cracks and inspect for subbase failure.",
@@ -597,7 +613,7 @@ def intervention_for(label: str, severity: str, pavement: str = DEFAULT_PAVEMENT
     """The DPWH activity, one-line method and response time for one defect."""
     if pavement not in PAVEMENT_TYPES:
         pavement = DEFAULT_PAVEMENT
-    entry = INTERVENTIONS.get(label, {}).get(severity)
+    entry = INTERVENTIONS.get(canonical_label(label), {}).get(severity)
     return dict(entry[pavement]) if entry else dict(DEFAULT_INTERVENTION)
 
 
