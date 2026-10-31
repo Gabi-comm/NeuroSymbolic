@@ -10,8 +10,16 @@ import { createSupabaseServerClient } from '@/utils/supabaseServer';
  * activated, which is what happened before: signup sent a mail whose link went
  * nowhere.
  */
+
+function siteOrigin(request: Request): string {
+  const url = new URL(request.url);
+  const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host');
+  const proto = request.headers.get('x-forwarded-proto') ?? url.protocol.replace(':', '');
+  return host ? `${proto}://${host}` : url.origin;
+}
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
+  const origin = siteOrigin(request);
   const code = searchParams.get('code');
   // Recovery links carry ?next=/reset-password so they land on the form.
   const next = searchParams.get('next') ?? '/';
