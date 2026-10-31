@@ -107,8 +107,8 @@ export default function Sidebar() {
                   </li>
                 );
               })}
-              {/* The tour lives in Info as one more row, styled like the links. */}
-              {group.title === 'Info' && (
+              {/* The tour lives in Info (Console, for admins) as one more row, styled like the links. */}
+              {(group.title === 'Info' || group.title === 'Console') && (
                 <li>
                   <button
                     onClick={() => window.dispatchEvent(new Event(SHELL_EVENTS.tour))}

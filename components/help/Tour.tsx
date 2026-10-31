@@ -8,6 +8,9 @@ import { INTRO_DONE_EVENT, introPlaying } from './IntroSplash';
 import TourScene, { type TourSceneKey } from './TourScene';
 
 export const TOUR_KEY = 'oasys.tourDone';
+// Admins get their own tour, remembered separately: an account that saw the
+// reporter tour has still not seen the console.
+export const ADMIN_TOUR_KEY = 'oasys.adminTourDone';
 
 interface Step {
   /** `data-tour` value(s) to spotlight; the first one visible wins. None = centred card. */
@@ -50,6 +53,40 @@ const STEPS: Step[] = [
   },
 ];
 
+// The console's tour. Runs on /admin; the later steps point at the sidebar
+// links (the tab bar on phones) and show what each page does.
+const ADMIN_STEPS: Step[] = [
+  {
+    title: 'Welcome to the console',
+    body: 'Reports are reviewed, corrected and resolved here. This is where everything lives.',
+    demo: 'admin-console',
+  },
+  {
+    targets: ['admin-queue'],
+    title: 'What is waiting',
+    body: 'How much of the queue is resolved and how many waiting reports are high severity. Next up lists the most urgent first.',
+    demo: 'admin-queue',
+  },
+  {
+    targets: ['nav-admin-reports'],
+    title: 'Review and resolve',
+    body: 'Filter by High, Medium or Low, open a report to check it, then resolve it or fix what the system got wrong. The map shows only the tab you are on.',
+    demo: 'admin-reports',
+  },
+  {
+    targets: ['nav-admin-dashboard'],
+    title: 'Trends over time',
+    body: 'Submissions, severity and distress types over 7 days, 30 days or 12 months, with a CSV export.',
+    demo: 'admin-dashboard',
+  },
+  {
+    targets: ['nav-admin-users'],
+    title: 'Who has access',
+    body: 'Every account by type. Set a reporter type, or grant and remove admin access.',
+    demo: 'admin-users',
+  },
+];
+
 const PAD = 8;
 
 type Rect = { top: number; left: number; width: number; height: number };
@@ -71,33 +108,36 @@ export default function Tour() {
   const pathname = usePathname();
   const router = useRouter();
   const { authUser, isAdmin } = useAuth();
+  const steps = isAdmin ? ADMIN_STEPS : STEPS;
+  const home = isAdmin ? '/admin' : '/';
+  const doneKey = isAdmin ? ADMIN_TOUR_KEY : TOUR_KEY;
 
   const finish = useCallback(() => {
     setStep(null);
     setRect(null);
     try {
-      localStorage.setItem(TOUR_KEY, '1');
+      localStorage.setItem(doneKey, '1');
     } catch {}
-  }, []);
+  }, [doneKey]);
 
   // Started from the Guide card, the mobile "?" or the command palette. The
-  // dashboard is where the targets are, so go there first.
+  // dashboard (the console, for admins) is where the targets are, so go there first.
   useEffect(() => {
     const start = () => {
-      if (pathname !== '/') router.push('/');
+      if (pathname !== home) router.push(home);
       setStep(0);
     };
     window.addEventListener(SHELL_EVENTS.tour, start);
     return () => window.removeEventListener(SHELL_EVENTS.tour, start);
-  }, [pathname, router]);
+  }, [pathname, router, home]);
 
-  // First visit to the dashboard after signing in: start by itself, once,
-  // after the intro has finished.
+  // First visit to the dashboard (the console, for admins) after signing in:
+  // start by itself, once, after the intro has finished.
   useEffect(() => {
-    if (!authUser || isAdmin || pathname !== '/') return;
+    if (!authUser || pathname !== home) return;
     let done = '1';
     try {
-      done = localStorage.getItem(TOUR_KEY) ?? '';
+      done = localStorage.getItem(doneKey) ?? '';
     } catch {}
     if (done) return;
 
@@ -111,12 +151,13 @@ export default function Tour() {
       window.clearTimeout(timer);
       window.removeEventListener(INTRO_DONE_EVENT, begin);
     };
-  }, [authUser, isAdmin, pathname]);
+  }, [authUser, pathname, home, doneKey]);
 
   // Follow the current target: scroll it into view, then track it.
   useLayoutEffect(() => {
     if (step === null) return;
-    const current = STEPS[step];
+    const current = steps[step];
+    if (!current) return;
     let el = findTarget(current);
     let frame = 0;
 
@@ -156,18 +197,18 @@ export default function Tour() {
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setRect(null);
-  }, [step]);
+  }, [step, steps]);
 
   useEffect(() => {
     if (step === null) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') finish();
-      if (e.key === 'ArrowRight') setStep((s) => (s === null ? s : Math.min(s + 1, STEPS.length - 1)));
+      if (e.key === 'ArrowRight') setStep((s) => (s === null ? s : Math.min(s + 1, steps.length - 1)));
       if (e.key === 'ArrowLeft') setStep((s) => (s === null ? s : Math.max(s - 1, 0)));
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [step, finish]);
+  }, [step, steps, finish]);
 
   // Place the card once its real size is known: beside a narrow target (the
   // sidebar links), else below it, else above it, always kept on screen.
@@ -212,8 +253,10 @@ export default function Tour() {
   }, [rect, step]);
 
   if (step === null) return null;
-  const current = STEPS[step];
-  const last = step === STEPS.length - 1;
+  const current = steps[step];
+  // The role changed under an open tour (signed out part-way through).
+  if (!current) return null;
+  const last = step === steps.length - 1;
   const floating = !!rect && !!place;
 
   return (
@@ -240,14 +283,14 @@ export default function Tour() {
       >
         <TourScene name={current.demo} />
         <p className="mt-3 font-stat text-sm text-accent">
-          {step + 1} / {STEPS.length}
+          {step + 1} / {steps.length}
         </p>
         <h2 className="mt-0.5 text-lg font-semibold text-fg">{current.title}</h2>
         <p className="mt-1 text-sm leading-relaxed text-fg-muted">{current.body}</p>
 
         <div className="mt-4 flex items-center gap-2">
           <span className="flex gap-1.5 mr-auto" aria-hidden="true">
-            {STEPS.map((_, i) => (
+            {steps.map((_, i) => (
               <span
                 key={i}
                 className={`h-1.5 rounded-full transition-all duration-300 ${i === step ? 'w-5 bg-accent' : 'w-1.5 bg-line-strong'}`}

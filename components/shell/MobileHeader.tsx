@@ -30,16 +30,14 @@ export default function MobileHeader() {
         >
           <IconSearch className="w-5 h-5" />
         </button>
-        {!isAdmin && (
-          <button
-            onClick={() => window.dispatchEvent(new Event(SHELL_EVENTS.tour))}
-            aria-label="Guide"
-            data-tour="guide-mobile"
-            className={iconButton}
-          >
-            <IconHelp className="w-5 h-5" />
-          </button>
-        )}
+        <button
+          onClick={() => window.dispatchEvent(new Event(SHELL_EVENTS.tour))}
+          aria-label="Guide"
+          data-tour="guide-mobile"
+          className={iconButton}
+        >
+          <IconHelp className="w-5 h-5" />
+        </button>
         <ThemeButton />
 
         {!authChecked ? (

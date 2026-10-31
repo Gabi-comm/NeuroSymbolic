@@ -111,7 +111,9 @@ export default function AdminHome() {
       {loadError && <ErrorNote title="Could not load the overview" message={loadError} />}
 
       {/* The queue at a glance: how much is done, how much is left. */}
-      <section className="page-enter rounded-[24px] hero-theme queue-band p-5 sm:p-7 flex flex-col md:flex-row md:items-center gap-6 md:gap-10">
+      <section
+        data-tour="admin-queue"
+        className="page-enter rounded-[24px] hero-theme queue-band p-5 sm:p-7 flex flex-col md:flex-row md:items-center gap-6 md:gap-10">
         {loading ? (
           <div className="skeleton w-[176px] h-[176px] rounded-full shrink-0" />
         ) : (

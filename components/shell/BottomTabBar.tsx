@@ -68,6 +68,7 @@ export default function BottomTabBar() {
             <li key={tab.href} className="flex-1">
               <Link
                 href={tab.href}
+                data-tour={tab.tour}
                 aria-current={active ? 'page' : undefined}
                 onClick={(e) => {
                   if (locked) {

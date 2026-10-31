@@ -67,6 +67,8 @@ export default function AdminReports() {
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  // One severity at a time, or every severity. Applies to the cards and the map.
+  const [sevFilter, setSevFilter] = useState<Severity | 'All'>('All');
   const [showMap, setShowMap] = useState(true);
   // "Track report": which report the map is following. The nonce lets the
   // same button fly back to the same report after the map was panned away.
@@ -200,8 +202,12 @@ export default function AdminReports() {
     );
   }, [reports, searchQuery]);
 
-  const unresolved = useMemo(() => filtered.filter((r) => r.state !== 'Resolved'), [filtered]);
-  const resolved = useMemo(() => filtered.filter((r) => r.state === 'Resolved'), [filtered]);
+  const bySeverity = useMemo(
+    () => (sevFilter === 'All' ? filtered : filtered.filter((r) => sevOf(r) === sevFilter)),
+    [filtered, sevFilter],
+  );
+  const unresolved = useMemo(() => bySeverity.filter((r) => r.state !== 'Resolved'), [bySeverity]);
+  const resolved = useMemo(() => bySeverity.filter((r) => r.state === 'Resolved'), [bySeverity]);
 
   // A resolve, reopen or search can shrink a column below the page it is on.
   const needsPageShown = Math.min(needsPage, lastPage(unresolved.length));
@@ -446,12 +452,29 @@ export default function AdminReports() {
     );
   };
 
+  // Counts for the filter buttons: the open queue before the severity filter,
+  // so every button says what picking it would show.
   const queueSev: Record<Severity, number> = { High: 0, Medium: 0, Low: 0 };
-  for (const r of isResolvedView ? resolved : unresolved) {
-    const s = toSeverity(r.corrected_severity ?? r.severity);
+  let queueAll = 0;
+  for (const r of filtered) {
+    if ((r.state === 'Resolved') !== isResolvedView) continue;
+    queueAll += 1;
+    const s = sevOf(r);
     if (s) queueSev[s] += 1;
   }
-  const mapped = filtered.filter((r) => r.lat != null).length;
+  // The map follows the open tab: every page of it, not only the cards on screen.
+  // Pins carry the severity the filter used, so a corrected report is not
+  // coloured by the system's original grade.
+  const mapReports = useMemo(
+    () => (isResolvedView ? resolved : unresolved).map((r) => ({ ...r, severity: r.corrected_severity ?? r.severity })),
+    [isResolvedView, resolved, unresolved],
+  );
+  const mapped = mapReports.filter((r) => r.lat != null).length;
+  const pickSeverity = (s: Severity | 'All') => {
+    setSevFilter(s);
+    setNeedsPage(1);
+    setResolvedPage(1);
+  };
 
   return (
     <main className={PAGE}>
@@ -502,11 +525,15 @@ export default function AdminReports() {
       {showMap && (
         <section ref={mapRef} className="page-enter mb-4 scroll-mt-24 rounded-2xl bg-surface border border-line p-3 sm:p-4">
           <h2 className="px-1 mb-3 text-base font-semibold text-fg">
-            Map <span className="ml-1 text-sm font-normal text-fg-muted">{mapped} mapped</span>
+            Map{' '}
+            <span className="ml-1 text-sm font-normal text-fg-muted">
+              {mapped} {isResolvedView ? 'resolved' : 'needing action'}
+              {sevFilter !== 'All' && ` · ${sevFilter}`}
+            </span>
           </h2>
           {!isLoading && (
             <ReportsMap
-              reports={filtered}
+              reports={mapReports}
               trackedId={tracked?.id ?? null}
               trackNonce={tracked?.nonce ?? 0}
               heightClass="h-[24rem] sm:h-[32rem]"
@@ -545,20 +572,23 @@ export default function AdminReports() {
                 { key: 'resolved', label: 'Resolved', count: resolved.length },
               ]}
             />
-            <ul className="flex gap-4 text-xs text-fg-muted" aria-label="Severity in this queue">
-              {(['High', 'Medium', 'Low'] as Severity[]).map((s) => (
-                <li key={s} className="flex items-center gap-1.5">
-                  <span className={SEVERITY[s].text}>{SEVERITY[s].icon}</span>
-                  {s}
-                  <span className="font-stat text-sm text-fg">{queueSev[s]}</span>
-                </li>
-              ))}
-            </ul>
+            <SeverityFilter value={sevFilter} counts={queueSev} total={queueAll} onChange={pickSeverity} />
           </div>
 
           {shown.length === 0 ? (
             <p className="rounded-2xl border border-line bg-surface p-8 text-center text-sm text-fg-muted">
-              {isResolvedView ? 'No resolved reports.' : 'All caught up, nothing pending.'}
+              {sevFilter !== 'All' ? (
+                <>
+                  No {sevFilter.toLowerCase()} severity reports {isResolvedView ? 'resolved' : 'waiting'}.{' '}
+                  <button onClick={() => pickSeverity('All')} className="font-semibold text-accent hover:text-accent-hover">
+                    Show all
+                  </button>
+                </>
+              ) : isResolvedView ? (
+                'No resolved reports.'
+              ) : (
+                'All caught up, nothing pending.'
+              )}
             </p>
           ) : (
             <div className="stagger flex flex-col gap-3">{shown.map((report) => renderCard(report, isResolvedView))}</div>
@@ -604,11 +634,62 @@ export default function AdminReports() {
   );
 }
 
+// The admin's corrected severity counts where one exists, as on the cards.
+const sevOf = (r: IndexRow) => toSeverity(r.corrected_severity ?? r.severity);
+
 const SEV_COLOR: Record<Severity, string> = {
   High: 'var(--sev-high)',
   Medium: 'var(--sev-medium)',
   Low: 'var(--sev-low)',
 };
+
+/**
+ * All / High / Medium / Low, one at a time. Glyph and word with a count, and a
+ * bar in the severity's colour under the one picked, the way UnderlineTabs
+ * marks a tab. Picking the active severity again goes back to All.
+ */
+function SeverityFilter({
+  value,
+  counts,
+  total,
+  onChange,
+}: {
+  value: Severity | 'All';
+  counts: Record<Severity, number>;
+  total: number;
+  onChange: (value: Severity | 'All') => void;
+}) {
+  const options: (Severity | 'All')[] = ['All', 'High', 'Medium', 'Low'];
+  return (
+    <div role="group" aria-label="Filter by severity" className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+      {options.map((s) => {
+        const active = s === value;
+        return (
+          <button
+            key={s}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(active && s !== 'All' ? 'All' : s)}
+            className={`relative inline-flex items-center gap-1.5 pb-1 transition-colors ${
+              active ? 'font-semibold text-fg' : 'text-fg-muted hover:text-fg'
+            }`}
+          >
+            {s !== 'All' && <span className={SEVERITY[s].text}>{SEVERITY[s].icon}</span>}
+            {s}
+            <span className="tabular-nums text-fg-faint font-normal">{s === 'All' ? total : counts[s]}</span>
+            <span
+              aria-hidden="true"
+              className={`absolute left-0 right-0 -bottom-0.5 h-0.5 rounded-full origin-left transition-transform duration-300 ${
+                active ? 'scale-x-100' : 'scale-x-0'
+              }`}
+              style={{ background: s === 'All' ? 'var(--fg-muted)' : SEV_COLOR[s] }}
+            />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 /** A labelled 0-100 bar for one measurement. */
 function Meter({

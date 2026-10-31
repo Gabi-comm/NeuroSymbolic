@@ -331,10 +331,9 @@ export default function UploadResultUi({
       >
         <div className="flex flex-col items-center text-center">
           <div className="w-14 h-14 border-4 border-oasys-blue border-t-transparent rounded-full animate-spin mb-6" />
-          <h1 className="text-xl sm:text-2xl font-bold text-fg mb-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-fg">
             Analyzing road distress
           </h1>
-          <p className="text-fg-muted">This usually takes 20–30 seconds.</p>
         </div>
       </div>
     );

@@ -1,6 +1,7 @@
 // Tour card art: a real screenshot of the app (public/tour/*-light|dark.webp,
-// taken from the dashboard and Report page at 1280px) with a hand tapping
-// through it. Keyframes live in app/globals.css under "Tour scenes".
+// taken from the dashboard and Report page at 1280px; admin-* from the admin
+// pages at 1280px, a 960x600 crop of the content from 284,20, with sample data)
+// with a hand tapping through it. Keyframes live in app/globals.css under "Tour scenes".
 //
 // Every position is a percentage of the screenshot, measured from the live
 // page when the shots were taken. Retake the shots and these move with them.
@@ -8,7 +9,17 @@
 import Image from 'next/image';
 import type { CSSProperties, ReactNode } from 'react';
 
-export type TourSceneKey = 'overview' | 'stats' | 'map' | 'report' | 'captures';
+export type TourSceneKey =
+  | 'overview'
+  | 'stats'
+  | 'map'
+  | 'report'
+  | 'captures'
+  | 'admin-console'
+  | 'admin-queue'
+  | 'admin-reports'
+  | 'admin-dashboard'
+  | 'admin-users';
 
 type Pt = [x: number, y: number];
 type Box = [left: number, top: number, width: number, height: number];
@@ -40,6 +51,14 @@ const Ring = ({ box, after, round = 'rounded-[10px]' }: { box: Box; after: 1 | 2
   <span
     className={`tour-after-${after} ${round} border-2 border-accent shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_22%,transparent)]`}
     style={boxStyle(box)}
+  />
+);
+
+/** The bar a tab gets when picked, under the tab at `box`. */
+const TabBar = ({ box, after, color = 'var(--accent)' }: { box: Box; after: 1 | 2; color?: string }) => (
+  <span
+    className={`tour-after-${after} h-[3px] rounded-full`}
+    style={{ left: pct(box[0]), top: pct(box[1] + box[3]), width: pct(box[2]), background: color }}
   />
 );
 
@@ -127,6 +146,71 @@ const SCENES: Record<TourSceneKey, Scene> = {
       <>
         <Ring box={[4.8, 25.3, 28.3, 45.1]} after={1} />
         <Ring box={[79.5, 8.5, 16, 12.5]} after={2} round="rounded-[6px]" />
+      </>
+    ),
+  },
+  // Admin console: open the queue, then the Needs action tile.
+  'admin-console': {
+    tap1: [88.5, 8.7],
+    tap2: [13.5, 71.4],
+    zoom: [50, 40],
+    scale: 1.12,
+    effects: () => (
+      <>
+        <Ring box={[78.9, 5, 19.1, 7.3]} after={1} round="rounded-full" />
+        <Ring box={[2.1, 57.9, 22.7, 26.9]} after={2} round="rounded-[14px]" />
+      </>
+    ),
+  },
+  // Console, scrolled: the High severity tile, then the first report in Next up.
+  'admin-queue': {
+    tap1: [37.9, 16.4],
+    tap2: [33.8, 47.6],
+    zoom: [35, 30],
+    scale: 1.15,
+    effects: () => (
+      <>
+        <Ring box={[26.5, 2.9, 22.7, 26.9]} after="between" round="rounded-[14px]" />
+        <Ring box={[3.8, 42.6, 59.9, 10]} after={2} />
+      </>
+    ),
+  },
+  // Reports: filter to High, then open the first card.
+  'admin-reports': {
+    tap1: [74.8, 29],
+    tap2: [89.9, 43],
+    zoom: [78, 35],
+    scale: 1.15,
+    effects: () => (
+      <>
+        <TabBar box={[71.6, 27, 6.4, 4]} after={1} color="var(--sev-high)" />
+        <Ring box={[2.1, 33.7, 95.9, 18.6]} after={2} round="rounded-[14px]" />
+      </>
+    ),
+  },
+  // Dashboard: switch the range to 12 months, then the chart to By severity.
+  'admin-dashboard': {
+    tap1: [19.5, 18.3],
+    tap2: [82, 62.7],
+    zoom: [50, 40],
+    scale: 1.1,
+    effects: () => (
+      <>
+        <TabBar box={[16.1, 16.3, 6.8, 4]} after={1} />
+        <TabBar box={[78.3, 60.7, 7.3, 4]} after={2} />
+      </>
+    ),
+  },
+  // Users: filter to Inspectors, then make one an admin.
+  'admin-users': {
+    tap1: [66.6, 22.5],
+    tap2: [91.2, 55.1],
+    zoom: [70, 40],
+    scale: 1.12,
+    effects: () => (
+      <>
+        <TabBar box={[62.5, 20.5, 8.2, 4]} after={1} />
+        <Ring box={[85.3, 52.1, 11.7, 6]} after={2} />
       </>
     ),
   },

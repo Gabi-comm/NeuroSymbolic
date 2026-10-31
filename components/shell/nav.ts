@@ -34,9 +34,9 @@ export const INFO_LINKS: NavLink[] = [{ href: '/about', label: 'About', icon: Ic
 // menu and buried the pages they actually work in.
 export const ADMIN_LINKS: NavLink[] = [
   { href: '/admin', label: 'Console', icon: IconGrid },
-  { href: '/admin/dashboard', label: 'Dashboard', icon: IconChart },
-  { href: '/admin/reports', label: 'Reports', icon: IconList },
-  { href: '/admin/users', label: 'Users', icon: IconUsers },
+  { href: '/admin/dashboard', label: 'Dashboard', icon: IconChart, tour: 'nav-admin-dashboard' },
+  { href: '/admin/reports', label: 'Reports', icon: IconList, tour: 'nav-admin-reports' },
+  { href: '/admin/users', label: 'Users', icon: IconUsers, tour: 'nav-admin-users' },
 ];
 
 /** Exact match for the roots, prefix match for everything below them. */

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 
 export const INTRO_DONE_EVENT = 'oasys:intro-done';
@@ -12,12 +12,18 @@ export const introPlaying = () =>
 const HOLD_MS = 2300;
 const EXIT_MS = 700;
 const WORD = 'OASYS';
+const DOUBLE_TAP_MS = 350;
 
 /**
  * On every page load: the logo pops in with two burst rings and a glow, the
  * name flips up letter by letter with a light sweep, the tagline settles, and
- * an iris closes onto the app. ~3s, skippable, never shown under reduced motion.
+ * an iris closes onto the app. ~3s, never shown under reduced motion.
+ *
+ * Skipped by a double click or double tap anywhere (or Escape), with no button
+ * on screen. Double taps are timed by hand from pointerup, because mobile
+ * browsers do not fire dblclick reliably.
  */
+
 export default function IntroSplash() {
   const [phase, setPhase] = useState<'off' | 'on' | 'exit'>('off');
 
@@ -39,14 +45,30 @@ export default function IntroSplash() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhase('on');
     const t = window.setTimeout(skip, HOLD_MS);
-    return () => window.clearTimeout(t);
+    // Keyboard users have no double click; Escape does the same.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') skip();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener('keydown', onKey);
+    };
   }, [skip]);
+
+  const lastTap = useRef(0);
+  const onPointerUp = () => {
+    const now = performance.now();
+    if (now - lastTap.current < DOUBLE_TAP_MS) skip();
+    lastTap.current = now;
+  };
 
   if (phase === 'off') return null;
 
   return (
     <div
       role="presentation"
+      onPointerUp={onPointerUp}
       className={`intro fixed inset-0 z-[90] overflow-hidden text-white ${phase === 'exit' ? 'intro-exit' : ''}`}
       style={{ background: 'radial-gradient(80% 70% at 50% 45%, #13265a 0%, #050a1a 100%)' }}
     >
@@ -72,13 +94,6 @@ export default function IntroSplash() {
           Road distress assessment
         </p>
       </div>
-
-      <button
-        onClick={skip}
-        className="absolute bottom-[calc(28px+env(safe-area-inset-bottom))] right-6 h-10 px-4 rounded-full text-sm font-semibold text-white/80 hover:text-white border border-white/25 hover:bg-white/10 transition-colors"
-      >
-        Skip
-      </button>
     </div>
   );
 }
