@@ -23,7 +23,6 @@ const DOUBLE_TAP_MS = 350;
  * on screen. Double taps are timed by hand from pointerup, because mobile
  * browsers do not fire dblclick reliably.
  */
-
 export default function IntroSplash() {
   const [phase, setPhase] = useState<'off' | 'on' | 'exit'>('off');
 
