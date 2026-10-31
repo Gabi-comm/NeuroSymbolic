@@ -20,7 +20,10 @@ export async function POST(request: Request) {
 
     const pythonResponse = await fetch(`${API_BASE_URL}/analyze-road`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': process.env.BACKEND_API_KEY ?? '',
+      },
       body: JSON.stringify(body),
     });
 
