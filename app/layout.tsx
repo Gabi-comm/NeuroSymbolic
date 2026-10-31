@@ -25,7 +25,7 @@ const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains', 
 
 export const metadata: Metadata = {
   title: {
-    default: 'OASYS — Road Distress Assessment',
+    default: 'OASYS',
     template: '%s · OASYS',
   },
   description:
