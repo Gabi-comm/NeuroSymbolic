@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, File, UploadFile
+from fastapi import FastAPI, HTTPException, File, UploadFile, Header
 from fastapi.responses import JSONResponse
 from typing import Literal
 
@@ -65,7 +65,7 @@ DEFAULT_GSD_MM_PX = float(os.environ.get("DEFAULT_GSD_MM_PX", "4.357"))
 # 2 m still fills most of the frame with pavement, while a photo of something
 # else rarely reaches it.
 MIN_ROAD_COVERAGE = float(os.environ.get("MIN_ROAD_COVERAGE", "0.15"))
-
+BACKEND_API_KEY = os.environ.get("BACKEND_API_KEY", "")
 print("Loading AI models into memory. This may take a moment...")
 
 
@@ -610,7 +610,7 @@ road maintenance bulletin.
 Measured findings:
 {context}
 
-Write two or three sentences describing the condition of this road segment.
+Write two short sentences describing the condition of this road segment.
 Cite the measured crack density figure exactly as given. Refer to distress types
 only by the exact names listed. Do not recommend any action, do not assign a
 priority, and do not state any measurement that is not listed above.
@@ -709,7 +709,9 @@ def llm_status():
 
 
 @app.post("/analyze-road")
-async def analyze_road(request: ImageRequest):
+async def analyze_road(request: ImageRequest, x_api_key: str | None = Header(default=None)):
+    if BACKEND_API_KEY and x_api_key != BACKEND_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
     try:
         print("--- Request received ---")
 

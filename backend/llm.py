@@ -38,8 +38,10 @@ import requests
 
 PROVIDER = os.environ.get("LLM_PROVIDER", "ollama").strip().lower()
 
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2")
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:1.5b")
+OLLAMA_NUM_PREDICT = int(os.environ.get("OLLAMA_NUM_PREDICT", "80"))
+OLLAMA_NUM_THREAD = int(os.environ.get("OLLAMA_NUM_THREAD", "0"))
 
 LLM_API_URL = os.environ.get("LLM_API_URL", "").rstrip("/")
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
@@ -47,7 +49,7 @@ LLM_MODEL_LABEL = os.environ.get("LLM_MODEL_LABEL", "Hugging Face model")
 LLM_TIMEOUT_S = float(os.environ.get("LLM_TIMEOUT_S", "120"))
 
 MAX_NEW_TOKENS = 220
-TEMPERATURE = 0.3
+TEMPERATURE = 0.2
 
 
 def describe() -> str:
@@ -60,12 +62,23 @@ def describe() -> str:
 def _headers() -> dict:
     return {"Authorization": f"Bearer {LLM_API_KEY}"} if LLM_API_KEY else {}
 
+def _ollama_options() -> dict:
+    options = {"num_predict": OLLAMA_NUM_PREDICT, "temperature": TEMPERATURE}
+    if OLLAMA_NUM_THREAD > 0:
+        options["num_thread"] = OLLAMA_NUM_THREAD
+    return options
 
 def _generate_ollama(prompt: str) -> str:
     try:
         response = requests.post(
             f"{OLLAMA_HOST}/api/generate",
-            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
+            json={
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
+                "keep_alive": -1,
+                "options": _ollama_options(),
+            },
             timeout=180,
         )
         response.raise_for_status()
