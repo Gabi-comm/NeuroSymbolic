@@ -35,7 +35,28 @@ Its weak spot is recall on thin cracks: Transverse mask mAP50 0.632, recall 0.53
    * Internet: **On** (phone verification is required for this).
    * Persistence: Files only.
 3. **Add-ons → Secrets → Add secret**: label `ROBOFLOW_API_KEY`, value = Roboflow → Settings → API Keys → *Private API Key*. Tick it for this notebook. **Never** paste the key into a cell, because Kaggle notebooks can be made public.
-4. If you use a P100 (one GPU), set `BATCH = 8` in section 1.
+4. **Create the `old-distress-model` dataset** (needed for fine-tune mode):
+   * kaggle.com → **Create → New Dataset**, title `old-distress-model`, keep it **Private**.
+   * Upload two files: the old `backend/best.pt` (52 MB) and `training/v1_train_names.txt` (the 3,011 photos the old model trained on).
+   * In the notebook: right panel → **Add Input** → *Your Datasets* → `old-distress-model`. The notebook finds the files anywhere under `/kaggle/input`.
+5. If you use a P100 (one GPU), set `BATCH = 8` in section 1.
+
+### Fine-tune mode (default) vs scratch mode
+`MODE` in section 1 picks the starting weights:
+
+| | `MODE = "finetune"` (recommended) | `MODE = "scratch"` |
+|---|---|---|
+| Starts from | old `backend/best.pt` (YOLOv8m-seg, trained on v1) | COCO `yolov8l-seg.pt` |
+| Epochs / patience | 40 / 15 | 80 / 30 |
+| `lr0` / `lrf` / warm-up | 0.002 / 0.1 / 1 | 0.01 / 0.01 / 3 |
+| `close_mosaic` | 10 | 15 |
+| Run name | `distress_v3_ft_old` | `distress_v3_l1024` |
+| Time on T4 x2 | about 3 to 4 h | about 8 to 9 h |
+
+Why fine-tune: the first scratch run on v3 plateaued at mask mAP50 ~0.52 by epoch 29. On test photos neither model had trained on, it scored 0.30 on Longitudinal and 0.29 on Transverse, against the old model's 0.61 and 0.51. It was better only on Alligator (0.81 vs 0.55). Fine-tuning keeps the old model's linear-crack skill and lets v3 improve Alligator.
+
+### The v1-overlap filter (section 3b)
+68% of the v3 test photos (and very likely much of val) were in the **old model's training set**, because v1 used a different split. A model fine-tuned from the old weights has already memorised them. That would inflate the test score, and `best.pt` would be picked on memorised val photos. Section 3b moves every val/test image whose original file name (the part before `.rf.`) is in `v1_train_names.txt` into train. Val and test then hold only photos neither model has seen, so section 7's old-vs-new comparison is fair too. Expect val and test to shrink to roughly a third of their size; that is normal.
 
 ## 4. Running
 
@@ -45,7 +66,7 @@ Its weak spot is recall on thin cracks: Transverse mask mAP50 0.632, recall 0.53
 2. Then click **Save Version → Save & Run All (Commit)**. A committed run keeps going after you close the browser, up to Kaggle's 12-hour limit. Expect about 5 to 8 hours on T4 x2 for YOLOv8l-seg at 1024.
 3. When it finishes, open the version → **Output** and download:
    * `distress_best.pt`: the model for the backend.
-   * `distress_v3_l1024.zip`: curves, confusion matrix and `test_metrics.csv` for the thesis.
+   * `distress_v3_ft_old.zip` (or `distress_v3_l1024.zip` in scratch mode): curves, confusion matrix and `test_metrics.csv` for the thesis.
 
 ### Training parameters and why
 
@@ -67,10 +88,10 @@ Its weak spot is recall on thin cracks: Transverse mask mAP50 0.632, recall 0.53
 | `mask_ratio`, `overlap_mask` | 4, True | Defaults. For thinner masks try `mask_ratio=2` (needs more GPU memory). |
 
 ### If the session dies
-Start a new session and re-run sections 1 to 3. Then run:
+Start a new session and re-run sections 1 to 3. Then run (use the run name for your `MODE`):
 ```python
 from ultralytics import YOLO
-YOLO('/kaggle/working/runs/distress_v3_l1024/weights/last.pt').train(resume=True)
+YOLO('/kaggle/working/runs/distress_v3_ft_old/weights/last.pt').train(resume=True)
 ```
 To keep `last.pt` between sessions, save the notebook output as a Kaggle Dataset and attach it.
 
@@ -83,7 +104,7 @@ The notebook prints two different kinds of numbers. **Name each one correctly in
 
 The confidence threshold for (2) is chosen on the **validation** split, never on test. It is saved in `deploy_conf.json`, so use it in the backend as well.
 
-Optional: upload the old `backend/best.pt` as a Kaggle Dataset named `old-distress-model`. Section 7 then scores old and new models on the **same** test set, which makes a clean before/after table for the thesis.
+Section 7 scores the old `best.pt` (from the `old-distress-model` dataset) and the new model on the **same** filtered test set, which gives a clean before/after table for the thesis.
 
 ## 6. Known dataset issues to fix in Roboflow when you have time
 

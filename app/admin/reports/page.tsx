@@ -324,10 +324,15 @@ export default function AdminReports() {
                   {new Date(report.uploadtime).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </span>
               )}
-              {report.userid && (
+              {report.userid ? (
                 <span>
                   by <span className="font-semibold text-fg-muted">{filers[report.userid]?.username ?? 'Unknown user'}</span>
                   {filers[report.userid]?.user_type && ` · ${filers[report.userid]?.user_type}`}
+                </span>
+              ) : (
+                // The owner removed the account (delete_user); the report stays.
+                <span>
+                  by <span className="font-semibold text-fg-muted">Removed user</span>
                 </span>
               )}
               <Coordinates lat={report.lat} lng={report.lng} />

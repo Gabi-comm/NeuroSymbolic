@@ -5,6 +5,8 @@ import { supabase } from '@/utils/supabase';
 import Pagination, { pageRange } from '@/components/Pagination';
 import { ProgressList } from '@/components/Charts';
 import { AdminHeader, ConfirmDialog, ErrorNote, PAGE, Panel, Toast, UnderlineTabs } from '@/components/admin/ui';
+import { useAdminSession } from '@/utils/adminData';
+import { ago } from '@/utils/adminStats';
 
 interface UserProfile {
   // The primary key. userloginuuid is null on older accounts, so it cannot
@@ -21,7 +23,26 @@ interface UserProfile {
 // only: what an account may do is decided by role, not by this.
 const USER_TYPES = ['Civilian', 'Reporter', 'Inspector'] as const;
 
-const roleLabel = (role: string) => (role === 'admin' ? 'Admin' : 'User');
+const roleLabel = (role: string) => (role === 'owner' ? 'Owner' : role === 'admin' ? 'Admin' : 'User');
+const hasAdminPower = (role: string) => role === 'admin' || role === 'owner';
+
+interface RoleChange {
+  id: number;
+  changed_at: string;
+  actor_email: string | null;
+  target_email: string;
+  old_role: string | null;
+  new_role: string;
+}
+
+/** One line of the audit log, in words. */
+function describeChange(c: RoleChange) {
+  const who = c.actor_email ?? 'The database';
+  if (c.new_role === 'removed') return { who, what: 'removed the account', target: c.target_email };
+  if (c.new_role === 'owner') return { who, what: 'made owner', target: c.target_email };
+  if (c.new_role === 'admin') return { who, what: 'gave admin access to', target: c.target_email };
+  return { who, what: 'removed admin access from', target: c.target_email };
+}
 
 const FILTERS = ['All', ...USER_TYPES, 'Admin'] as const;
 type Filter = (typeof FILTERS)[number];
@@ -31,10 +52,10 @@ type Filter = (typeof FILTERS)[number];
  * non-admin accounts, and a null type is shown (and counted) as Civilian.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the builder's generic type is unwieldy
-function applyFilter<Q extends { eq: any; or: any }>(query: Q, filter: Filter): Q {
+function applyFilter<Q extends { eq: any; or: any; in: any }>(query: Q, filter: Filter): Q {
   if (filter === 'All') return query;
-  if (filter === 'Admin') return query.eq('role', 'admin');
-  const nonAdmin = query.or('role.is.null,role.neq.admin');
+  if (filter === 'Admin') return query.in('role', ['admin', 'owner']);
+  const nonAdmin = query.or('role.is.null,role.eq.user');
   return filter === 'Civilian' ? nonAdmin.or('user_type.is.null,user_type.eq.Civilian') : nonAdmin.eq('user_type', filter);
 }
 
@@ -43,6 +64,12 @@ export default function UserManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
+  // Only the owner grants or removes admin access and removes accounts. The
+  // database enforces it (migration.sql section J); this only hides buttons
+  // an admin could not use.
+  const isOwner = useAdminSession()?.role === 'owner';
+  const [removing, setRemoving] = useState<UserProfile | null>(null);
+  const [changes, setChanges] = useState<RoleChange[] | null>(null);
 
   // Replaces confirm()/alert(). A native confirm cannot be styled, cannot be
   // dismissed with a click outside, and reads poorly to screen readers.
@@ -67,6 +94,21 @@ export default function UserManagementPage() {
       if (user) setCurrentAdminId(user.id);
     });
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    supabase
+      .from('role_change_log')
+      .select('id, changed_at, actor_email, target_email, old_role, new_role')
+      .order('changed_at', { ascending: false })
+      .limit(6)
+      .then(({ data }) => {
+        if (isMounted) setChanges((data as RoleChange[] | null) ?? []);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [reloadKey]);
 
   useEffect(() => {
     let isMounted = true;
@@ -139,6 +181,21 @@ export default function UserManagementPage() {
     setPending(null);
   };
 
+  const removeUser = async () => {
+    if (!removing) return;
+    const user = removing;
+    setRemoving(null);
+    setActionError(null);
+    // delete_user checks the owner role, refuses the owner and yourself, keeps
+    // the reports and logs the removal, all in the database.
+    const { error } = await supabase.rpc('delete_user', { profile_id: user.id });
+    if (error) {
+      setActionError(`Could not remove the account: ${error.message}`);
+    } else {
+      reload();
+    }
+  };
+
   const applyUserType = async (user: UserProfile, userType: string) => {
     setActionError(null);
     setSavingType(user.id);
@@ -165,7 +222,8 @@ export default function UserManagementPage() {
       {loadError && <ErrorNote title="Could not load users" message={loadError} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-        <Panel title="Accounts" className="lg:sticky lg:top-6">
+        <div className="flex flex-col gap-4 lg:sticky lg:top-6">
+        <Panel title="Accounts">
           <p className="font-stat text-5xl leading-none text-fg">
             {counts.All === undefined ? <span className="skeleton inline-block h-10 w-16 rounded-lg" /> : accountCount}
           </p>
@@ -177,7 +235,38 @@ export default function UserManagementPage() {
               <ProgressList items={composition} total={accountCount} emptyMessage="No accounts yet." />
             )}
           </div>
+          {!isOwner && (
+            <p className="mt-5 pt-4 border-t border-line text-xs leading-relaxed text-fg-muted">
+              Only the owner can give or remove admin access and remove accounts.
+            </p>
+          )}
         </Panel>
+
+        <Panel title="Access changes">
+          {changes === null ? (
+            <div className="skeleton h-24 rounded-xl" />
+          ) : changes.length === 0 ? (
+            <p className="text-sm text-fg-muted">No access changes yet.</p>
+          ) : (
+            <ul className="-my-2 divide-y divide-line">
+              {changes.map((c) => {
+                const line = describeChange(c);
+                return (
+                  <li key={c.id} className="flex gap-3 py-2.5 text-xs leading-relaxed">
+                    <span className="grow min-w-0 text-fg-muted break-words">
+                      <span className="font-semibold text-fg">{line.who}</span> {line.what}{' '}
+                      <span className="font-semibold text-fg">{line.target}</span>
+                    </span>
+                    <span className="shrink-0 tabular-nums text-fg-faint" title={new Date(c.changed_at).toLocaleString()}>
+                      {ago(c.changed_at)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Panel>
+        </div>
 
         <Panel
           className="lg:col-span-2"
@@ -228,23 +317,25 @@ export default function UserManagementPage() {
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-3 sm:gap-4 shrink-0 pl-[52px] sm:pl-0">
+                    <div className="flex flex-wrap items-center gap-3 sm:gap-4 sm:flex-nowrap shrink-0 pl-[52px] sm:pl-0">
                       {/* Role: glyph + word, no chip behind it. */}
                       <span
                         className={`inline-flex items-center gap-1.5 w-16 text-[11px] font-semibold uppercase tracking-wide ${
-                          role === 'admin' ? 'text-accent' : 'text-fg-muted'
+                          hasAdminPower(role) ? 'text-accent' : 'text-fg-muted'
                         }`}
                       >
                         <svg
                           viewBox="0 0 24 24"
                           className="w-3.5 h-3.5"
-                          fill={role === 'admin' ? 'currentColor' : 'none'}
+                          fill={hasAdminPower(role) ? 'currentColor' : 'none'}
                           stroke="currentColor"
                           strokeWidth="2"
                           strokeLinejoin="round"
                           aria-hidden="true"
                         >
-                          {role === 'admin' ? (
+                          {role === 'owner' ? (
+                            <path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5Z" />
+                          ) : role === 'admin' ? (
                             <path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6Z" />
                           ) : (
                             <>
@@ -256,7 +347,7 @@ export default function UserManagementPage() {
                         {roleLabel(role)}
                       </span>
 
-                      {role !== 'admin' ? (
+                      {!hasAdminPower(role) ? (
                         <label className="shrink-0">
                           <span className="sr-only">Reporter type for {user.username || user.email || 'this user'}</span>
                           <select
@@ -276,15 +367,28 @@ export default function UserManagementPage() {
                         <span className="w-[6.4rem] hidden sm:block" />
                       )}
 
-                      {isSelf ? (
-                        <span className="w-28 text-right text-xs text-fg-faint">Protected</span>
+                      {isSelf || role === 'owner' ? (
+                        <span className={`${isOwner ? 'w-[13.5rem]' : 'w-28'} text-right text-xs text-fg-faint`}>
+                          Protected
+                        </span>
+                      ) : isOwner ? (
+                        <span className="flex gap-2">
+                          <button
+                            onClick={() => setPending({ user, newRole: role === 'admin' ? 'user' : 'admin' })}
+                            className="w-28 h-9 rounded-lg border border-line text-xs font-semibold text-fg hover:border-line-strong transition-colors"
+                          >
+                            {role === 'admin' ? 'Remove admin' : 'Make admin'}
+                          </button>
+                          <button
+                            onClick={() => setRemoving(user)}
+                            aria-label={`Remove ${name}`}
+                            className="w-24 h-9 rounded-lg border border-line text-xs font-semibold text-danger hover:border-danger/60 hover:bg-danger/5 transition-colors"
+                          >
+                            Remove user
+                          </button>
+                        </span>
                       ) : (
-                        <button
-                          onClick={() => setPending({ user, newRole: role === 'admin' ? 'user' : 'admin' })}
-                          className="w-28 h-9 rounded-lg border border-line text-xs font-semibold text-fg hover:border-line-strong transition-colors"
-                        >
-                          {role === 'admin' ? 'Remove admin' : 'Make admin'}
-                        </button>
+                        <span className="w-28" aria-hidden="true" />
                       )}
                     </div>
                   </li>
@@ -314,6 +418,22 @@ export default function UserManagementPage() {
           tone={pending.newRole === 'admin' ? 'accent' : 'danger'}
           onCancel={() => setPending(null)}
           onConfirm={applyRoleChange}
+        />
+      )}
+
+      {removing && (
+        <ConfirmDialog
+          title="Remove this account?"
+          body={
+            <>
+              {removing.username || removing.email || 'This account'} will be deleted and can no longer sign in. Their
+              reports stay, shown as filed by a removed user.
+            </>
+          }
+          confirm="Remove account"
+          tone="danger"
+          onCancel={() => setRemoving(null)}
+          onConfirm={removeUser}
         />
       )}
 

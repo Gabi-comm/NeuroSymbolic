@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/utils/supabase';
+import { hasAdminPower } from '@/components/shell/AuthProvider';
 import { AdminSessionContext, getVerifiedAdmin, loadAdminSummary, setVerifiedAdmin, type AdminSession } from '@/utils/adminData';
 
 type AuthState = 'checking' | 'authorized' | 'denied';
@@ -61,14 +62,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           .eq('userloginuuid', user.id)
           .maybeSingle();
 
-        if (dbError || profile?.role?.toLowerCase() !== 'admin') {
+        if (dbError || !profile || !hasAdminPower(profile.role)) {
           setVerifiedAdmin(null);
           if (isMounted) setAuthState('denied');
           router.replace('/');
           return;
         }
 
-        const verified = { userId: user.id, username: profile.username ?? user.email ?? null };
+        const verified: AdminSession = {
+          userId: user.id,
+          username: profile.username ?? user.email ?? null,
+          role: profile.role?.toLowerCase() === 'owner' ? 'owner' : 'admin',
+        };
         setVerifiedAdmin(verified);
         if (isMounted) {
           setSession(verified);

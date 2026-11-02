@@ -536,6 +536,258 @@ revoke all on "FileUpload" from anon;
 revoke all on "UserDetail" from anon;
 
 
+-- ============================================================================
+-- I. No profile until the email is verified (2026-11-02)
+--    APPLIED 2026-11-02 (the commented one-time cleanup and cron job are not)
+--
+-- Sign-up now asks for the code emailed to the address (LoginModal). Until
+-- this section, handle_new_user wrote the UserDetail row the moment
+-- auth.signUp() ran, so every unverified, mistyped or spam address showed up
+-- as an account on /admin/users.
+--
+-- After this, the profile is written when Supabase marks the email confirmed
+-- (the correct code was typed, or the link was followed), and never before.
+-- Supabase itself still keeps the unverified sign-up in auth.users: that row
+-- is what the code is checked against, so it cannot be skipped without
+-- replacing Supabase's email sending. It cannot sign in, owns nothing, and
+-- the optional job at the end deletes it after a day.
+--
+-- An account created already confirmed (email confirmation off, or added from
+-- the dashboard) still gets its profile straight away. Re-runnable.
+-- ============================================================================
+
+create or replace function public.handle_new_user() returns trigger
+  language plpgsql security definer set search_path = public
+as $$
+begin
+  -- Runs on insert and on update of email_confirmed_at; acts once, at the
+  -- moment the address is confirmed.
+  if new.email_confirmed_at is null then
+    return new;
+  end if;
+  if tg_op = 'UPDATE' and old.email_confirmed_at is not null then
+    return new;
+  end if;
+
+  -- Every account starts as a Civilian; see section F.
+  insert into "UserDetail" (username, email, userloginuuid, role, user_type)
+  select coalesce(nullif(trim(new.raw_user_meta_data ->> 'username'), ''),
+                  split_part(new.email, '@', 1)),
+         new.email, new.id, 'user', 'Civilian'
+  where not exists (select 1 from "UserDetail" where userloginuuid = new.id);
+  return new;
+end $$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+drop trigger if exists on_auth_user_confirmed on auth.users;
+create trigger on_auth_user_confirmed after update of email_confirmed_at on auth.users
+  for each row execute function public.handle_new_user();
+
+
+-- ---------------------------------------------------------------------------
+-- Run once, by hand: profiles that unverified sign-ups already got before this
+-- section. Look first, then delete. Unverified accounts cannot sign in, so
+-- they have no reports.
+--
+--   select d.id, d.username, d.email, u.created_at
+--   from "UserDetail" d join auth.users u on u.id = d.userloginuuid
+--   where u.email_confirmed_at is null;
+--
+--   delete from "UserDetail" d using auth.users u
+--   where u.id = d.userloginuuid and u.email_confirmed_at is null and d.role <> 'admin';
+-- ---------------------------------------------------------------------------
+
+
+-- ---------------------------------------------------------------------------
+-- Optional: clear sign-ups that never entered their code, daily. Needs the
+-- pg_cron extension (Database > Extensions > pg_cron). A cleared address can
+-- simply sign up again.
+--
+--   select cron.schedule(
+--     'delete-unverified-signups', '0 3 * * *',
+--     $$ delete from auth.users
+--        where email_confirmed_at is null and created_at < now() - interval '1 day' $$
+--   );
+-- ---------------------------------------------------------------------------
+
+
+-- ============================================================================
+-- J. Owner level (2026-11-02)
+--    NOT YET APPLIED, run in Supabase
+--
+-- Until now any admin could remove any other admin; only the last admin was
+-- protected. One admin could therefore strip everyone else's access.
+--
+-- After this there are three roles:
+--   user   files reports.
+--   admin  reviews, resolves and corrects reports; sets user types.
+--   owner  everything an admin does, and is the only one who can grant or
+--          remove admin access, and remove accounts.
+--
+-- The owner role itself is never granted or removed from the app: only here,
+-- in the SQL editor (where auth.uid() is null). So even a stolen admin or
+-- owner session cannot create a second owner or demote the first.
+--
+-- Every rule is a trigger or a SECURITY DEFINER function, not a hidden
+-- button: the Data API is reachable from any browser with a valid login.
+-- Re-runnable.
+-- ============================================================================
+
+-- 1. Allow 'owner' as a role. The live table may carry a role CHECK that is
+--    not in this file, so every CHECK that mentions role is replaced.
+do $$
+declare c record;
+begin
+  for c in
+    select conname from pg_constraint
+    where conrelid = 'public."UserDetail"'::regclass and contype = 'c'
+      and pg_get_constraintdef(oid) ilike '%role%'
+  loop
+    execute format('alter table "UserDetail" drop constraint %I', c.conname);
+  end loop;
+end $$;
+alter table "UserDetail" add constraint userdetail_role_check
+  check (role is null or role in ('user', 'admin', 'owner'));
+
+-- 2. The owner has every admin power. is_admin() backs all the admin RLS
+--    policies, so widening it is what lets the owner into the console.
+create or replace function public.is_admin() returns boolean
+  language sql security definer stable set search_path = public
+as $$ select exists (select 1 from "UserDetail"
+                     where userloginuuid = auth.uid() and role in ('admin', 'owner')); $$;
+
+create or replace function public.is_owner() returns boolean
+  language sql security definer stable set search_path = public
+as $$ select exists (select 1 from "UserDetail"
+                     where userloginuuid = auth.uid() and role = 'owner'); $$;
+
+-- 3. Who may change what on a profile. Replaces section F's version.
+create or replace function public.guard_userdetail_columns() returns trigger
+  language plpgsql security definer set search_path = public
+as $$
+begin
+  -- The SQL editor and the service role act with no auth.uid(): that is how
+  -- the owner is set, so they pass.
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if old.role = 'owner' and not public.is_owner() then
+    raise exception 'The owner account can only be changed by the owner.'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  if new.role is distinct from old.role then
+    if old.role = 'owner' or new.role = 'owner' then
+      raise exception 'The owner role can only be changed in the Supabase SQL editor.'
+        using errcode = 'insufficient_privilege';
+    end if;
+    if not public.is_owner() then
+      raise exception 'Only the owner can grant or remove admin access.'
+        using errcode = 'insufficient_privilege';
+    end if;
+  end if;
+
+  if new.user_type is distinct from old.user_type and not public.is_admin() then
+    raise exception 'Only an admin can change user types.'
+      using errcode = 'insufficient_privilege';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists guard_userdetail_columns_trigger on "UserDetail";
+create trigger guard_userdetail_columns_trigger before update on "UserDetail"
+  for each row execute function public.guard_userdetail_columns();
+
+-- 4. Keep at least one account with admin power, now counting the owner.
+create or replace function public.guard_last_admin() returns trigger
+  language plpgsql security definer set search_path = public
+as $$
+declare admin_count integer;
+begin
+  if tg_op = 'DELETE' then
+    if old.role in ('admin', 'owner') then
+      select count(*) into admin_count from "UserDetail" where role in ('admin', 'owner');
+      if admin_count <= 1 then
+        raise exception 'Cannot delete the last administrator. Promote another account first.'
+          using errcode = 'check_violation';
+      end if;
+    end if;
+    return old;
+  end if;
+  if old.role in ('admin', 'owner') and coalesce(new.role, 'user') not in ('admin', 'owner') then
+    select count(*) into admin_count from "UserDetail" where role in ('admin', 'owner');
+    if admin_count <= 1 then
+      raise exception 'Cannot remove the last administrator. Promote another account first.'
+        using errcode = 'check_violation';
+    end if;
+  end if;
+  return new;
+end $$;
+
+-- 5. Removing an account (owner only). Takes the profile id, not the auth
+--    uuid, so legacy profiles with no userloginuuid can be removed too.
+--    Their reports are kept, detached from the account, and show as
+--    "Removed user"; their unreported captures go with the account.
+alter table "FileUpload" alter column userid drop not null;
+
+create or replace function public.delete_user(profile_id bigint) returns void
+  language plpgsql security definer set search_path = public
+as $$
+declare
+  target "UserDetail";
+begin
+  if not public.is_owner() then
+    raise exception 'Only the owner can remove accounts.'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  select * into target from "UserDetail" where id = profile_id;
+  if not found then
+    raise exception 'That account no longer exists.' using errcode = 'no_data_found';
+  end if;
+  if target.userloginuuid = auth.uid() then
+    raise exception 'You cannot remove your own account.' using errcode = 'check_violation';
+  end if;
+  if target.role = 'owner' then
+    raise exception 'The owner account cannot be removed.' using errcode = 'check_violation';
+  end if;
+
+  insert into public.role_change_log
+    (actor_uuid, actor_email, target_uuid, target_email, old_role, new_role)
+  values (auth.uid(),
+          (select email from "UserDetail" where userloginuuid = auth.uid()),
+          target.userloginuuid, coalesce(target.email, '(no email)'),
+          target.role, 'removed');
+
+  if target.userloginuuid is not null then
+    update "FileUpload" set userid = null where userid = target.userloginuuid;
+  end if;
+  delete from "UserDetail" where id = profile_id;
+  if target.userloginuuid is not null then
+    delete from auth.users where id = target.userloginuuid;
+  end if;
+end $$;
+
+revoke all on function public.delete_user(bigint) from public, anon;
+grant execute on function public.delete_user(bigint) to authenticated;
+
+-- 6. The owner. Runs here, with no auth.uid(), so the guard above lets it pass.
+do $$
+declare n integer;
+begin
+  update "UserDetail" set role = 'owner'
+  where lower(email) = 'gabrieljohnsolomon@gmail.com';
+  get diagnostics n = row_count;
+  if n = 0 then
+    raise notice 'No profile with email gabrieljohnsolomon@gmail.com: sign up and verify with it, then run this block again.';
+  end if;
+end $$;
+
+
 -- ---------------------------------------------------------------------------
 -- Promoting the first administrator
 --

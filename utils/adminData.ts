@@ -96,6 +96,8 @@ export function useAdminSummary(): { data: AdminSummary | null; error: string | 
 export interface AdminSession {
   userId: string;
   username: string | null;
+  /** 'owner' may grant and remove admin access and remove accounts. */
+  role: 'admin' | 'owner';
 }
 
 export const AdminSessionContext = createContext<AdminSession | null>(null);

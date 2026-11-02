@@ -22,6 +22,12 @@ interface AuthValue {
 
 const AuthContext = createContext<AuthValue | null>(null);
 
+/** Admins and the owner both use the console; only the database tells them apart. */
+export function hasAdminPower(role: string | null | undefined) {
+  const r = role?.toLowerCase();
+  return r === 'admin' || r === 'owner';
+}
+
 export function useAuth() {
   const value = useContext(AuthContext);
   if (!value) throw new Error('useAuth must be used inside <AuthProvider>');
@@ -95,7 +101,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       const userId = session.user.id;
       setTimeout(async () => {
         const fetched = await fetchUserProfile(userId);
-        if (justSignedIn && fetched?.role?.toLowerCase() === 'admin') {
+        if (justSignedIn && hasAdminPower(fetched?.role)) {
           router.push('/admin');
         }
       }, 0);
@@ -125,7 +131,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     authUser,
     authChecked,
     profile,
-    isAdmin: profile?.role?.toLowerCase() === 'admin',
+    isAdmin: hasAdminPower(profile?.role),
     openLogin,
     logout,
   };

@@ -17,6 +17,34 @@ import { supabase } from '@/utils/supabase';
  * segmented control instead of the sliding cover. The Supabase calls are
  * unchanged.
  */
+const RESEND_SECONDS = 60;
+// Supabase email codes are 6 digits by default and can be set up to 10.
+const CODE_MIN = 6;
+const CODE_MAX = 10;
+
+const TOO_MANY_EMAILS = 'Too many emails have been sent in the last hour. Wait a while, then try again.';
+
+/**
+ * Supabase's own messages, said plainly. Returns how long to wait when the
+ * error is a cooldown, so the resend countdown can show it. A cooldown has no
+ * message: the countdown on the button already says it.
+ */
+function explainAuthError(error: unknown, fallback: string): { message: string; waitSeconds?: number } {
+  if (!(error instanceof Error)) return { message: fallback };
+  const raw = error.message;
+  const lower = raw.toLowerCase();
+  const code = (error as { code?: string }).code ?? '';
+  // "For security purposes, you can only request this after 42 seconds."
+  const after = raw.match(/after (\d+) seconds?/i);
+  if (after) return { message: '', waitSeconds: Number(after[1]) };
+  // The project-wide cap on emails per hour. With Supabase's built-in email
+  // sender it is only a handful an hour, so testing hits it quickly.
+  if (code === 'over_email_send_rate_limit' || code === 'over_request_rate_limit' || lower.includes('rate limit')) {
+    return { message: TOO_MANY_EMAILS, waitSeconds: RESEND_SECONDS };
+  }
+  return { message: raw || fallback };
+}
+
 export default function LoginModal({ onClose }: { onClose: () => void }) {
   // Opens on Sign in, because the button that opens it says "Sign in". The
   // previous default showed the sign-up panel, which contradicted the trigger.
@@ -25,9 +53,15 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  // Set after a successful sign-up, so the modal can tell the user to go and
-  // confirm rather than silently doing nothing while they wait for a session.
+  // Set after a successful sign-up (or a sign-in to an unconfirmed account):
+  // the email the verification code went to. The account stays inactive until
+  // that code is typed back here, so a throwaway or mistyped address never
+  // becomes a working account.
   const [awaitingConfirmation, setAwaitingConfirmation] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  // Seconds until another code may be requested. Supabase refuses a resend
+  // inside 60 s anyway; counting down says so instead of failing.
+  const [resendIn, setResendIn] = useState(0);
 
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -54,6 +88,20 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
     };
   }, [onClose]);
 
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = window.setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [resendIn]);
+
+  const startVerification = (address: string) => {
+    setAwaitingConfirmation(address);
+    setCode('');
+    setErrorMsg('');
+    setSuccessMsg('');
+    setResendIn(RESEND_SECONDS);
+  };
+
   // ---------------------------------------------------------------- auth
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -62,8 +110,8 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
     setErrorMsg('');
 
     try {
-      // The profile row is created by the on_auth_user_created trigger, in the
-      // same transaction as the auth user. The app used to insert into
+      // The profile row is created by handle_new_user once the emailed code is
+      // verified (migration.sql section I), not here. The app used to insert into
       // UserDetail itself as a second step; when that failed it left a
       // half-created account -- an auth user with no profile, or a profile with
       // a null userloginuuid that could never sign in. Nine of those had
@@ -86,9 +134,17 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
         return;
       }
 
-      setAwaitingConfirmation(email);
+      // Supabase answers a sign-up for an address that is already registered
+      // with a user that has no identities, and sends nothing, so accounts
+      // cannot be probed. Waiting for a code here would wait forever.
+      if (data.user && data.user.identities?.length === 0) {
+        setErrorMsg('This email is already registered. Sign in instead.');
+        return;
+      }
+
+      startVerification(email);
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : 'Failed to create account.');
+      setErrorMsg(explainAuthError(error, 'Failed to create account.').message);
     } finally {
       setIsLoading(false);
     }
@@ -108,11 +164,74 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
       // which otherwise both surface as a generic failure and leave the user
       // retrying a password that was correct all along.
       const message = error instanceof Error ? error.message.toLowerCase() : '';
+      if (message.includes('not confirmed') || message.includes('confirm')) {
+        // The password was right but the email was never verified: send a
+        // fresh code and ask for it, rather than a dead end.
+        const { error: resendError } = await supabase.auth.resend({ type: 'signup', email });
+        startVerification(email);
+        if (resendError) {
+          const { message, waitSeconds } = explainAuthError(resendError, 'Could not send a code.');
+          setErrorMsg(message);
+          if (waitSeconds) setResendIn(waitSeconds);
+        }
+      } else {
+        setErrorMsg('Invalid email or password.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!awaitingConfirmation) return;
+    setIsLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      // A correct code confirms the account and returns a session, so the
+      // user is signed in from here with no second step.
+      const { error } = await supabase.auth.verifyOtp({
+        email: awaitingConfirmation,
+        token: code,
+        type: 'signup',
+      });
+      if (error) throw error;
+      onClose();
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
       setErrorMsg(
-        message.includes('not confirmed') || message.includes('confirm')
-          ? 'Check your inbox and confirm your email address first.'
-          : 'Invalid email or password.'
+        message.includes('expired') || message.includes('invalid')
+          ? 'That code is wrong or has expired. Check it, or send a new one.'
+          : error instanceof Error
+            ? error.message
+            : 'Could not verify the code.'
       );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (!awaitingConfirmation || resendIn > 0) return;
+    setIsLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: awaitingConfirmation,
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (error) throw error;
+      setCode('');
+      setResendIn(RESEND_SECONDS);
+    } catch (error) {
+      const { message, waitSeconds } = explainAuthError(error, 'Could not send a new code.');
+      setErrorMsg(message);
+      if (waitSeconds) setResendIn(waitSeconds);
     } finally {
       setIsLoading(false);
     }
@@ -153,6 +272,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
     setPassword('');
     setShowPassword(false);
     setAwaitingConfirmation(null);
+    setCode('');
   };
 
   // ---------------------------------------------------------------- markup
@@ -209,10 +329,9 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
         {/* Form */}
         <div className="flex-1 p-7 sm:p-10">
           {awaitingConfirmation ? (
-            /* Sign-up succeeded but there is no session yet: the account is
-               unconfirmed. Saying so beats leaving the user staring at a form
-               that appears to have done nothing. */
-            <div className="text-center py-4">
+            /* Sign-up succeeded but the account is inactive until the emailed
+               code comes back. No session exists before then. */
+            <form onSubmit={handleVerify} className="flex flex-col">
               <span
                 aria-hidden="true"
                 className="w-16 h-16 mx-auto mb-5 rounded-full bg-oasys-blue/15 text-oasys-blue flex items-center justify-center"
@@ -223,23 +342,66 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
                 </svg>
               </span>
 
-              <h2 id="auth-title" className="text-2xl font-semibold text-fg mb-2">
-                Check your email
+              <h2 id="auth-title" className="text-2xl font-semibold text-fg mb-2 text-center">
+                Enter your verification code
               </h2>
-              <p className="text-fg-muted text-sm leading-relaxed mb-1">
-                We sent a confirmation link to
-              </p>
-              <p className="font-bold text-fg mb-5 break-all">{awaitingConfirmation}</p>
-              <p className="text-fg-muted text-xs leading-relaxed mb-7 max-w-sm mx-auto">
-                Click it to activate your account, then come back and sign in. The
-                link expires after a while — request a new one by signing up again
-                if it does. Check spam if it has not arrived in a minute.
-              </p>
+              <p className="text-fg-muted text-sm leading-relaxed text-center">We sent a code to</p>
+              <p className="font-bold text-fg mb-6 break-all text-center">{awaitingConfirmation}</p>
 
-              <button onClick={() => toggleMode(true)} className="btn-blue w-full py-3.5">
-                Back to sign in
+              <label htmlFor="auth-code" className={label}>
+                Verification code
+              </label>
+              <input
+                id="auth-code"
+                autoFocus
+                required
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern={`[0-9]{${CODE_MIN},${CODE_MAX}}`}
+                minLength={CODE_MIN}
+                maxLength={CODE_MAX}
+                value={code}
+                // Digits only, so a code pasted with spaces or a dash still fits.
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, CODE_MAX))}
+                className={`${field} text-center font-mono text-2xl tracking-[0.4em]`}
+                placeholder="000000"
+              />
+
+              <div aria-live="polite" className="min-h-[1.25rem] my-4">
+                {errorMsg && (
+                  <p role="alert" className="text-danger text-sm font-bold">
+                    {errorMsg}
+                  </p>
+                )}
+                {successMsg && <p className="text-ok text-sm font-bold">{successMsg}</p>}
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading || code.length < CODE_MIN}
+                className="btn-blue w-full py-3.5 disabled:opacity-60"
+              >
+                {isLoading ? 'Verifying…' : 'Verify and continue'}
               </button>
-            </div>
+
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm">
+                <button
+                  type="button"
+                  onClick={() => toggleMode(true)}
+                  className="text-fg-muted hover:text-fg font-bold transition-colors"
+                >
+                  Back to sign in
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={isLoading || resendIn > 0}
+                  className="text-oasys-blue hover:underline font-bold disabled:text-fg-faint disabled:no-underline tabular-nums"
+                >
+                  {resendIn > 0 ? `Send a new code in ${resendIn}s` : 'Send a new code'}
+                </button>
+              </div>
+            </form>
           ) : (
             <>
               <h2 id="auth-title" className="text-2xl sm:text-3xl font-semibold text-fg mb-1">
