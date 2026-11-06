@@ -450,10 +450,7 @@ function PhotoCheckNote({ check, onRetry }: { check: PhotoCheck | null; onRetry:
   }
   return (
     <div role="alert" className="bg-red-500/10 border border-danger/40 text-danger text-sm font-bold rounded-xl px-4 py-3 flex flex-col gap-2">
-      <p>
-        {check.status === 'rejected' ? 'This photo cannot be saved. ' : ''}
-        {check.message}
-      </p>
+      <p>{check.status === 'rejected' ? 'Invalid image, capture again.' : check.message}</p>
       {check.status === 'error' && (
         <button type="button" onClick={onRetry} className="self-start text-xs underline">
           Check again
