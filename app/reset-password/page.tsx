@@ -1,9 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/utils/supabase';
+import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  breachCount,
+  breachMessage,
+  checkPassword,
+} from '@/utils/passwordPolicy';
+import PasswordStrength from '@/components/PasswordStrength';
 
 /**
  * Sets a new password after arriving from a recovery email.
@@ -20,8 +28,6 @@ import { supabase } from '@/utils/supabase';
  */
 type Status = 'checking' | 'ready' | 'invalid' | 'done';
 
-const MIN_PASSWORD_LENGTH = 6;
-
 export default function ResetPasswordPage() {
   const [status, setStatus] = useState<Status>('checking');
   const [password, setPassword] = useState('');
@@ -29,7 +35,12 @@ export default function ResetPasswordPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [breachNote, setBreachNote] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | undefined>(undefined);
   const router = useRouter();
+
+  // Same rules as sign-up (utils/passwordPolicy.ts, NIST SP 800-63B-4).
+  const passwordCheck = useMemo(() => checkPassword(password, { email }), [password, email]);
 
   useEffect(() => {
     let active = true;
@@ -43,6 +54,7 @@ export default function ResetPasswordPage() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!active) return;
+      setEmail(session?.user?.email ?? undefined);
       setStatus(session ? 'ready' : 'invalid');
     });
 
@@ -55,9 +67,10 @@ export default function ResetPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setBreachNote(null);
 
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      setErrorMsg(`Use at least ${MIN_PASSWORD_LENGTH} characters.`);
+    if (!passwordCheck.ok) {
+      setErrorMsg(passwordCheck.problems[0]);
       return;
     }
     if (password !== confirm) {
@@ -67,6 +80,15 @@ export default function ResetPasswordPage() {
 
     setIsSaving(true);
     try {
+      // Refuse a password already exposed in a breach. Only a 5-character
+      // hash prefix leaves the browser; see breachCount().
+      const leaked = breachMessage(await breachCount(password));
+      if (leaked) {
+        setBreachNote(leaked);
+        setErrorMsg('Choose a different password.');
+        return;
+      }
+
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
 
@@ -161,7 +183,7 @@ export default function ResetPasswordPage() {
           Set a new password
         </h1>
         <p className="text-fg-muted text-sm mb-7">
-          Choose something you have not used here before.
+          Choose something you have not used here or on any other site.
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -174,12 +196,17 @@ export default function ResetPasswordPage() {
                 id="new-password"
                 type={showPassword ? 'text' : 'password'}
                 required
-                minLength={MIN_PASSWORD_LENGTH}
+                minLength={PASSWORD_MIN_LENGTH}
+                maxLength={PASSWORD_MAX_LENGTH}
                 autoComplete="new-password"
+                aria-describedby="new-password-rules"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setBreachNote(null);
+                }}
                 className={`${field} pr-20`}
-                placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+                placeholder={`At least ${PASSWORD_MIN_LENGTH} characters`}
               />
               <button
                 type="button"
@@ -189,6 +216,12 @@ export default function ResetPasswordPage() {
                 {showPassword ? 'Hide' : 'Show'}
               </button>
             </div>
+            <PasswordStrength
+              id="new-password-rules"
+              password={password}
+              check={passwordCheck}
+              breachNote={breachNote}
+            />
           </div>
 
           <div>
@@ -215,7 +248,11 @@ export default function ResetPasswordPage() {
             )}
           </div>
 
-          <button type="submit" disabled={isSaving} className="btn-blue w-full py-3.5">
+          <button
+            type="submit"
+            disabled={isSaving || !passwordCheck.ok}
+            className="btn-blue w-full py-3.5 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
             {isSaving ? 'Updating…' : 'Update password'}
           </button>
         </form>

@@ -17,6 +17,7 @@ import {
   deleteCapture,
   type CapturedDistress,
 } from '@/utils/captures';
+import { downscaleToDataUrl } from '@/utils/pendingScan';
 import LoginModal from '@/components/LoginModal';
 import Coordinates from '@/components/Coordinates';
 import Pagination, { lastPage } from '@/components/Pagination';
@@ -42,6 +43,36 @@ interface Section {
 }
 
 const EMPTY: Section = { rows: [], total: 0 };
+
+/**
+ * Whether the draft photo shows road distress. A capture can only be saved once
+ * this is 'ok': the backend found road surface and at least one defect on it
+ * (/api/check-distress). Anything else blocks the Save button.
+ */
+type PhotoCheck =
+  | { status: 'checking' }
+  | { status: 'ok'; defects: { label: string; confidence: number }[] }
+  | { status: 'rejected'; message: string }
+  | { status: 'error'; message: string };
+
+async function checkDistressPhoto(file: File): Promise<PhotoCheck> {
+  try {
+    const image = await downscaleToDataUrl(file);
+    const res = await fetch('/api/check-distress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_base64: image }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (res.ok && body.ok) return { status: 'ok', defects: body.defects ?? [] };
+    if (res.status === 422) {
+      return { status: 'rejected', message: body.message ?? 'This photo does not show road distress.' };
+    }
+    return { status: 'error', message: body.message ?? 'The photo could not be checked.' };
+  } catch (err) {
+    return { status: 'error', message: err instanceof Error ? err.message : 'The photo could not be checked.' };
+  }
+}
 
 const dateFormat = new Intl.DateTimeFormat('en-PH', {
   dateStyle: 'medium',
@@ -71,8 +102,12 @@ export default function CapturedDistressPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+  const [photoCheck, setPhotoCheck] = useState<PhotoCheck | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  // The draft the running check belongs to; a newer photo makes an older
+  // check's answer stale.
+  const checkFor = useRef<File | null>(null);
 
   // Same reasoning as UploadResultUi: the subscription reports the session on
   // subscribe, so there is no awaited auth call to get stuck on.
@@ -150,6 +185,7 @@ export default function CapturedDistressPage() {
     if (draft) URL.revokeObjectURL(draft.preview);
     setDraft({ file, preview: URL.createObjectURL(file) });
     setFix(null);
+    runCheck(file);
 
     // EXIF describes where the photo was taken; the device is the fallback,
     // and it is right here because a capture is taken on the spot.
@@ -162,8 +198,18 @@ export default function CapturedDistressPage() {
     }
   };
 
+  const runCheck = (file: File) => {
+    checkFor.current = file;
+    setPhotoCheck({ status: 'checking' });
+    checkDistressPhoto(file).then((result) => {
+      if (checkFor.current === file) setPhotoCheck(result);
+    });
+  };
+
   const discardDraft = () => {
     if (draft) URL.revokeObjectURL(draft.preview);
+    checkFor.current = null;
+    setPhotoCheck(null);
     setDraft(null);
     setFix(null);
     setLocationNote(null);
@@ -175,8 +221,16 @@ export default function CapturedDistressPage() {
     setFix({ lat: pos.lat, lng: pos.lng, accuracy_m: null, source: 'manual_pin' });
   }, []);
 
+  const canSave = photoCheck?.status === 'ok';
+
   const save = async () => {
     if (!draft || !fix || !userId) return;
+    // Only road distress may be saved. The button is disabled otherwise; this
+    // guards a stale click.
+    if (!canSave) {
+      setSaveError('Only a photo of road distress can be saved.');
+      return;
+    }
     setIsSaving(true);
     setSaveError(null);
     try {
@@ -265,6 +319,7 @@ export default function CapturedDistressPage() {
                     <p className="text-xs text-fg-muted truncate" title={draft.file.name}>
                       {draft.file.name}
                     </p>
+                    <PhotoCheckNote check={photoCheck} onRetry={() => runCheck(draft.file)} />
                   </div>
 
                   <div className="lg:col-span-3 flex flex-col gap-3">
@@ -318,10 +373,18 @@ export default function CapturedDistressPage() {
                       <button
                         type="button"
                         onClick={save}
-                        disabled={!fix || isSaving}
+                        disabled={!fix || !canSave || isSaving}
                         className="btn-blue px-10 py-3.5 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {isSaving ? 'Saving…' : !fix ? 'Set the location first' : 'Save capture'}
+                        {isSaving
+                          ? 'Saving…'
+                          : photoCheck?.status === 'checking'
+                            ? 'Checking photo…'
+                            : !canSave
+                              ? 'Not road distress'
+                              : !fix
+                                ? 'Set the location first'
+                                : 'Save capture'}
                       </button>
                     </div>
                   </div>
@@ -364,6 +427,38 @@ export default function CapturedDistressPage() {
       </div>
 
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
+    </div>
+  );
+}
+
+function PhotoCheckNote({ check, onRetry }: { check: PhotoCheck | null; onRetry: () => void }) {
+  if (!check) return null;
+  if (check.status === 'checking') {
+    return (
+      <p role="status" className="text-sm font-bold text-fg-muted animate-pulse">
+        Checking that this is road distress…
+      </p>
+    );
+  }
+  if (check.status === 'ok') {
+    const labels = [...new Set(check.defects.map((d) => d.label))];
+    return (
+      <p role="status" className="bg-[#16a34a]/10 border border-[#16a34a]/30 text-ok text-sm font-bold rounded-xl px-4 py-3">
+        Road distress found: {labels.join(', ')}.
+      </p>
+    );
+  }
+  return (
+    <div role="alert" className="bg-red-500/10 border border-danger/40 text-danger text-sm font-bold rounded-xl px-4 py-3 flex flex-col gap-2">
+      <p>
+        {check.status === 'rejected' ? 'This photo cannot be saved. ' : ''}
+        {check.message}
+      </p>
+      {check.status === 'error' && (
+        <button type="button" onClick={onRetry} className="self-start text-xs underline">
+          Check again
+        </button>
+      )}
     </div>
   );
 }

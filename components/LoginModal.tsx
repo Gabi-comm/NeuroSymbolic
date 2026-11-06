@@ -1,8 +1,16 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/utils/supabase';
+import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  breachCount,
+  breachMessage,
+  checkPassword,
+} from '@/utils/passwordPolicy';
+import PasswordStrength from '@/components/PasswordStrength';
 
 /**
  * Sign in / sign up.
@@ -66,6 +74,15 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  // Set when the breach lookup refused the password on submit.
+  const [breachNote, setBreachNote] = useState<string | null>(null);
+
+  // Sign-up only: the password rules (utils/passwordPolicy.ts) checked as the
+  // user types, so the meter and the reasons update live.
+  const passwordCheck = useMemo(
+    () => checkPassword(password, { email, username }),
+    [password, email, username]
+  );
 
   const dialogRef = useRef<HTMLDivElement>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
@@ -106,10 +123,26 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setErrorMsg('');
+    setBreachNote(null);
+
+    if (!passwordCheck.ok) {
+      setErrorMsg(passwordCheck.problems[0]);
+      return;
+    }
+
+    setIsLoading(true);
 
     try {
+      // Refuse a password already exposed in a breach (NIST SP 800-63B-4).
+      // Only a 5-character hash prefix is sent; see breachCount().
+      const leaked = breachMessage(await breachCount(password));
+      if (leaked) {
+        setBreachNote(leaked);
+        setErrorMsg('Choose a different password.');
+        return;
+      }
+
       // The profile row is created by handle_new_user once the emailed code is
       // verified (migration.sql section I), not here. The app used to insert into
       // UserDetail itself as a second step; when that failed it left a
@@ -270,6 +303,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
     setEmail('');
     setUsername('');
     setPassword('');
+    setBreachNote(null);
     setShowPassword(false);
     setAwaitingConfirmation(null);
     setCode('');
@@ -471,12 +505,17 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
                       id="auth-password"
                       type={showPassword ? 'text' : 'password'}
                       required
-                      minLength={isLogin ? undefined : 6}
+                      minLength={isLogin ? undefined : PASSWORD_MIN_LENGTH}
+                      maxLength={isLogin ? undefined : PASSWORD_MAX_LENGTH}
                       autoComplete={isLogin ? 'current-password' : 'new-password'}
+                      aria-describedby={isLogin ? undefined : 'auth-password-rules'}
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setBreachNote(null);
+                      }}
                       className={`${field} pr-20`}
-                      placeholder={isLogin ? 'Your password' : 'At least 6 characters'}
+                      placeholder={isLogin ? 'Your password' : `At least ${PASSWORD_MIN_LENGTH} characters`}
                     />
                     <button
                       type="button"
@@ -486,6 +525,14 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
                       {showPassword ? 'Hide' : 'Show'}
                     </button>
                   </div>
+                  {!isLogin && (
+                    <PasswordStrength
+                      id="auth-password-rules"
+                      password={password}
+                      check={passwordCheck}
+                      breachNote={breachNote}
+                    />
+                  )}
                 </div>
 
                 {isLogin && (
@@ -510,7 +557,11 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
                   )}
                 </div>
 
-                <button type="submit" disabled={isLoading} className="btn-blue w-full py-3.5">
+                <button
+                  type="submit"
+                  disabled={isLoading || (!isLogin && !passwordCheck.ok)}
+                  className="btn-blue w-full py-3.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
                   {isLoading
                     ? isLogin
                       ? 'Signing in…'

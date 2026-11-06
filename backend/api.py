@@ -65,6 +65,14 @@ DEFAULT_GSD_MM_PX = float(os.environ.get("DEFAULT_GSD_MM_PX", "4.357"))
 # 2 m still fills most of the frame with pavement, while a photo of something
 # else rarely reaches it.
 MIN_ROAD_COVERAGE = float(os.environ.get("MIN_ROAD_COVERAGE", "0.15"))
+
+# --- Capture gate (Captured Distress) -----------------------------------------
+# A capture may only be saved when the photo shows road distress: the road gate
+# above passes AND the crack model finds at least one defect on the road
+# surface. Stricter than the 0.1 the full analysis runs at, because here a false
+# "yes" lets a non-road photo into the queue, while the full analysis only
+# lists candidates that SAM and the fuzzy engine then grade.
+CAPTURE_MIN_DEFECT_CONF = float(os.environ.get("CAPTURE_MIN_DEFECT_CONF", "0.25"))
 BACKEND_API_KEY = os.environ.get("BACKEND_API_KEY", "")
 print("Loading AI models into memory. This may take a moment...")
 
@@ -208,10 +216,10 @@ def apply_privacy_blur(img):
     return img
 
 
-def road_mask_area_px(road_results, image_shape):
-    """Road surface area in pixels, used as the density denominator when IPM fails."""
+def road_mask_full(road_results, image_shape):
+    """The road model's masks merged and resized to the image, 0/255. None if no road."""
     if road_results[0].masks is None:
-        return 0
+        return None
 
     h, w = image_shape[:2]
     masks = road_results[0].masks.data.cpu().numpy()
@@ -219,8 +227,13 @@ def road_mask_area_px(road_results, image_shape):
     for m in masks:
         combined = np.maximum(combined, m)
 
-    resized = cv2.resize((combined * 255).astype(np.uint8), (w, h))
-    return int(cv2.countNonZero(resized))
+    return cv2.resize((combined * 255).astype(np.uint8), (w, h))
+
+
+def road_mask_area_px(road_results, image_shape):
+    """Road surface area in pixels, used as the density denominator when IPM fails."""
+    mask = road_mask_full(road_results, image_shape)
+    return 0 if mask is None else int(cv2.countNonZero(mask))
 
 
 def decode_base64_img(base64_str):
@@ -290,6 +303,24 @@ def get_birds_eye_view(img, road_results):
     bot_l, bot_r = int(np.mean(le[bot_idx:])), int(np.mean(re[bot_idx:]))
     top_y, bot_y = valid_ys[0], valid_ys[-1]
 
+    # Shape check. A road photographed from chest height is a trapezoid that
+    # narrows (or at most stays level) toward the horizon, and it spans a good
+    # part of the frame. A region that widens upward, or is a thin sliver, is
+    # not a road seen in perspective -- typically a wall or a kerb the road
+    # model misread -- and warping it would only stretch it into a fake
+    # top-down view. Keep the original view instead, which the caller already
+    # handles as "IPM not applied".
+    top_w, bot_w = top_r - top_l, bot_r - bot_l
+    if top_w <= 0 or bot_w <= 0:
+        print("IPM skipped: road edges cross.")
+        return img.copy(), False
+    if top_w > bot_w * 1.15:
+        print(f"IPM skipped: region widens upward ({top_w}px top vs {bot_w}px bottom).")
+        return img.copy(), False
+    if (bot_y - top_y) < h * 0.25:
+        print(f"IPM skipped: road spans only {(bot_y - top_y) / h:.0%} of the frame height.")
+        return img.copy(), False
+
     # Expand trapezoid for wider field of view
     expand = int((bot_r - bot_l) * 0.25)
     src = np.float32([
@@ -303,8 +334,14 @@ def get_birds_eye_view(img, road_results):
     width, height = 700, 700
     dst = np.float32([[0, 0], [width, 0], [0, height], [width, height]])
 
-    # Apply perspective transformation
-    M = cv2.getPerspectiveTransform(src, dst)
+    # Apply perspective transformation. A degenerate quad gives a singular or
+    # non-finite matrix; treat that as a failed warp, not a result.
+    try:
+        M = cv2.getPerspectiveTransform(src, dst)
+    except cv2.error:
+        return img.copy(), False
+    if not np.all(np.isfinite(M)):
+        return img.copy(), False
     bev = cv2.warpPerspective(img, M, (width, height))
 
     return bev, True
@@ -706,6 +743,87 @@ def generate_maintenance_bulletin(distresses, density_pct, ipm_applied,
 def llm_status():
     """Which model writes the bulletin and whether it answers; shown in the admin console."""
     return llm.status()
+
+
+def _reject(error, message, **extra):
+    return JSONResponse(status_code=422, content={"ok": False, "error": error, "message": message, **extra})
+
+
+@app.post("/check-distress")
+async def check_distress(request: ImageRequest, x_api_key: str | None = Header(default=None)):
+    """Is this photo road distress? Used by Captured Distress before saving.
+
+    Runs only the two checks that answer the question, without SAM, the fuzzy
+    engine or the bulletin, so it returns in a second or two:
+      1. the road gate (same MIN_ROAD_COVERAGE rule as /analyze-road), then
+      2. the crack model, which must find at least one defect at
+         CAPTURE_MIN_DEFECT_CONF or above, lying on the road surface.
+    Nothing is stored and no image is returned.
+    """
+    if BACKEND_API_KEY and x_api_key != BACKEND_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+    try:
+        img = decode_base64_img(request.image_base64)
+        if img is None:
+            return JSONResponse(status_code=400, content={"ok": False, "message": "Invalid Image Data"})
+
+        road_results = road_model.predict(img, conf=0.25, verbose=False)
+        frame_px = img.shape[0] * img.shape[1]
+        road_mask = road_mask_full(road_results, img.shape)
+        road_px = 0 if road_mask is None else int(cv2.countNonZero(road_mask))
+        road_coverage = (road_px / frame_px) if frame_px else 0.0
+
+        if road_coverage < MIN_ROAD_COVERAGE:
+            return _reject(
+                "no_road_detected",
+                "This does not look like a road. Photograph the road surface from "
+                "chest height, about 2 m from the defect, with the pavement filling "
+                "most of the frame.",
+                road_coverage_pct=round(road_coverage * 100, 2),
+                required_coverage_pct=round(MIN_ROAD_COVERAGE * 100, 2),
+            )
+
+        bev_img, ipm_applied = get_birds_eye_view(img, road_results)
+        crack_results = crack_model.predict(bev_img, conf=CAPTURE_MIN_DEFECT_CONF, verbose=False)
+
+        defects = []
+        result = crack_results[0] if crack_results else None
+        if result is not None and result.boxes is not None and len(result.boxes):
+            xyxy = result.boxes.xyxy.cpu().numpy()
+            confs = result.boxes.conf.cpu().numpy()
+            classes = result.boxes.cls.cpu().numpy().astype(int)
+            for (x1, y1, x2, y2), conf, cls in zip(xyxy, confs, classes):
+                # After a successful warp the whole frame is road. Without it,
+                # a detection only counts if it sits on the road mask, so a
+                # crack-like mark on a wall or kerb beside the road does not.
+                if not ipm_applied and road_mask is not None:
+                    cx = int(min(max((x1 + x2) / 2, 0), road_mask.shape[1] - 1))
+                    cy = int(min(max((y1 + y2) / 2, 0), road_mask.shape[0] - 1))
+                    if road_mask[cy, cx] == 0:
+                        continue
+                defects.append({
+                    "label": fuzzy_engine.canonical_label(result.names.get(int(cls), str(cls))),
+                    "confidence": round(float(conf), 3),
+                })
+
+        if not defects:
+            return _reject(
+                "no_distress_detected",
+                "A road was found, but no crack or pothole was detected on it. Move "
+                "closer so the defect is clearly visible, and try again.",
+                road_coverage_pct=round(road_coverage * 100, 2),
+            )
+
+        defects.sort(key=lambda d: d["confidence"], reverse=True)
+        return {
+            "ok": True,
+            "road_coverage_pct": round(road_coverage * 100, 2),
+            "ipm_applied": ipm_applied,
+            "defects": defects,
+        }
+    except Exception as e:
+        print(f"check-distress error: {e}")
+        return JSONResponse(status_code=500, content={"ok": False, "message": str(e)})
 
 
 @app.post("/analyze-road")

@@ -36,6 +36,59 @@ const FEATURES = [
   { title: 'Automated summary reports', detail: 'A maintenance bulletin generated locally, with no data leaving the device.' },
 ];
 
+// Every source a number in the calculation comes from, Philippine only. Keep in
+// step with backend/fuzzy_engine.py, backend/api.py and proof.md.
+const REFERENCES = [
+  {
+    source: 'DPWH Department Order No. 120, Series of 2019',
+    uses: [
+      'The 3 mm crack-width line: Narrow ≤ 3 mm, Wide > 3 mm average crack width (Low / Medium boundary).',
+      'Crack extent (density): total area of cracking over total area of the segment, as a percentage.',
+      'Pothole unit: one pothole is equivalent to 0.25 m² (Medium / High pothole line).',
+      'Severity and extent rated together on a two-dimensional scale; VCI weight factors (Table 4) used to make alligator cracking escalate faster than other cracks.',
+    ],
+  },
+  {
+    source: 'DPWH Department Order No. 47, Series of 2024',
+    uses: [
+      'Table 5.1, Beyond Routine Maintenance: alligator cracks over 167.5 m² (continuous), the anchor for the "dense" extent level (about 55% of a 3.05 m lane over 100 m).',
+      'Table 4.1, response times: 3 working days for potholes, alligator cracks and cracks.',
+      'Table 6.1a, inspection weights (potholes 10%, alligator cracks 9%, cracks 5%), used for the priority order.',
+      'Appendix A-9, maintenance activities: Act. 111, 112, 113, 121 and 122 in each repair recommendation.',
+    ],
+  },
+  {
+    source: 'DPWH Standard Specifications for Highways, Bridges and Airports, Vol. II (Blue Book)',
+    uses: ['Item 311: the repair for High-severity cracking on concrete, full slab reblocking.'],
+  },
+  {
+    source: 'DILG Local Road and Bridge Inventory and Condition Survey (LRBICS) Manual, 2020',
+    uses: [
+      'Sec. III.5.2.4, pp. 121–122: the same 3 mm Narrow / Wide crack-width line, for local roads.',
+      'Sec. III.5.2.5, p. 124: a slab that needs re-blocking is "shattered", the basis for High on concrete.',
+      'Sec. III.5.1.2, p. 98: severe cracking with base failure on asphalt is rated as a pothole.',
+    ],
+  },
+  {
+    source: 'DPWH Department Order No. 88, Series of 2020',
+    uses: [
+      'Minimum urban lane width of 3.05 m. The capture guide frames one lane across the 700 px top-down view, so 3,050 mm ÷ 700 px = 4.357 mm per pixel, the scale used to turn pixels into millimetres and square metres.',
+    ],
+  },
+  {
+    source: 'City Engineer, City of Caloocan: validated severity criteria for Samson Road',
+    uses: [
+      'The 10 mm line between Medium (open cracks, 3–10 mm) and High (wide structural cracks, over 10 mm). No Philippine standard publishes a 10 mm cut; this is the City Engineer’s validated criterion for Samson Road.',
+      'The High wording: alligator cracking over continuous sections, road no longer serviceable, needing full slab reblocking or structural replacement.',
+      'One pothole up to 0.25 m² is Medium; a larger one, or several, is High.',
+    ],
+  },
+  {
+    source: 'Republic Act No. 10173, Data Privacy Act of 2012',
+    uses: ['Why faces and vehicle plates are blurred before any photo is measured or stored.'],
+  },
+];
+
 const AUDIENCES = [
   { name: 'Government agencies', detail: 'Objective, standardised condition data for budget planning.' },
   { name: 'Road engineers', detail: 'A visible reason for every severity grade assigned.' },
@@ -135,6 +188,33 @@ export default function AboutUs() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* References */}
+      <section id="references" className="bg-card-bg rounded-oasys p-8 sm:p-12 border border-line">
+        <h2 className="text-2xl font-semibold mb-2 uppercase">References</h2>
+        <p className="text-fg-muted mb-8 max-w-3xl">
+          Every number OASYS uses to measure and grade a defect comes from one of
+          these sources. All are Philippine standards or the study area&apos;s City
+          Engineer.
+        </p>
+        <ol className="flex flex-col gap-4">
+          {REFERENCES.map((ref, index) => (
+            <li key={ref.source} className="bg-inset rounded-2xl p-5 sm:p-6 border border-line grid grid-cols-[2.25rem_1fr] gap-x-3">
+              <span aria-hidden="true" className="font-stat text-xl leading-none text-accent tabular-nums pt-0.5">
+                {String(index + 1).padStart(2, '0')}
+              </span>
+              <div className="min-w-0">
+                <p className="font-bold text-fg leading-snug">{ref.source}</p>
+                <ul className="mt-3 flex flex-col gap-1.5 text-sm text-fg-soft leading-snug list-disc pl-4">
+                  {ref.uses.map((use) => (
+                    <li key={use}>{use}</li>
+                  ))}
+                </ul>
+              </div>
+            </li>
+          ))}
+        </ol>
       </section>
 
       {/* Features + evaluation */}
