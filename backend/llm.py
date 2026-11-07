@@ -42,6 +42,10 @@ OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:1.5b")
 OLLAMA_NUM_PREDICT = int(os.environ.get("OLLAMA_NUM_PREDICT", "80"))
 OLLAMA_NUM_THREAD = int(os.environ.get("OLLAMA_NUM_THREAD", "0"))
+# The bulletin paragraph is optional garnish; the assessment is already done when
+# it is requested. Cap the wait so a slow or cold CPU model cannot hold the
+# whole scan on the spinner (it was 180 s).
+OLLAMA_TIMEOUT_S = float(os.environ.get("OLLAMA_TIMEOUT_S", "45"))
 
 LLM_API_URL = os.environ.get("LLM_API_URL", "").rstrip("/")
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
@@ -79,10 +83,13 @@ def _generate_ollama(prompt: str) -> str:
                 "keep_alive": -1,
                 "options": _ollama_options(),
             },
-            timeout=180,
+            timeout=OLLAMA_TIMEOUT_S,
         )
         response.raise_for_status()
         return response.json().get("response", "").strip()
+    except requests.exceptions.Timeout:
+        print(f"Ollama did not answer within {OLLAMA_TIMEOUT_S:.0f}s; bulletin sent without the summary paragraph.")
+        return "[Summary paragraph skipped: the local language model took too long to respond.]"
     except requests.exceptions.ConnectionError:
         return (
             f"[Local LLM unavailable: could not reach Ollama at {OLLAMA_HOST}. "
@@ -104,6 +111,8 @@ def _generate_remote(prompt: str) -> str:
         )
         response.raise_for_status()
         return str(response.json().get("text", "")).strip()
+    except requests.exceptions.Timeout:
+        return "[Summary paragraph skipped: the remote language model took too long to respond.]"
     except requests.exceptions.ConnectionError:
         return f"[Remote LLM unavailable: could not reach {LLM_API_URL}.]"
     except Exception as e:
