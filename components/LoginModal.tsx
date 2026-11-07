@@ -11,6 +11,7 @@ import {
   checkPassword,
 } from '@/utils/passwordPolicy';
 import PasswordStrength from '@/components/PasswordStrength';
+import TermsGuidelines, { TERMS_DONE_EVENT, TERMS_VERSION, hasAcceptedTerms } from '@/components/TermsGuidelines';
 
 /**
  * Sign in / sign up.
@@ -70,6 +71,14 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
   // Seconds until another code may be requested. Supabase refuses a resend
   // inside 60 s anyway; counting down says so instead of failing.
   const [resendIn, setResendIn] = useState(0);
+  // Signed in, but not yet agreed to the terms: a new account right after its
+  // code is verified, or an older one that never agreed. The modal cannot be
+  // dismissed until the user agrees or declines (which signs them out).
+  const [needsTerms, setNeedsTerms] = useState(false);
+  const needsTermsRef = useRef(false);
+  useEffect(() => {
+    needsTermsRef.current = needsTerms;
+  }, [needsTerms]);
 
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -92,7 +101,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
     firstFieldRef.current?.focus();
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !needsTermsRef.current) onClose();
     };
     document.addEventListener('keydown', onKeyDown);
 
@@ -163,7 +172,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
       // With email confirmation on, Supabase returns a user but no session.
       // A session here means confirmation is still disabled in the project.
       if (data.session) {
-        onClose();
+        setNeedsTerms(true);
         return;
       }
 
@@ -189,8 +198,12 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
     setErrorMsg('');
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      if (!hasAcceptedTerms(data.user)) {
+        setNeedsTerms(true);
+        return;
+      }
       onClose();
     } catch (error) {
       // Distinguish "wrong password" from "you never confirmed your email",
@@ -224,14 +237,15 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
 
     try {
       // A correct code confirms the account and returns a session, so the
-      // user is signed in from here with no second step.
+      // user is signed in from here. The account now exists: the terms come next.
       const { error } = await supabase.auth.verifyOtp({
         email: awaitingConfirmation,
         token: code,
         type: 'signup',
       });
       if (error) throw error;
-      onClose();
+      setAwaitingConfirmation(null);
+      setNeedsTerms(true);
     } catch (error) {
       const message = error instanceof Error ? error.message.toLowerCase() : '';
       setErrorMsg(
@@ -268,6 +282,36 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleAcceptTerms = async () => {
+    setIsLoading(true);
+    setErrorMsg('');
+    try {
+      // Merged into user_metadata; the username stored at sign-up stays.
+      const { error } = await supabase.auth.updateUser({
+        data: { terms_version: TERMS_VERSION, terms_accepted_at: new Date().toISOString() },
+      });
+      if (error) throw error;
+      setNeedsTerms(false);
+      window.dispatchEvent(new Event(TERMS_DONE_EVENT));
+      onClose();
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'Could not save your agreement. Try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Declining leaves the account unused: signed out, and asked again on the
+  // next sign-in.
+  const handleDeclineTerms = async () => {
+    setIsLoading(true);
+    await supabase.auth.signOut();
+    setIsLoading(false);
+    setNeedsTerms(false);
+    toggleMode(true);
+    setErrorMsg('You need to agree to the terms to use OASYS. Sign in again when you are ready.');
   };
 
   const handleForgotPassword = async () => {
@@ -324,7 +368,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto"
-      onClick={onClose}
+      onClick={needsTerms ? undefined : onClose}
     >
       <div
         ref={dialogRef}
@@ -334,16 +378,18 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-4xl my-auto bg-panel-gradient rounded-oasys shadow-2xl border border-line overflow-hidden flex flex-col lg:flex-row"
       >
-        <button
-          onClick={onClose}
-          aria-label="Close"
-          className="absolute top-4 right-4 z-10 w-9 h-9 flex items-center justify-center rounded-full text-fg-muted hover:text-fg hover:bg-fg/10 transition-colors"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </button>
+        {!needsTerms && (
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute top-4 right-4 z-10 w-9 h-9 flex items-center justify-center rounded-full text-fg-muted hover:text-fg hover:bg-fg/10 transition-colors"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </button>
+        )}
 
         {/* Brand panel — desktop only; on mobile it would just push the form
             below the fold, which is the opposite of helpful. */}
@@ -362,7 +408,14 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
 
         {/* Form */}
         <div className="flex-1 p-7 sm:p-10">
-          {awaitingConfirmation ? (
+          {needsTerms ? (
+            <TermsGuidelines
+              onAccept={handleAcceptTerms}
+              onDecline={handleDeclineTerms}
+              busy={isLoading}
+              error={errorMsg}
+            />
+          ) : awaitingConfirmation ? (
             /* Sign-up succeeded but the account is inactive until the emailed
                code comes back. No session exists before then. */
             <form onSubmit={handleVerify} className="flex flex-col">

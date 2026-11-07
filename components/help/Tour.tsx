@@ -6,6 +6,7 @@ import { useAuth } from '@/components/shell/AuthProvider';
 import { SHELL_EVENTS } from '@/components/shell/nav';
 import { INTRO_DONE_EVENT, introPlaying } from './IntroSplash';
 import TourScene, { type TourSceneKey } from './TourScene';
+import { TERMS_DONE_EVENT, termsOpen } from '@/components/TermsGuidelines';
 
 export const TOUR_KEY = 'oasys.tourDone';
 // Admins get their own tour, remembered separately: an account that saw the
@@ -142,14 +143,19 @@ export default function Tour() {
     if (done) return;
 
     let timer = 0;
+    // A new account sees the terms first (LoginModal); start once they are agreed.
     const begin = () => {
-      timer = window.setTimeout(() => setStep((s) => s ?? 0), 900);
+      timer = window.setTimeout(() => {
+        if (termsOpen()) window.addEventListener(TERMS_DONE_EVENT, begin, { once: true });
+        else setStep((s) => s ?? 0);
+      }, 900);
     };
     if (introPlaying()) window.addEventListener(INTRO_DONE_EVENT, begin, { once: true });
     else begin();
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener(INTRO_DONE_EVENT, begin);
+      window.removeEventListener(TERMS_DONE_EVENT, begin);
     };
   }, [authUser, pathname, home, doneKey]);
 
