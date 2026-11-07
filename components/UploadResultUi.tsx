@@ -91,6 +91,9 @@ export default function UploadResultUi({
       try {
         const response = await fetch('/api/analyze', {
           method: 'POST',
+          // Never spin forever: the route gives up at 290 s, this is the backstop
+          // (e.g. a proxy that drops the connection without answering).
+          signal: AbortSignal.timeout(300_000),
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             image_base64: pending.image,
@@ -136,8 +139,11 @@ export default function UploadResultUi({
         );
         clearPendingScan();
       } catch (error) {
+        const timedOut = error instanceof Error && error.name === 'TimeoutError';
         setFetchError(
-          error instanceof Error ? error.message : 'Could not analyze this image.'
+          timedOut
+            ? 'The analysis took too long. Please try again in a minute.'
+            : error instanceof Error ? error.message : 'Could not analyze this image.'
         );
       }
     };

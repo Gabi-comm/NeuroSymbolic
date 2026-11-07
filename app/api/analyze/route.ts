@@ -13,6 +13,7 @@ const API_BASE_URL = (process.env.BACKEND_URL ?? process.env.API_BASE_URL ?? 'ht
 
 // SAM + YOLO on a CPU can take a while, especially on a cold start.
 export const maxDuration = 300;
+const BACKEND_TIMEOUT_MS = 290_000;
 
 export async function POST(request: Request) {
   try {
@@ -25,6 +26,8 @@ export async function POST(request: Request) {
         'X-API-Key': process.env.BACKEND_API_KEY ?? '',
       },
       body: JSON.stringify(body),
+      // Fail with a readable error instead of hanging if the backend stalls.
+      signal: AbortSignal.timeout(BACKEND_TIMEOUT_MS),
     });
 
     if (!pythonResponse.ok) {
@@ -48,6 +51,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json(await pythonResponse.json());
   } catch (error) {
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      console.error('Analyze route: backend did not answer in time');
+      return NextResponse.json(
+        { error: 'The analysis took too long. The server may be busy; please try again in a minute.' },
+        { status: 504 }
+      );
+    }
     console.error('Analyze route error:', error);
     return NextResponse.json(
       {

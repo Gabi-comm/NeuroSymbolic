@@ -4,6 +4,8 @@ import numpy as np
 import base64
 import json
 import os
+import threading
+import time
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, File, UploadFile, Header
@@ -128,6 +130,14 @@ sam = sam_model_registry["vit_b"](checkpoint=str(SAM_CHECKPOINT))
 predictor = SamPredictor(sam)
 
 print(f"Models loaded. Bulletin model: {llm.describe()}. Server is ready.")
+
+# One inference at a time. The handlers below are plain `def`, so FastAPI runs
+# them in its threadpool and the event loop stays free (a slow scan no longer
+# stalls every other request). The models are shared objects, though, and
+# SamPredictor in particular keeps the last set_image() as state, so two scans
+# running at once would measure each other's image. This lock serialises the
+# model work only; the bulletin call runs outside it.
+MODEL_LOCK = threading.Lock()
 
 # ==========================================
 # 2. DATA MODELS & UTILS
@@ -750,7 +760,7 @@ def _reject(error, message, **extra):
 
 
 @app.post("/check-distress")
-async def check_distress(request: ImageRequest, x_api_key: str | None = Header(default=None)):
+def check_distress(request: ImageRequest, x_api_key: str | None = Header(default=None)):
     """Is this photo road distress? Used by Captured Distress before saving.
 
     Runs only the two checks that answer the question, without SAM, the fuzzy
@@ -767,7 +777,8 @@ async def check_distress(request: ImageRequest, x_api_key: str | None = Header(d
         if img is None:
             return JSONResponse(status_code=400, content={"ok": False, "message": "Invalid Image Data"})
 
-        road_results = road_model.predict(img, conf=0.25, verbose=False)
+        with MODEL_LOCK:
+            road_results = road_model.predict(img, conf=0.25, verbose=False)
         frame_px = img.shape[0] * img.shape[1]
         road_mask = road_mask_full(road_results, img.shape)
         road_px = 0 if road_mask is None else int(cv2.countNonZero(road_mask))
@@ -784,7 +795,8 @@ async def check_distress(request: ImageRequest, x_api_key: str | None = Header(d
             )
 
         bev_img, ipm_applied = get_birds_eye_view(img, road_results)
-        crack_results = crack_model.predict(bev_img, conf=CAPTURE_MIN_DEFECT_CONF, verbose=False)
+        with MODEL_LOCK:
+            crack_results = crack_model.predict(bev_img, conf=CAPTURE_MIN_DEFECT_CONF, verbose=False)
 
         defects = []
         result = crack_results[0] if crack_results else None
@@ -827,9 +839,21 @@ async def check_distress(request: ImageRequest, x_api_key: str | None = Header(d
 
 
 @app.post("/analyze-road")
-async def analyze_road(request: ImageRequest, x_api_key: str | None = Header(default=None)):
+def analyze_road(request: ImageRequest, x_api_key: str | None = Header(default=None)):
     if BACKEND_API_KEY and x_api_key != BACKEND_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
+    t_start = time.perf_counter()
+    t_last = [t_start]
+
+    def lap(step):
+        # Per-step timings in the journal, so a slow scan shows where it went.
+        now = time.perf_counter()
+        print(f"[timing] {step}: {now - t_last[0]:.2f}s (total {now - t_start:.2f}s)")
+        t_last[0] = now
+
+    MODEL_LOCK.acquire()
+    lock_held = True
+    lap("waited for model lock")
     try:
         print("--- Request received ---")
 
@@ -840,9 +864,11 @@ async def analyze_road(request: ImageRequest, x_api_key: str | None = Header(def
 
         # 2. Privacy pass before anything is detected, measured or returned.
         img = apply_privacy_blur(img)
+        lap("decode + privacy blur")
 
         # 3. Road detection, and the gate that depends on it
-        road_results = road_model.predict(img, conf=0.25)
+        road_results = road_model.predict(img, conf=0.25, verbose=False)
+        lap("road model")
 
         frame_px = img.shape[0] * img.shape[1]
         road_px = road_mask_area_px(road_results, img.shape)
@@ -888,6 +914,7 @@ async def analyze_road(request: ImageRequest, x_api_key: str | None = Header(def
         # 5. Crack detection on the BEV
         print("Running crack detection...")
         crack_results = detect_crack(crack_model, bev_img)
+        lap("perspective + crack model")
 
         # 6. Scale. A reference card in the warped view is a measurement; the
         # default is the capture rule's one-lane assumption.
@@ -906,6 +933,7 @@ async def analyze_road(request: ImageRequest, x_api_key: str | None = Header(def
         traced_data, debug_img, skel, density_pct, consensus_mask = trace_cracks(
             bev_img, crack_results, predictor, gsd, road_area_px, pavement
         )
+        lap("SAM tracing + grading")
 
         # 6b. Stage frames. Every one of these is a step that already ran; this
         # only draws what it produced. Built defensively -- a visualisation
@@ -985,9 +1013,16 @@ async def analyze_road(request: ImageRequest, x_api_key: str | None = Header(def
         _, buffer = cv2.imencode(".jpg", debug_img)
         image_url = "data:image/jpeg;base64," + base64.b64encode(buffer).decode("utf-8")
 
+        lap("stage frames + encode")
+
+        # Model work is done; let the next scan start while the bulletin is written.
+        MODEL_LOCK.release()
+        lock_held = False
+
         # 9. Maintenance bulletin from the local model
-        print("Generating bulletin locally...")
+        print("Generating bulletin...")
         bulletin = generate_maintenance_bulletin(traced_data, density_pct, ipm_applied, pavement)
+        lap("bulletin")
 
         return {
             "fileUrl": image_url,
@@ -1010,3 +1045,7 @@ async def analyze_road(request: ImageRequest, x_api_key: str | None = Header(def
     except Exception as e:
         print(f"CRITICAL ERROR: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
+    finally:
+        # Early returns (bad image, no road) and errors leave it held.
+        if lock_held:
+            MODEL_LOCK.release()
