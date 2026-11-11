@@ -43,7 +43,8 @@ export default function PushToggle() {
   };
 
   return (
-    <section className="page-enter rounded-2xl bg-surface border border-line p-4 sm:p-5">
+    // mb-4: the console's blocks space themselves (16px, as the rows below use mt-4).
+    <section className="page-enter mb-4 rounded-2xl bg-surface border border-line p-4 sm:p-5">
       <div className="flex items-center gap-4">
         <span aria-hidden="true" className={`shrink-0 ${on ? 'text-oasys-blue' : 'text-fg-faint'}`}>
           <IconBell className="w-6 h-6" />
