@@ -788,6 +788,136 @@ begin
 end $$;
 
 
+-- ============================================================================
+-- K. Phone alerts for new reports (2026-11-11)
+--    NOT YET APPLIED, run in Supabase. Needs section J first (is_admin with owner).
+--
+-- An admin turns on "New report alerts" on the console; the phone's Web Push
+-- subscription is stored here. On every new "FileUpload" row, a trigger posts
+-- the report and the admins' subscriptions to the website
+-- (/api/push/new-report) through pg_net, with a shared secret. The website
+-- signs and sends the push. It never needs a Supabase service key.
+--
+-- The table has RLS on and no policies: it is reachable only through the two
+-- SECURITY DEFINER functions below, so nobody can list the subscriptions.
+-- Re-runnable.
+-- ============================================================================
+
+create extension if not exists pg_net with schema extensions;
+
+-- 1. Subscriptions, one per phone/browser (the endpoint is unique to it).
+create table if not exists public.push_subscriptions (
+  endpoint    text primary key,
+  user_uuid   uuid not null references auth.users (id) on delete cascade,
+  p256dh      text not null,
+  auth        text not null,
+  user_agent  text,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+alter table public.push_subscriptions enable row level security;
+revoke all on public.push_subscriptions from anon, authenticated;
+
+-- 2. Save this phone's subscription for the signed-in admin. A phone that
+--    changes hands (another account signs in) moves to the new account.
+create or replace function public.save_push_subscription(
+  p_endpoint text, p_p256dh text, p_auth text, p_user_agent text default null
+) returns void
+  language plpgsql security definer set search_path = public
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Only admins can turn on report alerts.' using errcode = 'insufficient_privilege';
+  end if;
+  if p_endpoint !~ '^https://' or length(p_endpoint) > 1000 then
+    raise exception 'Not a push endpoint.' using errcode = 'check_violation';
+  end if;
+  insert into public.push_subscriptions (endpoint, user_uuid, p256dh, auth, user_agent)
+  values (p_endpoint, auth.uid(), p_p256dh, p_auth, left(p_user_agent, 300))
+  on conflict (endpoint) do update
+    set user_uuid = excluded.user_uuid, p256dh = excluded.p256dh, auth = excluded.auth,
+        user_agent = excluded.user_agent, updated_at = now();
+end $$;
+
+-- 3. Remove a phone's subscription (turning alerts off, or signing out).
+--    Knowing the endpoint means holding that phone's subscription.
+create or replace function public.delete_push_subscription(p_endpoint text) returns void
+  language sql security definer set search_path = public
+as $$ delete from public.push_subscriptions where endpoint = p_endpoint; $$;
+
+revoke all on function public.save_push_subscription(text, text, text, text) from public, anon;
+revoke all on function public.delete_push_subscription(text) from public, anon;
+grant execute on function public.save_push_subscription(text, text, text, text) to authenticated;
+grant execute on function public.delete_push_subscription(text) to authenticated;
+
+-- 4. Where to post, and the secret. Kept in a schema the Data API does not
+--    expose. Fill it in with step 6.
+create schema if not exists private;
+revoke all on schema private from public, anon, authenticated;
+create table if not exists private.push_config (
+  id            boolean primary key default true check (id),
+  endpoint_url  text not null,  -- https://<your site>/api/push/new-report
+  secret        text not null   -- the same value as PUSH_WEBHOOK_SECRET on the server
+);
+
+-- 5. The trigger. Only current admins/owners get it, not the admin who filed
+--    the report. Any failure is a warning: a report must never fail to save
+--    because an alert could not be sent. pg_net sends after the commit.
+create or replace function public.notify_new_report() returns trigger
+  language plpgsql security definer set search_path = public, extensions
+as $$
+declare
+  cfg  private.push_config;
+  subs jsonb;
+begin
+  select * into cfg from private.push_config where id;
+  if not found then return new; end if;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'endpoint', s.endpoint,
+           'keys', jsonb_build_object('p256dh', s.p256dh, 'auth', s.auth))), '[]'::jsonb)
+    into subs
+  from public.push_subscriptions s
+  join "UserDetail" u on u.userloginuuid = s.user_uuid
+  where u.role in ('admin', 'owner')
+    and s.user_uuid is distinct from new.userid;
+
+  if jsonb_array_length(subs) = 0 then return new; end if;
+
+  perform net.http_post(
+    url     := cfg.endpoint_url,
+    body    := jsonb_build_object(
+                 'report', jsonb_build_object(
+                   'id', new.id, 'damage_type', new.damage_type, 'severity', new.severity,
+                   'barangay', new.barangay, 'road_name', new.road_name, 'address', new.address),
+                 'subscriptions', subs),
+    headers := jsonb_build_object('Content-Type', 'application/json',
+                                  'Authorization', 'Bearer ' || cfg.secret),
+    timeout_milliseconds := 10000);
+  return new;
+exception when others then
+  raise warning 'notify_new_report: %', sqlerrm;
+  return new;
+end $$;
+
+revoke all on function public.notify_new_report() from public, anon, authenticated;
+
+drop trigger if exists fileupload_push_notify on "FileUpload";
+create trigger fileupload_push_notify after insert on "FileUpload"
+  for each row execute function public.notify_new_report();
+
+-- 6. Your site and secret. Replace both values, then run this block.
+--    The URL must be the public HTTPS address of the site (not localhost):
+--    Supabase calls it from the internet.
+--
+-- insert into private.push_config (endpoint_url, secret)
+-- values ('https://YOUR-DOMAIN/api/push/new-report', 'PASTE_PUSH_WEBHOOK_SECRET')
+-- on conflict (id) do update
+--   set endpoint_url = excluded.endpoint_url, secret = excluded.secret;
+--
+-- Check deliveries: select status_code, content, created
+--                   from net._http_response order by created desc limit 10;
+
 -- ---------------------------------------------------------------------------
 -- Promoting the first administrator
 --

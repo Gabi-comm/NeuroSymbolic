@@ -18,6 +18,44 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// New-report alerts for admins (app/api/push/new-report). The payload is
+// { title, body, url, tag }; tapping the notification opens `url`, reusing an
+// OASYS tab when one is already open.
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : '' };
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'OASYS', {
+      body: data.body || 'A new report was submitted.',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      tag: data.tag,
+      renotify: !!data.tag,
+      data: { url: data.url || '/admin/reports' },
+    }),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || '/admin/reports', self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((tabs) => {
+      const tab = tabs.find((t) => new URL(t.url).origin === self.location.origin);
+      if (!tab) return self.clients.openWindow(url);
+      // navigate() rejects on a tab this worker does not control; open a new one then.
+      return tab
+        .focus()
+        .then((t) => (t || tab).navigate(url))
+        .catch(() => self.clients.openWindow(url));
+    }),
+  );
+});
+
 self.addEventListener('fetch', (event) => {
   const { pathname } = new URL(event.request.url);
   // The offline page's own icon, so it still shows with no connection.

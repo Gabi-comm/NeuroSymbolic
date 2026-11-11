@@ -8,6 +8,7 @@ import { ago, dailySeries, isResolved, severityOf, waitingAge } from '@/utils/ad
 import { ProgressList } from '@/components/Charts';
 import { AdminHeader, ErrorNote, PAGE, Panel, StatTile } from '@/components/admin/ui';
 import { QueueBar, QueueDial } from '@/components/admin/QueueHero';
+import PushToggle from '@/components/admin/PushToggle';
 import { IconArrow, IconList, IconUsers } from '@/components/shell/icons';
 
 /**
@@ -109,6 +110,9 @@ export default function AdminHome() {
       </AdminHeader>
 
       {loadError && <ErrorNote title="Could not load the overview" message={loadError} />}
+
+      {/* Phone alerts for new reports; per device. */}
+      <PushToggle />
 
       {/* The queue at a glance: how much is done, how much is left. */}
       <section

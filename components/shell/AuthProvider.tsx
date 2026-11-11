@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { useRouter } from 'next/navigation';
 import LoginModal from '@/components/LoginModal';
 import { supabase } from '@/utils/supabase';
+import { disablePush } from '@/utils/push';
 
 interface DbProfile {
   username: string | null;
@@ -118,6 +119,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   }, [router, fetchUserProfile]);
 
   const logout = useCallback(async () => {
+    // A signed-out phone should stop getting admin alerts. Needs the session,
+    // so before signOut; never blocks signing out.
+    await disablePush().catch(() => {});
     await supabase.auth.signOut();
     setAuthUser(null);
     setProfile(null);
