@@ -1,0 +1,387 @@
+[
+  {
+    "image": "12_jpg.rf.bca9bda57ef28e22b92909b4238042c8.jpg",
+    "status": 200,
+    "seconds": 16.282,
+    "bulletin": "Road Segment Health Summary:\nThe road segment, as measured, exhibits a crack density of 2.25 percent, indicating moderate to severe distress. There are three detections of alligator cracking, with a medium severity, and two instances of longitudinal distress, also with a medium severity.\n\nRecommended Interventions:\n  Pavement: concrete\n  Transverse Distress - severity Medium (3 detected)\n    Act. 122 Crack and Joints Sealing of Concrete Pavements: Rout and seal the crack. If the edges are spalled, partial-depth patch (Act. 121).\n    Response: 3 working days\n  Alligator Distress - severity Medium (3 detected)\n    Act. 121 Patching on Concrete Pavements: Partial or full-depth patch of the broken area.\n    Response: 3 working days\n  Longitudinal Distress - severity Medium (2 detected)\n    Act. 122 Crack and Joints Sealing of Concrete Pavements: Rout and seal the crack. If the edges are spalled, partial-depth patch (Act. 121).\n    Response: 3 working days\n\nPriority Level:\n  Moderate - driven by Medium severity Transverse Distress, Alligator Distress, Longitudinal Distress at 2.25 percent crack density.",
+    "distresses": [
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Longitudinal Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Longitudinal Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      }
+    ],
+    "overall_severity": "Medium",
+    "crack_density_pct": 2.25,
+    "message": null
+  },
+  {
+    "image": "138_jpg.rf.c75f59d54f29b51e8384e68b10c9124f.jpg",
+    "status": 200,
+    "seconds": 9.846,
+    "bulletin": "Road Segment Health Summary:\nThe road surface of this segment exhibits a crack density of 1.88 percent, indicating moderate to severe distress. Two instances of alligator cracking and two detections of longitudinal distress, both of medium severity, are noted.\n\nRecommended Interventions:\n  Pavement: concrete\n  Transverse Distress - severity High (2 detected)\n    Blue Book Item 311, Portland Cement Concrete Pavement (slab reblocking): Not serviceable: full slab reblocking.\n    Response: 3 working days to make safe; repair as programmed\n  Alligator Distress - severity Medium (2 detected)\n    Act. 121 Patching on Concrete Pavements: Partial or full-depth patch of the broken area.\n    Response: 3 working days\n  Longitudinal Distress - severity Medium (2 detected)\n    Act. 122 Crack and Joints Sealing of Concrete Pavements: Rout and seal the crack. If the edges are spalled, partial-depth patch (Act. 121).\n    Response: 3 working days\n\nPriority Level:\n  High - driven by High severity Transverse Distress at 1.88 percent crack density.",
+    "distresses": [
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "High",
+        "severity": "High"
+      },
+      {
+        "label": "Longitudinal Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Longitudinal Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      }
+    ],
+    "overall_severity": "High",
+    "crack_density_pct": 1.88,
+    "message": null
+  },
+  {
+    "image": "14_jpg.rf.d9adeff6afd88428db51f940045b54d1.jpg",
+    "status": 200,
+    "seconds": 9.955,
+    "bulletin": "Road Segment Health Summary:\nThe road segment, as measured, has a crack density of 2.93 percent, indicating moderate distress. Additionally, there is one detection of alligator distress, which is considered medium, and one detection of potholes, also rated as medium. There are three detections of transverse distress and one detection of longitudinal distress, all rated as medium.\n\nRecommended Interventions:\n  Pavement: concrete\n  Alligator Distress - severity Medium (1 detected)\n    Act. 121 Patching on Concrete Pavements: Partial or full-depth patch of the broken area.\n    Response: 3 working days\n  Pothole - severity Medium (1 detected)\n    Act. 121 Patching on Concrete Pavements: Patching on concrete pavement.\n    Response: 3 working days\n  Transverse Distress - severity Medium (3 detected)\n    Act. 122 Crack and Joints Sealing of Concrete Pavements: Rout and seal the crack. If the edges are spalled, partial-depth patch (Act. 121).\n    Response: 3 working days\n  Longitudinal Distress - severity Medium (1 detected)\n    Act. 122 Crack and Joints Sealing of Concrete Pavements: Rout and seal the crack. If the edges are spalled, partial-depth patch (Act. 121).\n    Response: 3 working days\n\nPriority Level:\n  Moderate - driven by Medium severity Alligator Distress, Pothole, Transverse Distress, Longitudinal Distress at 2.93 percent crack density.",
+    "distresses": [
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Pothole",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Longitudinal Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      }
+    ],
+    "overall_severity": "Medium",
+    "crack_density_pct": 2.93,
+    "message": null
+  },
+  {
+    "image": "152_jpg.rf.b74f987886230f4f1495c7c37aafa7ee.jpg",
+    "status": 200,
+    "seconds": 10.257,
+    "bulletin": "Road Segment Health Summary:\nThe road surface of this segment exhibits a crack density of 3.84 percent, indicating a moderate level of distress. Additionally, one instance of alligator distress has been detected, which is considered medium in severity.\n\nRecommended Interventions:\n  Pavement: concrete\n  Alligator Distress - severity Medium (1 detected)\n    Act. 121 Patching on Concrete Pavements: Partial or full-depth patch of the broken area.\n    Response: 3 working days\n\nPriority Level:\n  Moderate - driven by Medium severity Alligator Distress at 3.84 percent crack density.",
+    "distresses": [
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      }
+    ],
+    "overall_severity": "Medium",
+    "crack_density_pct": 3.84,
+    "message": null
+  },
+  {
+    "image": "154_jpg.rf.82fca4fa6ffa5054d9274c9fab0c8792.jpg",
+    "status": 200,
+    "seconds": 10.185,
+    "bulletin": "Road Segment Health Summary:\nThe road segment under review exhibits a moderate level of alligator distress, with one detection noted, indicating that the surface is showing signs of cracking. Additionally, there is a single detection of longitudinal distress, which is also rated as medium severity, suggesting that the road surface is experiencing slight imperfections in its alignment. The crack density, at 0.33 percent, is within the acceptable range for\n\nRecommended Interventions:\n  Pavement: concrete\n  Alligator Distress - severity Medium (1 detected)\n    Act. 121 Patching on Concrete Pavements: Partial or full-depth patch of the broken area.\n    Response: 3 working days\n  Longitudinal Distress - severity Medium (1 detected)\n    Act. 122 Crack and Joints Sealing of Concrete Pavements: Rout and seal the crack. If the edges are spalled, partial-depth patch (Act. 121).\n    Response: 3 working days\n  Transverse Distress - severity Medium (1 detected)\n    Act. 122 Crack and Joints Sealing of Concrete Pavements: Rout and seal the crack. If the edges are spalled, partial-depth patch (Act. 121).\n    Response: 3 working days\n\nPriority Level:\n  Moderate - driven by Medium severity Alligator Distress, Longitudinal Distress, Transverse Distress at 0.33 percent crack density.",
+    "distresses": [
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Longitudinal Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      }
+    ],
+    "overall_severity": "Medium",
+    "crack_density_pct": 0.33,
+    "message": null
+  },
+  {
+    "image": "154_jpg.rf.c6ad4bbbd71f14bd14b86b30d126f9fe.jpg",
+    "status": 200,
+    "seconds": 9.63,
+    "bulletin": "Road Segment Health Summary:\nThe road surface in this segment exhibits a crack density of 4.43 percent, indicating moderate distress. There are two instances of alligator distress, with a medium severity, and one pothole, also with a medium severity.\n\nRecommended Interventions:\n  Pavement: concrete\n  Alligator Distress - severity Medium (2 detected)\n    Act. 121 Patching on Concrete Pavements: Partial or full-depth patch of the broken area.\n    Response: 3 working days\n  Pothole - severity Medium (1 detected)\n    Act. 121 Patching on Concrete Pavements: Patching on concrete pavement.\n    Response: 3 working days\n\nPriority Level:\n  Moderate - driven by Medium severity Alligator Distress, Pothole at 4.43 percent crack density.",
+    "distresses": [
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Pothole",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      }
+    ],
+    "overall_severity": "Medium",
+    "crack_density_pct": 4.43,
+    "message": null
+  },
+  {
+    "image": "169_jpg.rf.b612a6b1bdb7d28baccee135eb20597b.jpg",
+    "status": 200,
+    "seconds": 9.988,
+    "bulletin": "Road Segment Health Summary:\nThe road surface of this segment exhibits a crack density of 3.49 percent, indicating moderate distress. There are three detections of transverse distress, with the highest severity, and two detections of alligator distress, with the medium severity. There is one detection of longitudinal distress, also with the medium severity.\n\nRecommended Interventions:\n  Pavement: concrete\n  Transverse Distress - severity High (3 detected)\n    Blue Book Item 311, Portland Cement Concrete Pavement (slab reblocking): Not serviceable: full slab reblocking.\n    Response: 3 working days to make safe; repair as programmed\n  Alligator Distress - severity Medium (2 detected)\n    Act. 121 Patching on Concrete Pavements: Partial or full-depth patch of the broken area.\n    Response: 3 working days\n  Longitudinal Distress - severity Medium (1 detected)\n    Act. 122 Crack and Joints Sealing of Concrete Pavements: Rout and seal the crack. If the edges are spalled, partial-depth patch (Act. 121).\n    Response: 3 working days\n\nPriority Level:\n  High - driven by High severity Transverse Distress at 3.49 percent crack density.",
+    "distresses": [
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Longitudinal Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "High",
+        "severity": "High"
+      },
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      }
+    ],
+    "overall_severity": "High",
+    "crack_density_pct": 3.49,
+    "message": null
+  },
+  {
+    "image": "173_jpg.rf.424de0665cb88a0798ff221a98024bc8.jpg",
+    "status": 200,
+    "seconds": 10.487,
+    "bulletin": "Road Segment Health Summary:\nThe road surface exhibits a crack density of 2.41 percent, indicating moderate distress. There are two instances of alligator distress, with a medium severity, and four detections of longitudinal distress, also with a medium severity. Additionally, there is one detection of transverse distress, and one detection of potholes, both with a medium severity.\n\nRecommended Interventions:\n  Pavement: concrete\n  Alligator Distress - severity Medium (2 detected)\n    Act. 121 Patching on Concrete Pavements: Partial or full-depth patch of the broken area.\n    Response: 3 working days\n  Longitudinal Distress - severity Medium (4 detected)\n    Act. 122 Crack and Joints Sealing of Concrete Pavements: Rout and seal the crack. If the edges are spalled, partial-depth patch (Act. 121).\n    Response: 3 working days\n  Transverse Distress - severity Medium (1 detected)\n    Act. 122 Crack and Joints Sealing of Concrete Pavements: Rout and seal the crack. If the edges are spalled, partial-depth patch (Act. 121).\n    Response: 3 working days\n  Pothole - severity Medium (1 detected)\n    Act. 121 Patching on Concrete Pavements: Patching on concrete pavement.\n    Response: 3 working days\n\nPriority Level:\n  Moderate - driven by Medium severity Alligator Distress, Longitudinal Distress, Transverse Distress, Pothole at 2.41 percent crack density.",
+    "distresses": [
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Longitudinal Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Longitudinal Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Longitudinal Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Longitudinal Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Pothole",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      }
+    ],
+    "overall_severity": "Medium",
+    "crack_density_pct": 2.41,
+    "message": null
+  },
+  {
+    "image": "21_jpg.rf.9e87452263cbca17e57941e8c578974c.jpg",
+    "status": 200,
+    "seconds": 10.466,
+    "bulletin": "Road Segment Health Summary:\nThe road segment, as measured, has a crack density of 1.08 percent, indicating moderate distress. There is one detection of alligator distress, which is of medium severity, and one detection of potholes, also of medium severity. Additionally, there are two detections of transverse distress, and one detection of longitudinal distress, all of which are of medium severity.\n\nRecommended Interventions:\n  Pavement: concrete\n  Alligator Distress - severity Medium (1 detected)\n    Act. 121 Patching on Concrete Pavements: Partial or full-depth patch of the broken area.\n    Response: 3 working days\n  Pothole - severity Medium (1 detected)\n    Act. 121 Patching on Concrete Pavements: Patching on concrete pavement.\n    Response: 3 working days\n  Transverse Distress - severity Medium (1 detected)\n    Act. 122 Crack and Joints Sealing of Concrete Pavements: Rout and seal the crack. If the edges are spalled, partial-depth patch (Act. 121).\n    Response: 3 working days\n  Longitudinal Distress - severity Medium (2 detected)\n    Act. 122 Crack and Joints Sealing of Concrete Pavements: Rout and seal the crack. If the edges are spalled, partial-depth patch (Act. 121).\n    Response: 3 working days\n\nPriority Level:\n  Moderate - driven by Medium severity Alligator Distress, Pothole, Transverse Distress, Longitudinal Distress at 1.08 percent crack density.",
+    "distresses": [
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Pothole",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Longitudinal Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Longitudinal Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      }
+    ],
+    "overall_severity": "Medium",
+    "crack_density_pct": 1.08,
+    "message": null
+  },
+  {
+    "image": "31_jpg.rf.d5d7098cdc0a708e6881f3f6901bd64c.jpg",
+    "status": 200,
+    "seconds": 11.15,
+    "bulletin": "Road Segment Health Summary:\nThe road surface of this segment exhibits a crack density of 2.25 percent, indicating moderate distress. There are three instances of alligator distress, with a medium severity, and one detection of a pothole, also with a medium severity. Additionally, there are three detections of transverse distress and two detections of longitudinal distress, all with a medium severity.\n\nRecommended Interventions:\n  Pavement: concrete\n  Alligator Distress - severity Medium (3 detected)\n    Act. 121 Patching on Concrete Pavements: Partial or full-depth patch of the broken area.\n    Response: 3 working days\n  Pothole - severity Medium (1 detected)\n    Act. 121 Patching on Concrete Pavements: Patching on concrete pavement.\n    Response: 3 working days\n  Transverse Distress - severity Medium (3 detected)\n    Act. 122 Crack and Joints Sealing of Concrete Pavements: Rout and seal the crack. If the edges are spalled, partial-depth patch (Act. 121).\n    Response: 3 working days\n  Longitudinal Distress - severity Medium (2 detected)\n    Act. 122 Crack and Joints Sealing of Concrete Pavements: Rout and seal the crack. If the edges are spalled, partial-depth patch (Act. 121).\n    Response: 3 working days\n\nPriority Level:\n  Moderate - driven by Medium severity Alligator Distress, Pothole, Transverse Distress, Longitudinal Distress at 2.25 percent crack density.",
+    "distresses": [
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Pothole",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Transverse Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Alligator Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Longitudinal Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      },
+      {
+        "label": "Longitudinal Distress",
+        "severity_fuzzy": "Medium",
+        "severity": "Medium"
+      }
+    ],
+    "overall_severity": "Medium",
+    "crack_density_pct": 2.25,
+    "message": null
+  }
+]
