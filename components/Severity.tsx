@@ -76,6 +76,10 @@ export function toSeverity(value: unknown): Severity | null {
   return null;
 }
 
+/** Other Distress is filed "Unrated": the rule base does not grade it. */
+export const isUnrated = (value: unknown) =>
+  typeof value === 'string' && value.trim().toLowerCase() === 'unrated';
+
 export const SEVERITY_RANK: Record<Severity, number> = { Low: 0, Medium: 1, High: 2 };
 
 interface BadgeProps {
@@ -93,6 +97,18 @@ interface BadgeProps {
 export function SeverityBadge({ severity, size = 'sm', className = '' }: BadgeProps) {
   const key = toSeverity(severity);
   const textSize = size === 'sm' ? 'text-[11px]' : 'text-xs';
+
+  if (!key && isUnrated(severity)) {
+    // Other Distress: not graded by the system, waiting for an admin. A dashed
+    // ring, so it never reads as a severity colour.
+    return (
+      <span className={`inline-flex items-center gap-1.5 font-semibold uppercase tracking-wide text-fg-muted ${textSize} ${className}`}>
+        <span aria-hidden="true" className="w-3 h-3 rounded-full border-[1.5px] border-dashed border-current shrink-0" />
+        Unrated
+        <span className="sr-only">. Not graded by the system; an admin will inspect and rate it.</span>
+      </span>
+    );
+  }
 
   if (!key) {
     return (

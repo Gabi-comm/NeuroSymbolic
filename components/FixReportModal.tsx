@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/utils/supabase';
 import { SeverityBadge, type Severity } from './Severity';
+import { OTHER_DISTRESS } from '@/utils/otherDistress';
 import type { Position } from '@/app/report-damage/Map';
 
 const MapComponent = dynamic(() => import('@/app/report-damage/Map'), {
@@ -41,6 +42,9 @@ export interface FixableReport {
   corrected_damage_type: string | null;
   corrected_severity: string | null;
   correction_note: string | null;
+  /** Other Distress only: what the reporter says it is (migration section L). */
+  other_subtype?: string | null;
+  other_note?: string | null;
   address: string | null;
   lat: number | null;
   lng: number | null;
@@ -51,6 +55,8 @@ const DAMAGE_TYPES = [
   'Longitudinal Distress',
   'Transverse Distress',
   'Pothole',
+  // Not a trained class: damage the detector cannot name, rated on inspection.
+  OTHER_DISTRESS,
 ];
 
 /** Reports saved before dataset v3 say "... Crack"; same class, older name. */
@@ -268,6 +274,12 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
                   System said: <span className="text-fg-soft">{report.damage_type}</span>
                 </p>
               )}
+              {report.other_subtype && (
+                <p className="text-xs text-fg-muted mt-1.5 break-words">
+                  Reporter says: <span className="text-fg-soft font-semibold">{report.other_subtype}</span>
+                  {report.other_note && <> · “{report.other_note}”</>}
+                </p>
+              )}
             </div>
 
             <div>
@@ -280,6 +292,11 @@ export default function FixReportModal({ report, onClose, onSaved }: Props) {
                 onChange={(e) => setSeverity(e.target.value)}
                 className={field}
               >
+                {/* An Other Distress report arrives Unrated; it stays listed
+                    until the admin picks a grade after inspection. */}
+                {!(SEVERITIES as string[]).includes(severity) && (
+                  <option value={severity}>{severity || 'Not graded'}</option>
+                )}
                 {SEVERITIES.map((level) => (
                   <option key={level} value={level}>
                     {level}

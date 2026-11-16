@@ -918,6 +918,47 @@ create trigger fileupload_push_notify after insert on "FileUpload"
 -- Check deliveries: select status_code, content, created
 --                   from net._http_response order by created desc limit 10;
 
+
+-- ============================================================================
+-- L. Other Distress (2026-11-16)
+--    NOT YET APPLIED, run in Supabase BEFORE deploying the matching site build
+--    (the site writes and reads these columns).
+--
+-- The detector knows four classes (Alligator, Longitudinal, Transverse,
+-- Pothole). Damage outside them (rutting, raveling, a depression, a failed
+-- patch...) is filed by the REPORTER as damage_type = 'Other Distress'. The
+-- rule base cannot grade it, so its severity is 'Unrated' until an admin
+-- inspects it and records corrected_severity (the original stays, as with
+-- every other correction). Re-runnable.
+-- ============================================================================
+
+alter table "FileUpload" add column if not exists other_subtype text;
+alter table "FileUpload" add column if not exists other_note    text;
+
+-- The reporter's best description of what it is. Each confirmed one is a
+-- labelled example toward a future trained class (dataset v4).
+alter table "FileUpload" drop constraint if exists fileupload_other_subtype_check;
+alter table "FileUpload" add constraint fileupload_other_subtype_check
+  check (other_subtype is null or other_subtype in (
+    'Rutting', 'Raveling', 'Depression', 'Bleeding', 'Edge break', 'Patch failure', 'Something else'));
+
+alter table "FileUpload" drop constraint if exists fileupload_other_note_check;
+alter table "FileUpload" add constraint fileupload_other_note_check
+  check (other_note is null or char_length(other_note) <= 300);
+
+-- An Other Distress report is always filed Unrated and with a subtype, and
+-- only Other Distress carries a subtype: a reporter cannot use the field to
+-- grade their own report.
+alter table "FileUpload" drop constraint if exists fileupload_other_shape_check;
+alter table "FileUpload" add constraint fileupload_other_shape_check
+  check (
+    case when damage_type = 'Other Distress'
+         then severity = 'Unrated' and other_subtype is not null
+         else other_subtype is null and other_note is null
+    end);
+
+notify pgrst, 'reload schema';
+
 -- ---------------------------------------------------------------------------
 -- Promoting the first administrator
 --

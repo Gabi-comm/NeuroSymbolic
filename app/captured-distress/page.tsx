@@ -21,6 +21,7 @@ import { downscaleToDataUrl } from '@/utils/pendingScan';
 import LoginModal from '@/components/LoginModal';
 import Coordinates from '@/components/Coordinates';
 import Pagination, { lastPage } from '@/components/Pagination';
+import { NO_DISTRESS_DETECTED } from '@/utils/otherDistress';
 import type { Position } from '../report-damage/Map';
 
 const MapComponent = dynamic(() => import('../report-damage/Map'), {
@@ -47,11 +48,14 @@ const EMPTY: Section = { rows: [], total: 0 };
 /**
  * Whether the draft photo shows road distress. A capture can only be saved once
  * this is 'ok': the backend found road surface and at least one defect on it
- * (/api/check-distress). Anything else blocks the Save button.
+ * (/api/check-distress). 'other' is a road with none of the four known types
+ * on it: it can be kept only when the reporter confirms the road is damaged,
+ * and is filed as Other Distress later. Anything else blocks the Save button.
  */
 type PhotoCheck =
   | { status: 'checking' }
   | { status: 'ok'; defects: { label: string; confidence: number }[] }
+  | { status: 'other'; message: string }
   | { status: 'rejected'; message: string }
   | { status: 'error'; message: string };
 
@@ -65,6 +69,9 @@ async function checkDistressPhoto(file: File): Promise<PhotoCheck> {
     });
     const body = await res.json().catch(() => ({}));
     if (res.ok && body.ok) return { status: 'ok', defects: body.defects ?? [] };
+    if (res.status === 422 && body.error === NO_DISTRESS_DETECTED) {
+      return { status: 'other', message: body.message ?? 'No known distress type was found.' };
+    }
     if (res.status === 422) {
       return { status: 'rejected', message: body.message ?? 'This photo does not show road distress.' };
     }
@@ -103,6 +110,8 @@ export default function CapturedDistressPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [photoCheck, setPhotoCheck] = useState<PhotoCheck | null>(null);
+  // The reporter's "the road IS damaged, just not one of the four types".
+  const [keepAsOther, setKeepAsOther] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   // The draft the running check belongs to; a newer photo makes an older
@@ -200,6 +209,7 @@ export default function CapturedDistressPage() {
 
   const runCheck = (file: File) => {
     checkFor.current = file;
+    setKeepAsOther(false);
     setPhotoCheck({ status: 'checking' });
     checkDistressPhoto(file).then((result) => {
       if (checkFor.current === file) setPhotoCheck(result);
@@ -221,7 +231,7 @@ export default function CapturedDistressPage() {
     setFix({ lat: pos.lat, lng: pos.lng, accuracy_m: null, source: 'manual_pin' });
   }, []);
 
-  const canSave = photoCheck?.status === 'ok';
+  const canSave = photoCheck?.status === 'ok' || (photoCheck?.status === 'other' && keepAsOther);
 
   const save = async () => {
     if (!draft || !fix || !userId) return;
@@ -319,7 +329,12 @@ export default function CapturedDistressPage() {
                     <p className="text-xs text-fg-muted truncate" title={draft.file.name}>
                       {draft.file.name}
                     </p>
-                    <PhotoCheckNote check={photoCheck} onRetry={() => runCheck(draft.file)} />
+                    <PhotoCheckNote
+                      check={photoCheck}
+                      onRetry={() => runCheck(draft.file)}
+                      keepAsOther={keepAsOther}
+                      onKeepAsOther={setKeepAsOther}
+                    />
                   </div>
 
                   <div className="lg:col-span-3 flex flex-col gap-3">
@@ -381,7 +396,9 @@ export default function CapturedDistressPage() {
                           : photoCheck?.status === 'checking'
                             ? 'Checking photo…'
                             : !canSave
-                              ? 'Not road distress'
+                              ? photoCheck?.status === 'other'
+                                ? 'Confirm the damage first'
+                                : 'Not road distress'
                               : !fix
                                 ? 'Set the location first'
                                 : 'Save capture'}
@@ -431,8 +448,38 @@ export default function CapturedDistressPage() {
   );
 }
 
-function PhotoCheckNote({ check, onRetry }: { check: PhotoCheck | null; onRetry: () => void }) {
+function PhotoCheckNote({
+  check,
+  onRetry,
+  keepAsOther,
+  onKeepAsOther,
+}: {
+  check: PhotoCheck | null;
+  onRetry: () => void;
+  keepAsOther: boolean;
+  onKeepAsOther: (keep: boolean) => void;
+}) {
   if (!check) return null;
+  if (check.status === 'other') {
+    // The road gate passed; only the four trained types were missing.
+    return (
+      <div role="status" className="bg-amber-500/10 border border-amber-500/30 text-warn text-sm rounded-xl px-4 py-3 flex flex-col gap-2.5">
+        <p className="font-bold">Road found, but none of the four known distress types.</p>
+        <label className="flex items-start gap-2.5 cursor-pointer text-fg">
+          <input
+            type="checkbox"
+            checked={keepAsOther}
+            onChange={(e) => onKeepAsOther(e.target.checked)}
+            className="mt-0.5 w-4 h-4 accent-oasys-blue shrink-0"
+          />
+          <span>
+            The road is damaged another way. Keep it, and I will file it as{' '}
+            <strong>Other Distress</strong> when I report it.
+          </span>
+        </label>
+      </div>
+    );
+  }
   if (check.status === 'checking') {
     return (
       <p role="status" className="text-sm font-bold text-fg-muted animate-pulse">

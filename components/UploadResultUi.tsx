@@ -22,6 +22,14 @@ import { fromQuery, SOURCE_LABEL, type ReportContext } from '@/utils/reportLocat
 import { markCaptureReported } from '@/utils/captures';
 import { SEVERITY, SEVERITY_RANK, SeverityBadge, toSeverity } from './Severity';
 import DistressCarousel from './DistressCarousel';
+import {
+  OTHER_DISTRESS,
+  OTHER_NOTE_MAX,
+  OTHER_SUBTYPES,
+  OTHER_SUBTYPE_HINT,
+  UNRATED,
+  type OtherSubtype,
+} from '@/utils/otherDistress';
 
 interface UploadResultUiProps {
   backLinkHref: string;
@@ -51,6 +59,13 @@ export default function UploadResultUi({
   const [submitState, setSubmitState] = useState<'idle' | 'done' | 'error'>('idle');
   const hasStages = useHasPipelineStages();
   const [submitMessage, setSubmitMessage] = useState<string>('');
+
+  // "Not one of these four types?": the reporter files it as Other Distress,
+  // which the rule base does not grade (Unrated until an admin inspects it).
+  // null = not decided yet; it starts open when nothing was detected.
+  const [otherOpen, setOtherOpen] = useState<boolean | null>(null);
+  const [otherSubtype, setOtherSubtype] = useState<OtherSubtype | ''>('');
+  const [otherNote, setOtherNote] = useState('');
 
   useEffect(() => {
     const reportContext = fromQuery(new URLSearchParams(window.location.search));
@@ -176,6 +191,11 @@ export default function UploadResultUi({
     )[0];
   };
 
+  /** Nothing graded was found: only the API's "Clear" placeholder, or nothing. */
+  const nothingDetected = (d: AnalysisData) => !d.distresses.some((x) => x.label !== 'Clear');
+  /** Open by default when nothing was detected, until the reporter decides. */
+  const reportAsOther = (d: AnalysisData) => otherOpen ?? nothingDetected(d);
+
   /**
    * Discard this result and go back for a different image.
    *
@@ -214,14 +234,23 @@ export default function UploadResultUi({
       }
 
       const primary = primaryDistress(data.distresses);
+      const asOther = reportAsOther(data);
+      if (asOther && !otherSubtype) {
+        throw new Error('Pick what kind of damage it is, or "Something else".');
+      }
 
       // A network request with no upper bound can hang indefinitely; a report
       // that fails loudly is far better than a button that spins forever.
       const insertPromise = supabase.from('FileUpload').insert([
         {
           userid: userId,
-          damage_type: primary?.label ?? 'No damage detected',
-          severity: data.overall_severity,
+          // Other Distress is the reporter's call, so it is filed Unrated; the
+          // detector's own output (observation_details, severity_fuzzy...) is
+          // still kept below as evidence, exactly as the system produced it.
+          damage_type: asOther ? OTHER_DISTRESS : (primary?.label ?? 'No damage detected'),
+          severity: asOther ? UNRATED : data.overall_severity,
+          other_subtype: asOther ? otherSubtype : null,
+          other_note: asOther ? otherNote.trim().slice(0, OTHER_NOTE_MAX) || null : null,
           state: 'Needs Action',
           uploadtime: new Date().toISOString(),
           address: context.address,
@@ -243,7 +272,8 @@ export default function UploadResultUi({
           observation_details: data.distresses,
           gsd_mm_px: data.gsd_mm_px ?? null,
           scale_source: data.scale_source ?? 'assumed_height',
-          recommendation: primary?.recommendation ?? null,
+          // A repair chosen for a class the photo is not would mislead.
+          recommendation: asOther ? null : (primary?.recommendation ?? null),
           crack_density_pct: data.crack_density_pct ?? null,
           severity_fuzzy: primary?.severity_fuzzy ?? null,
           severity_crisp: primary?.severity_crisp ?? null,
@@ -346,6 +376,8 @@ export default function UploadResultUi({
   }
 
   const primary = primaryDistress(data.distresses);
+  const noneFound = nothingDetected(data);
+  const asOther = reportAsOther(data);
 
   // One repair per defect type at its worst grade, worst first -- the same
   // grouping the bulletin uses, so the two never disagree.
@@ -628,6 +660,76 @@ export default function UploadResultUi({
             </div>
           </section>
         ) : (
+          <>
+          <section className="bg-panel-gradient rounded-oasys border border-line shadow-2xl p-5 sm:p-7">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={asOther}
+                onChange={(e) => setOtherOpen(e.target.checked)}
+                className="mt-1 w-5 h-5 accent-oasys-blue shrink-0"
+              />
+              <span>
+                <span className="block font-semibold">
+                  {noneFound ? 'Report it as Other Distress' : 'Not one of these types?'}
+                </span>
+                <span className="block text-sm text-fg-muted">
+                  {noneFound
+                    ? 'No crack or pothole was found. If the road is damaged in another way, an admin will inspect and rate it.'
+                    : 'The system knows four types. File it as Other Distress and an admin will inspect and rate it.'}
+                </span>
+              </span>
+            </label>
+
+            {asOther && (
+              <div className="mt-5 flex flex-col gap-4">
+                <fieldset>
+                  <legend className="text-xs font-bold uppercase tracking-wide text-fg-muted mb-2">
+                    What kind of damage is it?
+                  </legend>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
+                    {OTHER_SUBTYPES.map((type) => (
+                      <label key={type} className="flex items-start gap-2.5 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="other-subtype"
+                          value={type}
+                          checked={otherSubtype === type}
+                          onChange={() => setOtherSubtype(type)}
+                          className="mt-1 w-4 h-4 accent-oasys-blue shrink-0"
+                        />
+                        <span className="text-sm">
+                          <span className="font-semibold text-fg">{type}</span>
+                          <span className="block text-fg-muted">{OTHER_SUBTYPE_HINT[type]}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <div>
+                  <label
+                    htmlFor="other-note"
+                    className="block text-xs font-bold uppercase tracking-wide text-fg-muted mb-2"
+                  >
+                    Note (optional)
+                  </label>
+                  <textarea
+                    id="other-note"
+                    rows={2}
+                    maxLength={OTHER_NOTE_MAX}
+                    value={otherNote}
+                    onChange={(e) => setOtherNote(e.target.value)}
+                    placeholder="e.g. the lane sinks near the drain"
+                    className="w-full rounded-xl bg-inset border border-line px-3 py-2 text-sm text-fg placeholder:text-fg-faint focus:outline-none focus:border-line-strong"
+                  />
+                  <p className="text-xs text-fg-faint text-right tabular-nums">
+                    {otherNote.length}/{OTHER_NOTE_MAX}
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
+
           <section className="bg-panel-gradient rounded-oasys border border-line shadow-2xl p-5 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="font-semibold mb-0.5">Submit this report</h2>
@@ -650,10 +752,10 @@ export default function UploadResultUi({
             ) : isSignedIn ? (
               <button
                 onClick={handleSubmitReport}
-                disabled={isSubmitting || !context}
+                disabled={isSubmitting || !context || (asOther && !otherSubtype)}
                 className="btn-blue px-10 py-3.5 w-full sm:w-auto"
               >
-                {isSubmitting ? 'Submitting…' : 'Submit report'}
+                {isSubmitting ? 'Submitting…' : asOther ? 'Submit as Other Distress' : 'Submit report'}
               </button>
             ) : (
               <button
@@ -664,6 +766,7 @@ export default function UploadResultUi({
               </button>
             )}
           </section>
+          </>
         )}
       </div>
     </div>

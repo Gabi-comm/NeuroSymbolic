@@ -201,5 +201,28 @@ class ReferenceScale(unittest.TestCase):
         self.assertIsNone(scale.detect_reference_scale(self.scene(100, marker_id=3)))
 
 
+class OtherDistress(unittest.TestCase):
+    """Damage outside the four classes is never graded by the rule base."""
+
+    def test_intervention_is_an_inspection(self):
+        for severity in (fe.UNRATED, "Low", "High"):
+            with self.subTest(severity=severity):
+                rec = fe.intervention_for(fe.OTHER_LABEL, severity, "asphalt")
+                self.assertEqual(rec["activity"], "Field inspection required")
+
+    def test_unrated_known_class_is_not_given_a_repair(self):
+        rec = fe.intervention_for("Pothole", fe.UNRATED, "concrete")
+        self.assertEqual(rec["activity"], "Field inspection required")
+
+    def test_priority_waits_for_inspection(self):
+        for density in (0.0, 80.0):
+            with self.subTest(density=density):
+                self.assertEqual(fe.priority_level(fe.UNRATED, density), "Inspection required")
+
+    def test_known_classes_unchanged(self):
+        rec = fe.intervention_for("Pothole", "High", "concrete")
+        self.assertNotEqual(rec["activity"], "Field inspection required")
+
+
 if __name__ == "__main__":
     unittest.main()

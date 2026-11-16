@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/utils/supabase';
-import { SEVERITY, SeverityBadge, StatusLabel, toSeverity, type Severity } from '@/components/Severity';
+import { SEVERITY, SeverityBadge, StatusLabel, isUnrated, toSeverity, type Severity } from '@/components/Severity';
 import type { MapReport } from '@/components/ReportsMap';
 import FixReportModal, { type FixableReport } from '@/components/FixReportModal';
 import Coordinates from '@/components/Coordinates';
@@ -24,7 +24,8 @@ const ReportsMap = dynamic(() => import('@/components/ReportsMap'), {
 const INDEX_COLUMNS =
   'id, lat, lng, damage_type, severity, state, address, uploadtime, userid, corrected_damage_type, corrected_severity, correction_note';
 // The rest of a card, fetched only for the cards on the current pages.
-const DETAIL_COLUMNS = 'id, file_name, confidence, detection_details, observation_details, crack_density_pct, corrected_at';
+const DETAIL_COLUMNS =
+  'id, file_name, confidence, detection_details, observation_details, crack_density_pct, corrected_at, other_subtype, other_note';
 
 interface IndexRow extends MapReport {
   userid: string | null;
@@ -41,7 +42,12 @@ interface Detail {
   observation_details: unknown;
   crack_density_pct: number | null;
   corrected_at: string | null;
+  other_subtype: string | null;
+  other_note: string | null;
 }
+
+/** A severity, Other Distress still waiting for a grade, or everything. */
+type SevFilter = Severity | 'Unrated' | 'All';
 
 type Report = IndexRow & Partial<Detail>;
 
@@ -68,7 +74,7 @@ export default function AdminReports() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   // One severity at a time, or every severity. Applies to the cards and the map.
-  const [sevFilter, setSevFilter] = useState<Severity | 'All'>('All');
+  const [sevFilter, setSevFilter] = useState<SevFilter>('All');
   const [showMap, setShowMap] = useState(true);
   // "Track report": which report the map is following. The nonce lets the
   // same button fly back to the same report after the map was panned away.
@@ -203,7 +209,12 @@ export default function AdminReports() {
   }, [reports, searchQuery]);
 
   const bySeverity = useMemo(
-    () => (sevFilter === 'All' ? filtered : filtered.filter((r) => sevOf(r) === sevFilter)),
+    () =>
+      sevFilter === 'All'
+        ? filtered
+        : sevFilter === 'Unrated'
+          ? filtered.filter(unratedOf)
+          : filtered.filter((r) => sevOf(r) === sevFilter),
     [filtered, sevFilter],
   );
   const unresolved = useMemo(() => bySeverity.filter((r) => r.state !== 'Resolved'), [bySeverity]);
@@ -305,6 +316,7 @@ export default function AdminReports() {
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <h3 className="text-base font-semibold text-fg">
                 {report.corrected_damage_type ?? report.damage_type ?? 'Unclassified'}
+                {report.other_subtype && <span className="font-normal text-fg-muted"> · {report.other_subtype}</span>}
               </h3>
               {/* The admin's verdict leads where one exists; the system's
                   original is shown beside it, never replaced. */}
@@ -405,6 +417,15 @@ export default function AdminReports() {
             </div>
 
             <div className="flex flex-col gap-4 min-w-0">
+              {report.other_subtype && (
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-fg-muted mb-2">Reporter says</h4>
+                  <p className="text-sm text-fg break-words">
+                    <span className="font-semibold">{report.other_subtype}</span>
+                    {report.other_note && <span className="text-fg-soft"> · “{report.other_note}”</span>}
+                  </p>
+                </div>
+              )}
               <div>
                 <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-fg-muted mb-2">Detected distresses</h4>
                 <ul className="flex flex-col divide-y divide-line rounded-xl border border-line">
@@ -461,11 +482,13 @@ export default function AdminReports() {
   // so every button says what picking it would show.
   const queueSev: Record<Severity, number> = { High: 0, Medium: 0, Low: 0 };
   let queueAll = 0;
+  let queueUnrated = 0;
   for (const r of filtered) {
     if ((r.state === 'Resolved') !== isResolvedView) continue;
     queueAll += 1;
     const s = sevOf(r);
     if (s) queueSev[s] += 1;
+    else if (unratedOf(r)) queueUnrated += 1;
   }
   // The map follows the open tab: every page of it, not only the cards on screen.
   // Pins carry the severity the filter used, so a corrected report is not
@@ -475,7 +498,7 @@ export default function AdminReports() {
     [isResolvedView, resolved, unresolved],
   );
   const mapped = mapReports.filter((r) => r.lat != null).length;
-  const pickSeverity = (s: Severity | 'All') => {
+  const pickSeverity = (s: SevFilter) => {
     setSevFilter(s);
     setNeedsPage(1);
     setResolvedPage(1);
@@ -577,14 +600,20 @@ export default function AdminReports() {
                 { key: 'resolved', label: 'Resolved', count: resolved.length },
               ]}
             />
-            <SeverityFilter value={sevFilter} counts={queueSev} total={queueAll} onChange={pickSeverity} />
+            <SeverityFilter
+              value={sevFilter}
+              counts={queueSev}
+              unrated={queueUnrated}
+              total={queueAll}
+              onChange={pickSeverity}
+            />
           </div>
 
           {shown.length === 0 ? (
             <p className="rounded-2xl border border-line bg-surface p-8 text-center text-sm text-fg-muted">
               {sevFilter !== 'All' ? (
                 <>
-                  No {sevFilter.toLowerCase()} severity reports {isResolvedView ? 'resolved' : 'waiting'}.{' '}
+                  No {sevFilter === 'Unrated' ? 'unrated' : `${sevFilter.toLowerCase()} severity`} reports {isResolvedView ? 'resolved' : 'waiting'}.{' '}
                   <button onClick={() => pickSeverity('All')} className="font-semibold text-accent hover:text-accent-hover">
                     Show all
                   </button>
@@ -641,6 +670,8 @@ export default function AdminReports() {
 
 // The admin's corrected severity counts where one exists, as on the cards.
 const sevOf = (r: IndexRow) => toSeverity(r.corrected_severity ?? r.severity);
+// Other Distress no admin has graded yet.
+const unratedOf = (r: IndexRow) => isUnrated(r.corrected_severity ?? r.severity);
 
 const SEV_COLOR: Record<Severity, string> = {
   High: 'var(--sev-high)',
@@ -656,15 +687,18 @@ const SEV_COLOR: Record<Severity, string> = {
 function SeverityFilter({
   value,
   counts,
+  unrated,
   total,
   onChange,
 }: {
-  value: Severity | 'All';
+  value: SevFilter;
   counts: Record<Severity, number>;
+  unrated: number;
   total: number;
-  onChange: (value: Severity | 'All') => void;
+  onChange: (value: SevFilter) => void;
 }) {
-  const options: (Severity | 'All')[] = ['All', 'High', 'Medium', 'Low'];
+  // Unrated only appears while there is Other Distress to grade (or it is picked).
+  const options: SevFilter[] = ['All', 'High', 'Medium', 'Low', ...(unrated > 0 || value === 'Unrated' ? ['Unrated' as const] : [])];
   return (
     <div role="group" aria-label="Filter by severity" className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
       {options.map((s) => {
@@ -679,15 +713,21 @@ function SeverityFilter({
               active ? 'font-semibold text-fg' : 'text-fg-muted hover:text-fg'
             }`}
           >
-            {s !== 'All' && <span className={SEVERITY[s].text}>{SEVERITY[s].icon}</span>}
+            {s === 'Unrated' ? (
+              <span aria-hidden="true" className="w-3 h-3 rounded-full border-[1.5px] border-dashed border-current shrink-0" />
+            ) : (
+              s !== 'All' && <span className={SEVERITY[s].text}>{SEVERITY[s].icon}</span>
+            )}
             {s}
-            <span className="tabular-nums text-fg-faint font-normal">{s === 'All' ? total : counts[s]}</span>
+            <span className="tabular-nums text-fg-faint font-normal">
+              {s === 'All' ? total : s === 'Unrated' ? unrated : counts[s]}
+            </span>
             <span
               aria-hidden="true"
               className={`absolute left-0 right-0 -bottom-0.5 h-0.5 rounded-full origin-left transition-transform duration-300 ${
                 active ? 'scale-x-100' : 'scale-x-0'
               }`}
-              style={{ background: s === 'All' ? 'var(--fg-muted)' : SEV_COLOR[s] }}
+              style={{ background: s === 'All' || s === 'Unrated' ? 'var(--fg-muted)' : SEV_COLOR[s] }}
             />
           </button>
         );

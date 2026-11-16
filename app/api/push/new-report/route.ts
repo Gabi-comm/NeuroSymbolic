@@ -55,7 +55,9 @@ export async function POST(request: Request) {
   webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:oasysph@gmail.com', publicKey, privateKey);
 
   const place = report.road_name || report.barangay || report.address || 'an unknown location';
-  const severity = report.severity ? `${report.severity} severity` : 'New';
+  // Other Distress is filed Unrated: say it needs an inspection, not "Unrated severity".
+  const severity =
+    report.severity === 'Unrated' ? 'Needs inspection' : report.severity ? `${report.severity} severity` : 'New';
   const payload = JSON.stringify({
     title: 'New road distress report',
     body: `${severity} · ${report.damage_type || 'Road distress'} on ${place}`,

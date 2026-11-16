@@ -150,7 +150,9 @@ class ImageRequest(BaseModel):
     # are asphalt ones. Samson Road, the study's main segment, is concrete.
     pavement_type: Literal["concrete", "asphalt"] = fuzzy_engine.DEFAULT_PAVEMENT
 
-SEVERITY_RANK = {"Low": 0, "Medium": 1, "High": 2}
+# Unrated (Other Distress, filed by the reporter, never graded by the rules)
+# ranks below Low, so any graded defect in the same photo still decides.
+SEVERITY_RANK = {fuzzy_engine.UNRATED: -1, "Low": 0, "Medium": 1, "High": 2}
 
 
 def worst_severity(distresses):
@@ -824,6 +826,9 @@ def check_distress(request: ImageRequest, x_api_key: str | None = Header(default
                 "A road was found, but no crack or pothole was detected on it. Move "
                 "closer so the defect is clearly visible, and try again.",
                 road_coverage_pct=round(road_coverage * 100, 2),
+                # The road gate passed, so the reporter may still keep it as
+                # Other Distress: damage outside the four trained classes.
+                can_report_other=True,
             )
 
         defects.sort(key=lambda d: d["confidence"], reverse=True)

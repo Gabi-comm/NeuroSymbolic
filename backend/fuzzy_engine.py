@@ -605,6 +605,21 @@ DEFAULT_INTERVENTION = _rec(
     "No table entry for this defect; a City Engineer should inspect it.",
     "As scheduled", None)
 
+# --- Other Distress (open set) ------------------------------------------------
+# The detector only knows the four classes in data.yaml. Damage outside them
+# (rutting, raveling, a depression, a failed patch...) is filed by the REPORTER
+# as "Other Distress" and is never graded here: every rule above was written
+# for cracks (width, density) or potholes (area), and grading anything else with
+# them would look authoritative while measuring the wrong thing. It is
+# "Unrated" until an admin inspects it and records a severity.
+OTHER_LABEL = "Other Distress"
+UNRATED = "Unrated"
+OTHER_INTERVENTION = _rec(
+    "Field inspection required",
+    "Not one of the four distress types the system grades; a City Engineer "
+    "should identify and rate it on site.",
+    "As scheduled", None)
+
 # Overall priority from the worst severity present and the measured extent.
 PRIORITY_DENSITY_ESCALATION_PCT = 25.0
 
@@ -613,6 +628,8 @@ def intervention_for(label: str, severity: str, pavement: str = DEFAULT_PAVEMENT
     """The DPWH activity, one-line method and response time for one defect."""
     if pavement not in PAVEMENT_TYPES:
         pavement = DEFAULT_PAVEMENT
+    if canonical_label(label) == OTHER_LABEL or severity == UNRATED:
+        return dict(OTHER_INTERVENTION)
     entry = INTERVENTIONS.get(canonical_label(label), {}).get(severity)
     return dict(entry[pavement]) if entry else dict(DEFAULT_INTERVENTION)
 
@@ -623,8 +640,13 @@ def priority_level(worst_severity: str, density_pct: float) -> str:
     Severity sets the floor; widespread extent escalates one step, because a road
     covered in medium-severity distress needs attention sooner than one with a
     single medium defect.
+
+    Unrated (Other Distress only) has no floor to start from, so it is never
+    escalated or guessed: it waits for an inspection.
     """
-    base = {"Low": "Routine", "Medium": "Moderate", "High": "High"}.get(
+    if worst_severity == UNRATED:
+        return "Inspection required"
+    base ={"Low": "Routine", "Medium": "Moderate", "High": "High"}.get(
         worst_severity, "Routine"
     )
 
