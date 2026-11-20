@@ -5,7 +5,6 @@ import Image from 'next/image';
 
 export const INTRO_DONE_EVENT = 'oasys:intro-done';
 
-/** Set by the boot script in app/layout before first paint; see themeBoot. */
 export const introPlaying = () =>
   typeof document !== 'undefined' && document.documentElement.dataset.intro === '1';
 
@@ -14,15 +13,6 @@ const EXIT_MS = 700;
 const WORD = 'OASYS';
 const DOUBLE_TAP_MS = 350;
 
-/**
- * On every page load: the logo pops in with two burst rings and a glow, the
- * name flips up letter by letter with a light sweep, the tagline settles, and
- * an iris closes onto the app. ~3s, never shown under reduced motion.
- *
- * Skipped by a double click or double tap anywhere (or Escape), with no button
- * on screen. Double taps are timed by hand from pointerup, because mobile
- * browsers do not fire dblclick reliably.
- */
 export default function IntroSplash() {
   const [phase, setPhase] = useState<'off' | 'on' | 'exit'>('off');
 
@@ -33,18 +23,14 @@ export default function IntroSplash() {
 
   const skip = useCallback(() => {
     setPhase((p) => (p === 'on' ? 'exit' : p));
-    // Lift the pre-paint navy cover now, so the app shows through the iris.
     delete document.documentElement.dataset.intro;
     window.setTimeout(end, EXIT_MS);
   }, [end]);
 
   useEffect(() => {
     if (!introPlaying()) return;
-    // Reading a flag the pre-paint script set is the point of this effect.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhase('on');
     const t = window.setTimeout(skip, HOLD_MS);
-    // Keyboard users have no double click; Escape does the same.
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') skip();
     };
